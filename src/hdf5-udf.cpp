@@ -29,6 +29,7 @@ using json = nlohmann::json;
 
 /* Lua context */
 lua_State *State;
+static lua_State *State
 
 #define DATA_OFFSET(i)        (void *) (((char *) &State) + i)
 #define NAME_OFFSET(i)        (void *) (((char *) &State) + 100 + i)
@@ -263,6 +264,11 @@ std::vector<DatasetInfo> readHdf5Datasets(hid_t file_id, std::vector<std::string
 
         /* Allocate enough memory so we can read this dataset */
         void *rdata = (void *) malloc(n_elements * H5Tget_size(out.hdf5_datatype));
+        if (! rdata)
+        {
+            fprintf(stderr, "Not enough memory while allocating room for dataset\n");
+            return out;
+        }
 
         /* Read the dataset */
         if (H5Dread(dset_id, out.hdf5_datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata) < 0)
