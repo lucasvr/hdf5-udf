@@ -28,8 +28,7 @@ using namespace std;
 using json = nlohmann::json;
 
 /* Lua context */
-lua_State *State;
-static lua_State *State
+static lua_State *State;
 
 #define DATA_OFFSET(i)        (void *) (((char *) &State) + i)
 #define NAME_OFFSET(i)        (void *) (((char *) &State) + 100 + i)
