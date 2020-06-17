@@ -9,7 +9,6 @@
 local lib = {}
 
 function init(filterpath)
-    print(filterpath)
     local ffi = require("ffi")
     local filterlib = ffi.load(filterpath)
     ffi.cdef[[
