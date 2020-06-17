@@ -105,15 +105,45 @@ extern "C" const char *get_dims(const char *element)
     return NULL;
 }
 
+std::string getFilterPath()
+{
+    std::vector<std::string> paths;
+
+    const char *env = getenv("HDF5_PLUGIN_PATH");
+    if (env)
+    {
+        std::istringstream ss(env);
+        std::copy(std::istream_iterator<std::string>(ss),
+            std::istream_iterator<std::string>(),
+            std::back_inserter(paths));
+    }
+    else
+    {
+        paths.push_back("/usr/local/hdf5/lib/plugin");
+    }
+    for (auto &path: paths) {
+        struct stat statbuf;
+        auto p = path + "/libhdf5-udf.so";
+        if (stat(p.c_str(), &statbuf) == 0)
+            return p;
+    }
+    return "";
+}
+
 bool callLua(
     std::vector<DatasetInfo> &input_datasets, DatasetInfo &output_dataset,
     char *bytecode, long lSize, const char* dtype)
 {
+    std::string filterpath = getFilterPath();
+    if (filterpath.size() == 0)
+    {
+        fprintf(stderr, "Failed to identify path to HDF5-UDF filten\n");
+        return false;
+    }
+
     lua_State *L = luaL_newstate();
     State = L;
 
-    lua_pushcfunction(L, luaopen_os);
-    lua_call(L,0,0);
     lua_pushcfunction(L, luaopen_base);
     lua_call(L,0,0);
     lua_pushcfunction(L, luaopen_math);
@@ -174,14 +204,26 @@ bool callLua(
     }
     if (lua_pcall(L, 0, 0 , 0) != 0)
     {
-        fprintf(stderr, "lua_pcall failed to load bytecode: %s\n", lua_tostring(L, -1));
+        fprintf(stderr, "Failed to load the bytecode: %s\n", lua_tostring(L, -1));
         lua_close(L);
         return false;
     }
+
+    // Initialize the UDF library
+    lua_getglobal(L, "init");
+    lua_pushstring(L, filterpath.c_str());
+    if (lua_pcall(L, 1, 0, 0) != 0)
+    {
+        fprintf(stderr, "Failed to invoke the init callback: %s\n", lua_tostring(L, -1));
+        lua_close(L);
+        return false;
+    }
+
+    // Call the UDF entry point
     lua_getglobal(L, "dynamic_dataset");
     if (lua_pcall(L, 0, 0, 0) != 0)
     {
-        fprintf(stderr, "lua_pcall failed to invoke entry point: %s\n", lua_tostring(L, -1));
+        fprintf(stderr, "Failed to invoke the dynamic_dataset callback: %s\n", lua_tostring(L, -1));
         lua_close(L);
         return false;
     }
