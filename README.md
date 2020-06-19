@@ -115,12 +115,12 @@ $ export HDF5_PLUGIN_PATH=/installation/path/hdf5/lib/plugin
 
 The main program takes as input a few required arguments: the HDF5 file, the
 user-defined Lua script, and the output dataset name/resolution/data type. If
-we were to create a `float32` dataset named "temperature" with 1000x800 cells
+we were to create a `float` dataset named "temperature" with 1000x800 cells
 (and whose Lua script is named "udf.lua") then the following command would do
 it (while appending the result to "myfile.h5"):
 
 ```
-$ hdf5-udf myfile.h5 udf.lua temperature:1000x800:float32
+$ hdf5-udf myfile.h5 udf.lua temperature:1000x800:float
 ```
 
 It is also possible to let the main program infer the output dataset information
