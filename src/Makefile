@@ -2,7 +2,6 @@ DESTDIR        = /usr/local
 
 CXX            = g++
 CXXFLAGS       = $(shell pkg-config --cflags luajit) -fPIC -I. -Wall -O3
-CXXFLAGS      += -DUDF_LUA_PATH=\"$(DESTDIR)/share/hdf5-udf/udf.lua\"
 LDFLAGS        = $(shell pkg-config --libs luajit) -ldl -lm -lhdf5 -Wl,--no-undefined
 
 FILTER_TARGET  = libhdf5-udf.so

@@ -22,11 +22,6 @@
 #include "dataset.h"
 #include "lua.hpp"
 
-#define UDF_LUA_NAME "udf.lua"
-#ifndef UDF_LUA_PATH
-#define UDF_LUA_PATH "/usr/local/share/hdf5-udf/" UDF_LUA_NAME
-#endif
-
 /* Lua context */
 static lua_State *State;
 
