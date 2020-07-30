@@ -1,7 +1,7 @@
 /*
  * HDF5-UDF: User-Defined Functions for HDF5
  *
- * File: main.cpp
+ * File: lua_backend.cpp
  *
  * Lua code parser and bytecode generation/execution.
  */

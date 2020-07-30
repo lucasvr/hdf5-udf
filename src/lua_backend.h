@@ -12,8 +12,6 @@
 
 class LuaBackend : public Backend {
 public:
-    LuaBackend() {}
-
     // Backend name
     std::string name();
 
