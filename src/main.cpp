@@ -3,12 +3,11 @@
  *
  * File: main.cpp
  *
- * Compiles the UDF into a Lua bytecode and embeds it as a
+ * Compiles the UDF into executable form and embeds it as a
  * HDF5 dataset.
  */
 #include <map>
 #include <fstream>
-#include <hdf5.h>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -24,15 +23,9 @@
 #include <fstream>
 
 #include "filter_id.h"
-#include "lua_parser.h"
 #include "dataset.h"
+#include "backend.h"
 #include "json.hpp"
-
-#define UDF_LUA_NAME "udf.lua"
-
-#ifndef UDF_LUA_PATH
-#define UDF_LUA_PATH "/usr/local/share/hdf5-udf/" UDF_LUA_NAME
-#endif
 
 using json = nlohmann::json;
 using namespace std;
@@ -130,134 +123,42 @@ bool dataset_exists(std::string filename, std::string name)
     return exists;
 }
 
-/* Get the Lua template file */
-std::string lua_template_path(const char *argv0)
+/* Get the template file, if one exists for the given backend */
+std::string template_path(std::string backend_extension, std::string argv0)
 {
     /* Look for the file under $(dirname argv0) */
     char tmp[PATH_MAX];
     memset(tmp, 0, sizeof(tmp));
-    if (realpath(argv0, tmp) < 0)
+    if (realpath(argv0.c_str(), tmp) < 0)
     {
-        fprintf(stderr, "Error resolving path %s: %s\n", argv0, strerror(errno));
+        fprintf(stderr, "Error resolving path %s: %s\n", argv0.c_str(), strerror(errno));
         return "";
     }
     char *sep = strrchr(tmp, '/');
     if (! sep)
     {
-        fprintf(stderr, "Error parsing %s: missing / separator\n", argv0);
+        fprintf(stderr, "Error parsing %s: missing / separator\n", argv0.c_str());
         return "";
     }
     *(++sep) = '\0';
     size_t left = PATH_MAX - (sep-tmp) - 1;
-    if (strlen(UDF_LUA_NAME) + 1 > left)
+    if (strlen("udf") + backend_extension.size() + 1 > left)
     {
         fprintf(stderr, "Path component exceeds PATH_MAX\n");
         return "";
     }
-    strcat(sep, UDF_LUA_NAME);
+    strcat(sep, "udf");
+    strcat(sep, backend_extension.c_str());
 
     struct stat statbuf;
     if (stat(tmp, &statbuf) == 0)
     {
-        /* Lua template found */
+        /* Template file found */
         return std::string(tmp);
     }
 
-    /* Fallback: search under the HDF5 plugin directory */
-    if (stat(UDF_LUA_PATH, &statbuf) == -1)
-    {
-        fprintf(stderr, "Failed to access %s: %s\n", UDF_LUA_PATH, strerror(errno));
-        return "";
-    }
-    return std::string(UDF_LUA_PATH);
-}
-
-/* Lua to bytecode */
-std::string create_bytecode(std::string input, std::string output, const char *argv0)
-{
-    std::string bytecode;
-    std::ifstream ifs(input);
-    if (! ifs.is_open())
-    {
-        fprintf(stderr, "Failed to open %s\n", input.c_str());
-        return "";
-    }
-    std::string inputFileBuffer(
-		(std::istreambuf_iterator<char>(ifs)),
-        (std::istreambuf_iterator<char>()  ));
-
-    /* Basic check: does the template file exist? */
-    std::string template_path = lua_template_path(argv0);
-    if (template_path.size() == 0)
-    {
-        fprintf(stderr, "Failed to find Lua template file\n");
-        return "";
-    }
-    std::ifstream ifstr(template_path);
-    std::string udf(
-		(std::istreambuf_iterator<char>(ifstr)),
-        (std::istreambuf_iterator<char>()    ));
-
-    /* Basic check: is the template string present in the template file? */
-    std::string placeholder = "-- user_callback_placeholder";
-    auto start = udf.find(placeholder);
-    if (start == std::string::npos)
-    {
-        fprintf(stderr, "Failed to find placeholder string in %s\n", UDF_LUA_PATH);
-        return "";
-    }
-
-    /* Embed UDF string in the template */
-    auto completeCode = udf.replace(start, placeholder.length(), inputFileBuffer);
-
-    /* Compile the code */
-    std::ofstream tmpfile;
-    char buffer [32];
-    sprintf(buffer, "hdf5-udf-XXXXXX");
-    if (mkstemp(buffer) < 0){
-        fprintf(stderr, "Error creating temporary file.\n");
-        return std::string("");
-    }
-    tmpfile.open (buffer);
-    tmpfile << completeCode.data();
-    tmpfile.flush();
-    tmpfile.close();
-
-    pid_t pid = fork();
-    if (pid == 0)
-    {
-        // Child process
-        char *cmd[] = {
-            (char *) "luajit",
-            (char *) "-O3",
-            (char *) "-b",
-            (char *) buffer,
-            (char *) output.c_str(),
-            (char *) NULL
-        };
-        execvp(cmd[0], cmd);
-    }
-    else if (pid > 0)
-    {
-        // Parent
-        int exit_status;
-        wait4(pid, &exit_status, 0, NULL);
-
-        struct stat statbuf;
-        if (stat(output.c_str(), &statbuf) == 0) {
-            printf("Bytecode has %ld bytes\n", statbuf.st_size);
-
-            std::ifstream data(output, std::ifstream::binary);
-            std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(data), {});
-            bytecode.assign(buffer.begin(), buffer.end());
-
-            unlink(output.c_str());
-        }
-        unlink(buffer);
-        return bytecode;
-    }
-    fprintf(stderr, "Failed to execute luajit\n");
-    return bytecode;
+    /* Bad installation or given backend does not provide a template file */
+    return "";
 }
 
 int main(int argc, char **argv)
@@ -265,12 +166,12 @@ int main(int argc, char **argv)
     if(argc < 3)
     {
         fprintf(stdout,
-            "Syntax: %s <hdf5_file> <lua_file> [--overwrite] [virtual_dataset..]\n\n"
+            "Syntax: %s <hdf5_file> <udf_file> [--overwrite] [virtual_dataset..]\n\n"
             "Options:\n"
             "  hdf5_file                      Input/output HDF5 file\n"
-            "  lua_file                       Lua script with user-defined-function\n"
+            "  udf_file                       File implementing the user-defined-function\n"
             "  virtual_dataset                Virtual dataset(s) to create. See syntax below.\n"
-            "                                 If omitted, dataset names are picked from lua_file\n"
+            "                                 If omitted, dataset names are picked from udf_file\n"
             "                                 and their resolutions/types are set to match the input\n"
             "                                 datasets declared in that same file\n"
             "  --overwrite                    Overwrite existing virtual dataset(s)\n\n"
@@ -294,9 +195,16 @@ int main(int argc, char **argv)
     }
 
     std::string hdf5_file = argv[1];
-    std::string lua_file = argv[2];
+    std::string udf_file = argv[2];
     const int first_dataset_index = 3;
     bool overwrite = false;
+
+    Backend *backend = getBackendByFileExtension(udf_file);
+    if (! backend)
+    {
+        fprintf(stderr, "Could not identify a parser for %s\n", udf_file.c_str());
+        exit(1);
+    }
 
     /* Process virtual (output) datasets given in the command line */
     std::vector<DatasetInfo> virtual_datasets;
@@ -328,8 +236,8 @@ int main(int argc, char **argv)
         virtual_datasets.push_back(info);
     }
 
-    /* Identify virtual dataset name(s) and input dataset(s) that the Lua code depends on */
-    std::vector<std::string> dataset_names = LuaParser(lua_file).parseNames();
+    /* Identify virtual dataset name(s) and input dataset(s) that the UDF code depends on */
+    std::vector<std::string> dataset_names = backend->udfDatasetNames(udf_file);
     std::vector<DatasetInfo> input_datasets;
     for (auto &name: dataset_names)
     {
@@ -394,7 +302,7 @@ int main(int argc, char **argv)
     if (virtual_datasets.size() == 0)
     {
         fprintf(stderr,
-            "Error: all datasets given in the Lua script already exist.\n"
+            "Error: all datasets given in the UDF file already exist.\n"
             "Please explicitly specify the virtual dataset(s) in the command line.\n");
         exit(1);
     }
@@ -442,12 +350,12 @@ int main(int argc, char **argv)
         info.printInfo("Virtual");
     }
 
-    /* Generate a bytecode from the Lua source file */
-    std::string bytecode_file = lua_file + ".bytecode";
-    std::string bytecode = create_bytecode(lua_file, bytecode_file, argv[0]);
+    /* Compile the UDF source file */
+    auto template_file = template_path(backend->extension(), argv[0]);
+    auto bytecode = backend->compile(udf_file, template_file);
     if (bytecode.size() == 0)
     {
-        fprintf(stderr, "Failed to create bytecode file\n");
+        fprintf(stderr, "Failed to compile UDF file\n");
         exit(1);
     }
 
@@ -523,7 +431,8 @@ int main(int argc, char **argv)
         jas["output_resolution"] = info.dimensions;
         jas["output_datatype"] = info.datatype;
         jas["input_datasets"] = input_dataset_names;
-        jas["lua_bytecode_size"] = bytecode.length();
+        jas["bytecode_size"] = bytecode.length();
+        jas["backend"] = backend->name();
 
         std::string jas_str = jas.dump();
         size_t payload_size = jas_str.length() + bytecode.size() + 1;

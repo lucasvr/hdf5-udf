@@ -3,15 +3,15 @@ DESTDIR        = /usr/local
 CXX            = g++
 CXXFLAGS       = $(shell pkg-config --cflags luajit) -fPIC -I. -Wall -O3
 CXXFLAGS      += -DUDF_LUA_PATH=\"$(DESTDIR)/share/hdf5-udf/udf.lua\"
-LDFLAGS        = -ldl -lm -lhdf5 -Wl,--no-undefined
+LDFLAGS        = $(shell pkg-config --libs luajit) -ldl -lm -lhdf5 -Wl,--no-undefined
 
 FILTER_TARGET  = libhdf5-udf.so
-FILTER_SOURCES = hdf5-udf.cpp
+FILTER_SOURCES = hdf5-udf.cpp backend.cpp lua_backend.cpp dataset.cpp
 FILTER_OBJS    = $(patsubst %.cpp,%.o, $(FILTER_SOURCES))
-FILTER_LDFLAGS = $(shell pkg-config --libs luajit) -shared
+FILTER_LDFLAGS = -shared
 
 BIN_TARGETS    = hdf5-udf
-BIN_SOURCES    = main.cpp lua_parser.cpp
+BIN_SOURCES    = main.cpp backend.cpp lua_backend.cpp dataset.cpp
 BIN_OBJS       = $(patsubst %.cpp,%.o, $(BIN_SOURCES))
 BIN_CXXFLAGS   = -Wall
 

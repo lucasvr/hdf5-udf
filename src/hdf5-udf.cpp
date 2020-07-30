@@ -3,7 +3,7 @@
  *
  * File: hdf5-udf.cpp
  *
- * HDF5 filter callbacks and main interface with the Lua API.
+ * HDF5 filter callbacks and main interface with the backends.
  */
 #include <dirent.h>
 #include <H5PLextern.h>
@@ -20,90 +20,12 @@
 
 #include "filter_id.h"
 #include "dataset.h"
+#include "backend.h"
 #include "debug.h"
-#include "lua.hpp"
 #include "json.hpp"
 
 using namespace std;
 using json = nlohmann::json;
-
-/* Lua context */
-static lua_State *State;
-
-#define DATA_OFFSET(i)        (void *) (((char *) &State) + i)
-#define NAME_OFFSET(i)        (void *) (((char *) &State) + 100 + i)
-#define DIMS_OFFSET(i)        (void *) (((char *) &State) + 200 + i)
-#define TYPE_OFFSET(i)        (void *) (((char *) &State) + 300 + i)
-#define CAST_OFFSET(i)        (void *) (((char *) &State) + 400 + i)
-
-extern "C" int index_of(const char *element)
-{
-    for (int index=0; index<100; ++index) {
-        /* Set register key to get datasets name vector */
-        lua_pushlightuserdata(State, NAME_OFFSET(index));
-        lua_gettable(State, LUA_REGISTRYINDEX);
-        const char *name = lua_tostring(State, -1);
-        if (! strcmp(name, element))
-            return index;
-        else if (strlen(name) == 0)
-            break;
-    }
-    fprintf(stderr, "Error: dataset %s not found\n", element);
-    return -1;
-}
-
-/* Functions exported to the Lua library (udf.lua) */
-extern "C" void *get_data(const char *element)
-{
-    int index = index_of(element);
-    if (index >= 0)
-    {
-        /* Get datasets contents */
-        lua_pushlightuserdata(State, DATA_OFFSET(index)); 
-        lua_gettable(State, LUA_REGISTRYINDEX);
-        return lua_touserdata(State, -1);
-    }
-    return NULL;
-}
-
-extern "C" const char *get_type(const char *element)
-{
-    int index = index_of(element);
-    if (index >= 0)
-    {
-        /* Set register key to get dataset type */
-        lua_pushlightuserdata(State, TYPE_OFFSET(index));
-        lua_gettable(State, LUA_REGISTRYINDEX);
-        return lua_tostring(State, -1);
-    }
-    return NULL;
-}
-
-extern "C" const char *get_cast(const char *element)
-{
-    int index = index_of(element);
-    if (index >= 0)
-    {
-        /* Set register key to get dataset type */
-        lua_pushlightuserdata(State, CAST_OFFSET(index));
-        lua_gettable(State, LUA_REGISTRYINDEX);
-        return lua_tostring(State, -1);
-    }
-    return NULL;
-}
-
-extern "C" const char *get_dims(const char *element)
-{
-    int index = index_of(element);
-    if (index >= 0)
-    {
-        /* Set register key to get dataset size */
-        lua_pushlightuserdata(State, DIMS_OFFSET(index));
-        lua_gettable(State, LUA_REGISTRYINDEX);
-        return lua_tostring(State, -1);
-    }
-    return NULL;
-}
 
 std::string getFilterPath()
 {
@@ -128,108 +50,6 @@ std::string getFilterPath()
             return p;
     }
     return "";
-}
-
-bool callLua(
-    std::vector<DatasetInfo> &input_datasets, DatasetInfo &output_dataset,
-    char *bytecode, long lSize, const char* dtype)
-{
-    std::string filterpath = getFilterPath();
-    if (filterpath.size() == 0)
-    {
-        fprintf(stderr, "Failed to identify path to HDF5-UDF filten\n");
-        return false;
-    }
-
-    lua_State *L = luaL_newstate();
-    State = L;
-
-    lua_pushcfunction(L, luaopen_base);
-    lua_call(L,0,0);
-    lua_pushcfunction(L, luaopen_math);
-    lua_call(L,0,0);
-    lua_pushcfunction(L, luaopen_string);
-    lua_call(L,0,0);
-    lua_pushcfunction(L, luaopen_ffi);
-    lua_call(L,0,0);
-    lua_pushcfunction(L, luaopen_jit);
-    lua_call(L,0,0);
-    lua_pushcfunction(L, luaopen_package);
-    lua_call(L,0,0);
-    lua_pushcfunction(L, luaopen_table);
-    lua_call(L,0,0);
-
-    DatasetInfo empty_entry;
-    std::vector<DatasetInfo> dataset_info;
-    dataset_info.push_back(output_dataset);
-    dataset_info.insert(
-        dataset_info.end(), input_datasets.begin(), input_datasets.end());
-    dataset_info.push_back(empty_entry);
-
-    /* Populate vector of dataset names, sizes, and types */
-    for (size_t i=0; i<dataset_info.size(); ++i)
-    {
-        /* Grid */
-        lua_pushlightuserdata(L, DATA_OFFSET(i));
-        lua_pushlightuserdata(L, (void *) dataset_info[i].data);
-        lua_settable(L, LUA_REGISTRYINDEX);
-
-        /* Name */
-        lua_pushlightuserdata(L, NAME_OFFSET(i));
-        lua_pushstring(L, dataset_info[i].name.c_str());
-        lua_settable(L, LUA_REGISTRYINDEX);
-
-        /* Dimensions */
-        lua_pushlightuserdata(L, DIMS_OFFSET(i));
-        lua_pushstring(L, dataset_info[i].dimensions_str.c_str());
-        lua_settable(L, LUA_REGISTRYINDEX);
-
-        /* Type */
-        lua_pushlightuserdata(L, TYPE_OFFSET(i));
-        lua_pushstring(L, dataset_info[i].getDatatype());
-        lua_settable(L, LUA_REGISTRYINDEX);
-
-        /* Type, used for casting purposes */
-        lua_pushlightuserdata(L, CAST_OFFSET(i));
-        lua_pushstring(L, dataset_info[i].getCastDatatype());
-        lua_settable(L, LUA_REGISTRYINDEX);
-    }
-
-    int retValue = luaL_loadbuffer(L, bytecode, lSize, "hdf5_udf_bytecode");
-    if (retValue != 0)
-    {
-        fprintf(stderr, "luaL_loadbuffer failed: %s\n", lua_tostring(L, -1));
-        lua_close(L);
-        return false;
-    }
-    if (lua_pcall(L, 0, 0 , 0) != 0)
-    {
-        fprintf(stderr, "Failed to load the bytecode: %s\n", lua_tostring(L, -1));
-        lua_close(L);
-        return false;
-    }
-
-    // Initialize the UDF library
-    lua_getglobal(L, "init");
-    lua_pushstring(L, filterpath.c_str());
-    if (lua_pcall(L, 1, 0, 0) != 0)
-    {
-        fprintf(stderr, "Failed to invoke the init callback: %s\n", lua_tostring(L, -1));
-        lua_close(L);
-        return false;
-    }
-
-    // Call the UDF entry point
-    lua_getglobal(L, "dynamic_dataset");
-    if (lua_pcall(L, 0, 0, 0) != 0)
-    {
-        fprintf(stderr, "Failed to invoke the dynamic_dataset callback: %s\n", lua_tostring(L, -1));
-        lua_close(L);
-        return false;
-    }
-    lua_close(L);
-
-    return true;
 }
 
 /* Retrieve the HDF5 file handle associated with a given dataset name */
@@ -346,30 +166,6 @@ std::vector<DatasetInfo> readHdf5Datasets(hid_t file_id, std::vector<std::string
     return out;
 }
 
-void udf(
-    std::vector<DatasetInfo> &input_datasets, DatasetInfo &output_dataset,
-    size_t *buf_size, void **buf, size_t &nbytes, char *bytecode, long lSize, const char *dtype)
-{
-    Benchmark benchmark;
-    auto result = output_dataset.data;
-    auto n_elements = output_dataset.getGridSize();
-    auto storage_size = output_dataset.getStorageSize();
-
-    bool success = callLua(input_datasets, output_dataset, bytecode, lSize, dtype);
-    if (! success)
-    {
-        nbytes = 0;
-    } 
-    else 
-    {
-        free(*buf);
-        *buf = (void *) result;
-        *buf_size = n_elements * storage_size;
-        nbytes = n_elements * storage_size;
-        benchmark.print("Call to user-defined function");
-    }
-}
-
 static size_t
 H5Z_udf_filter_callback(unsigned int flags, size_t cd_nelmts,
 const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
@@ -380,11 +176,27 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         json jas = json::parse(json_string);
 
         /* Retrieve metadata stored in the JSON payload */
-        int lSize = jas["lua_bytecode_size"].get<int>();
+        int bytecode_size = jas["bytecode_size"].get<int>();
         auto names = jas["input_datasets"].get<std::vector<std::string>>();
         auto datatype = jas["output_datatype"].get<std::string>();
         auto resolution = jas["output_resolution"].get<std::vector<hsize_t>>();
         auto output_name = jas["output_dataset"].get<std::string>();
+        auto backend_name = jas["backend"].get<std::string>();
+
+        auto backend = getBackendByName(backend_name);
+        if (! backend)
+        {
+            fprintf(stderr, "No backend has been found to execute %s code\n",
+                backend_name.c_str());
+            return 0;
+        }
+
+        auto filterpath = getFilterPath();
+        if (filterpath.size() == 0)
+        {
+            fprintf(stderr, "Failed to identify path to HDF5-UDF filter\n");
+            return 0;
+        }
 
         /* Workaround for lack of API to retrieve the HDF5 file handle from the filter callback */
         bool handle_from_procfs = false;
@@ -401,13 +213,31 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         if (! output_dataset.data)
         {
             fprintf(stderr, "Not enough memory allocating output grid\n");
+            if (handle_from_procfs)
+                H5Fclose(file_id);
             return 0;
         }
 
-        /* Invoke the Lua interpreter to execute the user-defined function */
+        /* Execute the user-defined function */
+        Benchmark benchmark;
         auto dtype = output_dataset.getCastDatatype();
-        char *bytecode = (char *)(((char *) *buf) + *buf_size - lSize);
-        udf(input_datasets, output_dataset, buf_size, buf, nbytes, bytecode, lSize, dtype);
+        char *bytecode = (char *)(((char *) *buf) + *buf_size - bytecode_size);
+        if (! backend->run(
+            filterpath,input_datasets, output_dataset, dtype, bytecode, bytecode_size))
+        {
+            nbytes = 0;
+        } 
+        else 
+        {
+            auto n_elements = output_dataset.getGridSize();
+            auto storage_size = output_dataset.getStorageSize();
+
+            free(*buf);
+            *buf = (void *) output_dataset.data;
+            *buf_size = n_elements * storage_size;
+            nbytes = n_elements * storage_size;
+            benchmark.print("Call to user-defined function");
+        }
 
         /* Release memory used by auxiliary datasets */
         for (size_t i=0; i<input_datasets.size(); ++i)
@@ -420,8 +250,8 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
     {
         std::string json_string((const char *) *buf);
         json jas = json::parse(json_string);
-        int lSize = jas["lua_bytecode_size"].get<int>();
-        nbytes = json_string.length() + lSize + 1;
+        int bytecode_size = jas["bytecode_size"].get<int>();
+        nbytes = json_string.length() + bytecode_size + 1;
         *buf_size = nbytes;
     }
 
