@@ -29,7 +29,7 @@ int main(int argc, char **argv)
 
     for (int count=1; count<=dataset_count; ++count)
     {
-        const int dim0 = 50, dim1 = 50;
+        const int dim0 = 100, dim1 = 50;
         int data[dim0][dim1];
         for (int i=0; i<dim0; ++i)
             for (int j=0; j<dim1; ++j)
