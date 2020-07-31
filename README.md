@@ -4,15 +4,13 @@ HDF5-UDF is a mechanism to dynamically generate HDF5 datasets through
 user-defined functions written in Lua. UDF is compiled into bytecode
 form using LuaJIT and the result is embedded into HDF5. A supporting
 library gives access to existing datasets from Lua code so that data
-analysis and derivation of other data can be produced.
-
-Access to HDF5 is made through Foreign Function Interfaces (FFIs),
-meaning that there is no measurable overhead when accessing input
-and output datasets from Lua.
+analysis and derivation of other data can be produced. Access to HDF5
+is made through Foreign Function Interfaces (FFIs), meaning that there
+is no measurable overhead when accessing input and output datasets from Lua.
 
 HDF5-UDF also allows user-defined-functions to be written in C/C++.
-Such functions are compiled into shared libraries and embedded into
-HDF5 just like in the LuaJIT backend. The difference is that, unlike
+Such functions are compiled into shared libraries, compressed, and embedded
+into HDF5 just like in the LuaJIT backend. The difference is that, unlike
 a LuaJIT bytecode, shared libraries are compiled to the target
 architecture, hence are not as portable.
 
