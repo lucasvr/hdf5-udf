@@ -11,7 +11,6 @@
  * data types are determined to be the same as that of the
  * input datasets, Dataset1 and Dataset2.
  */
-#include <stdio.h>
 
 extern "C" void dynamic_dataset()
 {
