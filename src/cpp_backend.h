@@ -37,6 +37,12 @@ public:
 private:
     // Write a data buffer to a temporary file on disk
     std::string writeToDisk(const char *data, size_t size, std::string extension);
+
+    // Compress a data buffer
+    std::string compressBuffer(const char *data, size_t usize);
+
+    // Decompress a data buffer
+    std::string decompressBuffer(const char *data, size_t csize);
 };
 
 #endif /* __cpp_backend_h */

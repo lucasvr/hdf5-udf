@@ -23,6 +23,7 @@
 #include <algorithm>
 #include "cpp_backend.h"
 #include "dataset.h"
+#include "miniz.h"
 
 /* This backend's name */
 std::string CppBackend::name()
@@ -126,6 +127,7 @@ std::string CppBackend::compile(std::string udf_file, std::string template_file)
         int exit_status;
         wait4(pid, &exit_status, 0, NULL);
 
+        // Read generated shared library
         struct stat statbuf;
         if (stat(output.c_str(), &statbuf) == 0) {
             std::ifstream data(output, std::ifstream::binary);
@@ -134,10 +136,54 @@ std::string CppBackend::compile(std::string udf_file, std::string template_file)
             unlink(output.c_str());
         }
         unlink(cpp_file.c_str());
-        return bytecode;
+
+        // Compress the data
+        return compressBuffer(bytecode.data(), bytecode.size());
     }
     fprintf(stderr, "Failed to execute g++\n");
     return bytecode;
+}
+
+/* Compress the shared library object and return the result as a string */
+std::string CppBackend::compressBuffer(const char *data, size_t usize)
+{
+    uint64_t csize = mz_compressBound(usize);
+    std::string compressed;
+    compressed.resize(csize);
+
+    auto status = mz_compress(
+        (uint8_t *) compressed.data(), &csize,
+        (const uint8_t *) data, usize);
+    if (status != Z_OK)
+    {
+        fprintf(stderr, "Failed to compress input buffer\n");
+        return "";
+    }
+    memcpy(&compressed[csize], &usize, sizeof(uint64_t));
+    compressed.resize(csize + sizeof(uint64_t));
+    return compressed;
+}
+
+/* Decompress the shared library object and return the result as a string */
+std::string CppBackend::decompressBuffer(const char *data, size_t csize)
+{
+    /* Get original file size */
+    uint64_t usize;
+    memcpy(&usize, &data[csize-sizeof(uint64_t)], sizeof(uint64_t));
+    csize -= sizeof(uint64_t);
+
+    std::string uncompressed;
+    uncompressed.resize(usize);
+
+    auto status = mz_uncompress(
+        (uint8_t *) uncompressed.data(), &usize,
+        (const uint8_t *) data, csize);
+    if (status != Z_OK)
+    {
+        fprintf(stderr, "Failed to uncompress shared library object: %d\n", status);
+        return "";
+    }
+    return uncompressed;
 }
 
 /* Helper class to manage calls to dlopen and dlsym */
@@ -185,11 +231,19 @@ bool CppBackend::run(
     const char *sharedlib_data,
     size_t sharedlib_data_size)
 {
+    /* Decompress the shared library */
+    std::string decompressed_shlib = decompressBuffer(sharedlib_data, sharedlib_data_size);
+    if (decompressed_shlib.size() == 0)
+    {
+        fprintf(stderr, "Will not be able to load the UDF function\n");
+        return false;
+    }
+
     /*
      * Unfortunately we have to make a trip to disk so we can dlopen()
      * and dlsym() the function we are looking for in a portable way.
      */
-    auto so_file = writeToDisk(sharedlib_data, sharedlib_data_size, ".so");
+    auto so_file = writeToDisk(decompressed_shlib.data(), decompressed_shlib.size(), ".so");
     if (so_file.size() == 0)
     {
         fprintf(stderr, "Will not be able to load the UDF function\n");

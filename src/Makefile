@@ -4,13 +4,15 @@ CXX            = g++
 CXXFLAGS       = $(shell pkg-config --cflags luajit) -fPIC -I. -Wall -O3 -g -ggdb
 LDFLAGS        = $(shell pkg-config --libs luajit) -ldl -lm -lhdf5 -Wl,--no-undefined
 
+COMMON_SOURCES = backend.cpp lua_backend.cpp cpp_backend.cpp dataset.cpp miniz.cpp
+
 FILTER_TARGET  = libhdf5-udf.so
-FILTER_SOURCES = hdf5-udf.cpp backend.cpp lua_backend.cpp cpp_backend.cpp dataset.cpp
+FILTER_SOURCES = $(COMMON_SOURCES) hdf5-udf.cpp
 FILTER_OBJS    = $(patsubst %.cpp,%.o, $(FILTER_SOURCES))
 FILTER_LDFLAGS = -shared
 
 BIN_TARGETS    = hdf5-udf
-BIN_SOURCES    = main.cpp backend.cpp lua_backend.cpp cpp_backend.cpp dataset.cpp
+BIN_SOURCES    = $(COMMON_SOURCES) main.cpp
 BIN_OBJS       = $(patsubst %.cpp,%.o, $(BIN_SOURCES))
 BIN_CXXFLAGS   = -Wall
 
