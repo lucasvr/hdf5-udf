@@ -14,7 +14,7 @@ functions to interface with HDF5 datasets:
 - `lib.getData("DatasetName")`: fetches DatasetName from the HDF5
    file and loads it into memory
 - `lib.getSize("DatasetName")`: number of elements in DatasetName
-- `lib.getType("DatasetType")`: dataset type of DatasetName. See
+- `lib.getType("DatasetName")`: dataset type of DatasetName. See
    below for a list of supported dataset types.
 
 The user-provided function must be named `dynamic_dataset`. That
