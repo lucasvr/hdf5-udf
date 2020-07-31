@@ -1,7 +1,7 @@
 --
 -- HDF5-UDF: User-Defined Functions for HDF5
 --
--- File: udf.lua
+-- File: udf_template.lua
 --
 -- HDF5 filter callbacks and main interface with the Lua API.
 --

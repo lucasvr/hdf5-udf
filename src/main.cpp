@@ -126,36 +126,43 @@ bool dataset_exists(std::string filename, std::string name)
 /* Get the template file, if one exists for the given backend */
 std::string template_path(std::string backend_extension, std::string argv0)
 {
-    /* Look for the file under $(dirname argv0) */
-    char tmp[PATH_MAX];
-    memset(tmp, 0, sizeof(tmp));
-    if (realpath(argv0.c_str(), tmp) < 0)
+    char dirname_argv0[PATH_MAX], tmp[PATH_MAX];
+    memset(dirname_argv0, 0, sizeof(dirname_argv0));
+    if (realpath(argv0.c_str(), dirname_argv0) < 0)
     {
         fprintf(stderr, "Error resolving path %s: %s\n", argv0.c_str(), strerror(errno));
         return "";
     }
-    char *sep = strrchr(tmp, '/');
+    char *sep = strrchr(dirname_argv0, '/');
     if (! sep)
     {
         fprintf(stderr, "Error parsing %s: missing / separator\n", argv0.c_str());
         return "";
     }
-    *(++sep) = '\0';
-    size_t left = PATH_MAX - (sep-tmp) - 1;
-    if (strlen("udf") + backend_extension.size() + 1 > left)
+    *(sep) = '\0';
+
+    /* Look for the file under $(dirname argv0) */
+    struct stat statbuf;
+    int n = snprintf(tmp, sizeof(tmp)-1, "%s/udf_template%s",
+        dirname_argv0, backend_extension.c_str());
+    if (static_cast<size_t>(n) >= sizeof(tmp)-1)
     {
         fprintf(stderr, "Path component exceeds PATH_MAX\n");
         return "";
     }
-    strcat(sep, "udf");
-    strcat(sep, backend_extension.c_str());
-
-    struct stat statbuf;
     if (stat(tmp, &statbuf) == 0)
-    {
-        /* Template file found */
         return std::string(tmp);
+
+    /* Look for the file under $(dirname argv0)/../share/hdf5-udf */
+    n = snprintf(tmp, sizeof(tmp)-1, "%s/../share/hdf5-udf/udf_template%s",
+        dirname_argv0, backend_extension.c_str());
+    if (static_cast<size_t>(n) >= sizeof(tmp)-1)
+    {
+        fprintf(stderr, "Path component exceeds PATH_MAX\n");
+        return "";
     }
+    if (stat(tmp, &statbuf) == 0)
+        return std::string(tmp);
 
     /* Bad installation or given backend does not provide a template file */
     return "";
@@ -205,6 +212,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "Could not identify a parser for %s\n", udf_file.c_str());
         exit(1);
     }
+    printf("Backend: %s\n", backend->name().c_str());
 
     /* Process virtual (output) datasets given in the command line */
     std::vector<DatasetInfo> virtual_datasets;

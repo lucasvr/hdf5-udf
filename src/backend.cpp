@@ -7,6 +7,7 @@
  */
 #include <algorithm>
 #include "backend.h"
+#include "cpp_backend.h"
 #include "lua_backend.h"
 
 // Get a backend by their name (e.g., "LuaJIT")
@@ -14,6 +15,8 @@ Backend *getBackendByName(std::string name)
 {
     if (name.compare("LuaJIT") == 0)
         return static_cast<Backend *>(new LuaBackend());
+    else if (name.compare("C++") == 0)
+        return static_cast<Backend *>(new CppBackend());
     return NULL;
 }
 
@@ -35,5 +38,7 @@ Backend *getBackendByFileExtension(std::string name)
     auto ext = name.substr(sep);
     if (sameString(ext, ".lua"))
         return static_cast<Backend *>(new LuaBackend());
+    else if (sameString(ext, ".cpp"))
+        return static_cast<Backend *>(new CppBackend());
     return NULL;
 }
