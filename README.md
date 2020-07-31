@@ -94,13 +94,11 @@ Please refer to their source code for build instructions and further details.
 
 # Building the code
 
-Unless aiming at installing the software at '/usr/local', the installation
-prefix must be set at *compile time* so that the paths to the HDF5 filter
-and the Lua code template can be found at runtime. It also needs to be provided
-to the *install target* so that files can be copied to the proper location.
+Simply run `make` followed by `make install`, optionally providing an alternative
+destination directory other than `/usr/local`:
 
 ```
-$ make DESTDIR=/installation/path
+$ make
 $ make install DESTDIR=/installation/path
 ```
 
