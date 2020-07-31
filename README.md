@@ -8,12 +8,21 @@ analysis and derivation of other data can be produced.
 
 Access to HDF5 is made through Foreign Function Interfaces (FFIs),
 meaning that there is no measurable overhead when accessing input
-and output datasets from Lua. The API provides the following simple
+and output datasets from Lua.
+
+HDF5-UDF also allows user-defined-functions to be written in C/C++.
+Such functions are compiled into shared libraries and embedded into
+HDF5 just like in the LuaJIT backend. The difference is that, unlike
+a LuaJIT bytecode, shared libraries are compiled to the target
+architecture, hence are not as portable.
+
+The Lua and C/C++ APIs are identical and provide the following simple
 functions to interface with HDF5 datasets:
 
 - `lib.getData("DatasetName")`: fetches DatasetName from the HDF5
    file and loads it into memory
-- `lib.getSize("DatasetName")`: number of elements in DatasetName
+- `lib.getDims("DatasetName")`: number of dimensions in DatasetName
+   and their sizes
 - `lib.getType("DatasetName")`: dataset type of DatasetName. See
    below for a list of supported dataset types.
 
@@ -69,6 +78,20 @@ function dynamic_dataset()
 end
 ```
 
+## Same user-defined-function as before, but written in C++
+```
+extern "C" void dynamic_dataset()
+{
+    auto a_data = lib.getData<int>("A");
+    auto b_data = lib.getData<int>("B");
+    auto c_data = lib.getData<int>("C");
+    auto n = lib.getDims("C")[0] * lib.getDims("C")[1];
+
+    for (size_t i=0; i<n; ++i)
+        c_data[i] = a_data[i] + b_data[i];
+}
+```
+
 ## Declare dynamic datasets "B" and "C" as variations of dataset "A"
 ```
 function dynamic_dataset()
@@ -91,6 +114,11 @@ end
 The [examples](https://github.com/lucasvr/hdf5-udf/tree/master/examples)
 directory holds a collection of scripts that can be readily compiled and tested.
 Please refer to their source code for build instructions and further details.
+
+Also, make sure to read the template files for
+[Lua](https://github.com/lucasvr/hdf5-udf/blob/master/src/udf_template.lua) and
+[C/C++](https://github.com/lucasvr/hdf5-udf/blob/master/src/udf_template.cpp)
+to learn more about the APIs behind the `lib` interface.
 
 # Building the code
 
