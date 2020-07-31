@@ -11,6 +11,7 @@ all: $(TARGET)
 files: $(TARGET)
 	./$(TARGET) simple_vector.h5
 	./$(TARGET) sine_wave.h5
+	./$(TARGET) socket.h5
 	./$(TARGET) add_datasets.h5 2
 
 clean:
