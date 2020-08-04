@@ -1,12 +1,14 @@
 /*
  * Socket example: retrieves the Linux logo bitmap from the internet
- * using plain HTTP. The results are better seen on QGIS or on another
- * graphical user interface.
+ * using plain HTTP. 
  *
  * To embed this dataset in an existing HDF5 file, run:
  *
  * $ make files
  * $ hdf5-udf example-socket.h5 example-socket.cpp Tux:60x80:uint16
+ *
+ * To check its output you can use our readh5 utility:
+ * $ readh5 example-socket.h5 Tux
  */
 
 #include <stdio.h>

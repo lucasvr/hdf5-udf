@@ -2,22 +2,28 @@ CXX        = g++
 LDFLAGS    = -lhdf5
 CXXFLAGS   = -O3 -Wall
 
-TARGET     = createh5
-SOURCES    = createh5.cpp
-OBJS       = $(patsubst %.cpp,%.o, $(SOURCES))
+CREATE_BIN = createh5
+CREATE_SRC = createh5.cpp
+CREATE_OBJ = $(patsubst %.cpp,%.o, $(CREATE_SRC))
+READ_BIN   = readh5
+READ_SRC   = readh5.cpp
+READ_OBJ   = $(patsubst %.cpp,%.o, $(READ_SRC))
 
-all: $(TARGET)
+all: $(CREATE_BIN) $(READ_BIN)
 
-files: $(TARGET)
-	./$(TARGET) example-simple_vector.h5
-	./$(TARGET) example-sine_wave.h5
-	./$(TARGET) example-socket.h5
-	./$(TARGET) example-add_datasets.h5 2
+files: $(CREATE_BIN)
+	./$(CREATE_BIN) example-simple_vector.h5
+	./$(CREATE_BIN) example-sine_wave.h5
+	./$(CREATE_BIN) example-socket.h5
+	./$(CREATE_BIN) example-add_datasets.h5 2
 
 clean:
-	rm -f $(TARGET) *.o
+	rm -f $(CREATE_BIN) $(READ_BIN) *.o
 
-$(TARGET): $(OBJS)
+$(CREATE_BIN): $(CREATE_OBJ)
+	$(CXX) $^ -o $@ $(LDFLAGS)
+
+$(READ_BIN): $(READ_OBJ)
 	$(CXX) $^ -o $@ $(LDFLAGS)
 
 $(OBJS):
