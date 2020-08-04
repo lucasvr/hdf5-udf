@@ -3,7 +3,7 @@
 --
 -- To embed it in an existing HDF5 file, run:
 -- $ make files
--- $ hdf5-udf sine_wave.h5 sine_wave.lua SineWave:100x10:int32
+-- $ hdf5-udf example-sine_wave.h5 example-sine_wave.lua SineWave:100x10:int32
 --
 function dynamic_dataset()
     local udf_data = lib.getData("SineWave")

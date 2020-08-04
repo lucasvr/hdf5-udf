@@ -3,7 +3,7 @@
 --
 -- To embed it in an existing HDF5 file, run:
 -- $ make files
--- $ hdf5-udf simple_vector.h5 simple_vector.lua Simple:500:float
+-- $ hdf5-udf example-simple_vector.h5 example-simple_vector.lua Simple:500:float
 
 function dynamic_dataset()
     local udf_data = lib.getData("Simple")

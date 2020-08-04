@@ -3,7 +3,7 @@
 --
 -- To embed it in an existing HDF5 file, run:
 -- $ make files
--- $ hdf5-udf add_datasets.h5 add_datasets.lua
+-- $ hdf5-udf example-add_datasets.h5 example-add_datasets.lua
 --
 -- Note the absence of an output Dataset name in the call to
 -- hdf5-udf: the tool determines it based on the calls to

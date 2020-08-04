@@ -9,10 +9,10 @@ OBJS       = $(patsubst %.cpp,%.o, $(SOURCES))
 all: $(TARGET)
 
 files: $(TARGET)
-	./$(TARGET) simple_vector.h5
-	./$(TARGET) sine_wave.h5
-	./$(TARGET) socket.h5
-	./$(TARGET) add_datasets.h5 2
+	./$(TARGET) example-simple_vector.h5
+	./$(TARGET) example-sine_wave.h5
+	./$(TARGET) example-socket.h5
+	./$(TARGET) example-add_datasets.h5 2
 
 clean:
 	rm -f $(TARGET) *.o

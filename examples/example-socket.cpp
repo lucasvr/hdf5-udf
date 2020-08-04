@@ -6,7 +6,7 @@
  * To embed this dataset in an existing HDF5 file, run:
  *
  * $ make files
- * $ hdf5-udf socket.h5 socket.cpp Tux:60x80:uint16
+ * $ hdf5-udf example-socket.h5 example-socket.cpp Tux:60x80:uint16
  */
 
 #include <stdio.h>
