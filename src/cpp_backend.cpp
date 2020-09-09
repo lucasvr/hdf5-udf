@@ -1,7 +1,7 @@
 /*
  * HDF5-UDF: User-Defined Functions for HDF5
  *
- * File: main.cpp
+ * File: cpp_backend.cpp
  *
  * C++ code parser and shared library generation/execution.
  */

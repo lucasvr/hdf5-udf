@@ -1,7 +1,7 @@
 /*
  * HDF5-UDF: User-Defined Functions for HDF5
  *
- * File: CppBackend.h
+ * File: cpp_backend.h
  *
  * Interfaces for C++ code parser and shared library generation/execution.
  */
