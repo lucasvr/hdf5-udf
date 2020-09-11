@@ -5,7 +5,7 @@
  * To embed this dataset in an existing HDF5 file, run:
  *
  * $ make files
- * $ hdf5-udf example-socket.h5 example-socket.cpp Tux:60x80:uint16
+ * $ hdf5-udf example-socket.h5 example-socket.cpp Tux:60x80:int32
  *
  * To check its output you can use our readh5 utility:
  * $ readh5 example-socket.h5 Tux
@@ -28,7 +28,7 @@ ssize_t retrieveRemoteFile(char *pbm_data, ssize_t max_size);
 extern "C" void dynamic_dataset()
 {
     // UDF data and its dimensions
-    auto udf_data = lib.getData<uint16_t>("Tux");
+    auto udf_data = lib.getData<int32_t>("Tux");
     auto udf_dims = lib.getDims("Tux");
 
     // Retrieve file over plain HTTP

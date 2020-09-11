@@ -5,7 +5,7 @@
  *
  * Dumps a HDF5 dataset to stdout. This utility has been written as a visualization
  * helper for the dataset produced by example-socket.cpp. It may work with other
- * datasets too, as long as they're small enough and that they're encoded as uint16.
+ * datasets too, as long as they're small enough and that they're encoded as int32.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,9 +37,9 @@ int main(int argc, char **argv)
     }
 
 	hid_t type_id = H5Dget_type(dataset_id);
-	if (! H5Tequal(type_id, H5T_STD_U16LE))
+	if (! H5Tequal(type_id, H5T_NATIVE_INT))
 	{
-		fprintf(stderr, "We're only ready to deal with U16LE, sorry!\n");
+		fprintf(stderr, "We're only ready to deal with native INT data types, sorry!\n");
 		return 1;
 	}
 
@@ -54,9 +54,9 @@ int main(int argc, char **argv)
 	}
 	H5Sget_simple_extent_dims(space_id, dims, NULL);
 
-	uint16_t *rdata = new uint16_t[dims[0] * dims[1]];
-	memset(rdata, 0, sizeof(uint16_t) * dims[0] * dims[1]);
-	H5Dread(dataset_id, H5T_STD_U16LE, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata);
+	uint32_t *rdata = new uint32_t[dims[0] * dims[1]];
+	memset(rdata, 0, sizeof(uint32_t) * dims[0] * dims[1]);
+	H5Dread(dataset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata);
 	for (size_t i=0; i<dims[0]*dims[1]; ++i) {
 		if (i && i%dims[0] == 0)
 			printf("\n");
