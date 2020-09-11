@@ -47,6 +47,20 @@ public:
     virtual std::vector<std::string> udfDatasetNames(std::string udf_file) {
         return std::vector<std::string>();
     }
+
+    // Helper function: combine the UDF template file and the user-defined-function
+    // file into one, saving the result to a temporary file on disk that ends on the
+    // on the provided extension. The user-defined-function is injected in the template
+    // file right where the placeholder string is found.
+    std::string assembleUDF(
+        std::string udf_file,
+        std::string template_file,
+        std::string placeholder,
+        std::string extension);
+
+    // Helper function: save a data blob to a temporary file on disk whose name ends
+    // on the given extension.
+    std::string writeToDisk(const char *data, size_t size, std::string extension);
 };
 
 // Get a backend by their name (e.g., "LuaJIT")
