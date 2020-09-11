@@ -47,8 +47,8 @@ extern "C" int index_of(const char *element)
     return -1;
 }
 
-/* Functions exported to the Lua template library (udf.lua) */
-extern "C" void *get_data(const char *element)
+/* Functions exported to the Lua template library (udf_template.lua) */
+extern "C" void *luaGetData(const char *element)
 {
     int index = index_of(element);
     if (index >= 0)
@@ -61,7 +61,7 @@ extern "C" void *get_data(const char *element)
     return NULL;
 }
 
-extern "C" const char *get_type(const char *element)
+extern "C" const char *luaGetType(const char *element)
 {
     int index = index_of(element);
     if (index >= 0)
@@ -74,7 +74,7 @@ extern "C" const char *get_type(const char *element)
     return NULL;
 }
 
-extern "C" const char *get_cast(const char *element)
+extern "C" const char *luaGetCast(const char *element)
 {
     int index = index_of(element);
     if (index >= 0)
@@ -87,7 +87,7 @@ extern "C" const char *get_cast(const char *element)
     return NULL;
 }
 
-extern "C" const char *get_dims(const char *element)
+extern "C" const char *luaGetDims(const char *element)
 {
     int index = index_of(element);
     if (index >= 0)
@@ -115,53 +115,13 @@ std::string LuaBackend::extension()
 /* Compile Lua to bytecode using LuaJIT. Returns the bytecode as a string. */
 std::string LuaBackend::compile(std::string udf_file, std::string template_file)
 {
-    std::string bytecode;
-    std::ifstream ifs(udf_file);
-    if (! ifs.is_open())
-    {
-        fprintf(stderr, "Failed to open %s\n", udf_file.c_str());
-        return "";
-    }
-    std::string inputFileBuffer(
-		(std::istreambuf_iterator<char>(ifs)),
-        (std::istreambuf_iterator<char>()  ));
-
-    /* Basic check: does the template file exist? */
-    if (template_file.size() == 0)
-    {
-        fprintf(stderr, "Failed to find Lua template file\n");
-        return "";
-    }
-    std::ifstream ifstr(template_file);
-    std::string udf(
-		(std::istreambuf_iterator<char>(ifstr)),
-        (std::istreambuf_iterator<char>()    ));
-
-    /* Basic check: is the template string present in the template file? */
     std::string placeholder = "-- user_callback_placeholder";
-    auto start = udf.find(placeholder);
-    if (start == std::string::npos)
+    auto lua_file = Backend::assembleUDF(udf_file, template_file, placeholder, this->extension());
+    if (lua_file.size() == 0)
     {
-        fprintf(stderr, "Failed to find placeholder string in %s\n",
-            template_file.c_str());
+        fprintf(stderr, "Will not be able to compile the UDF code\n");
         return "";
     }
-
-    /* Embed UDF string in the template */
-    auto completeCode = udf.replace(start, placeholder.length(), inputFileBuffer);
-
-    /* Compile the code */
-    std::ofstream tmpfile;
-    char buffer [32];
-    sprintf(buffer, "hdf5-udf-XXXXXX");
-    if (mkstemp(buffer) < 0){
-        fprintf(stderr, "Error creating temporary file.\n");
-        return std::string("");
-    }
-    tmpfile.open (buffer);
-    tmpfile << completeCode.data();
-    tmpfile.flush();
-    tmpfile.close();
 
     std::string output = udf_file + ".bytecode";
     pid_t pid = fork();
@@ -172,7 +132,7 @@ std::string LuaBackend::compile(std::string udf_file, std::string template_file)
             (char *) "luajit",
             (char *) "-O3",
             (char *) "-b",
-            (char *) buffer,
+            (char *) lua_file.c_str(),
             (char *) output.c_str(),
             (char *) NULL
         };
@@ -185,6 +145,7 @@ std::string LuaBackend::compile(std::string udf_file, std::string template_file)
         wait4(pid, &exit_status, 0, NULL);
 
         struct stat statbuf;
+        std::string bytecode;
         if (stat(output.c_str(), &statbuf) == 0) {
             printf("Bytecode has %ld bytes\n", statbuf.st_size);
 
@@ -194,11 +155,11 @@ std::string LuaBackend::compile(std::string udf_file, std::string template_file)
 
             unlink(output.c_str());
         }
-        unlink(buffer);
+        unlink(lua_file.c_str());
         return bytecode;
     }
     fprintf(stderr, "Failed to execute luajit\n");
-    return bytecode;
+    return "";
 }
 
 /* Execute the user-defined-function embedded in the given bytecode */

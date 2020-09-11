@@ -12,22 +12,22 @@ function init(filterpath)
     local ffi = require("ffi")
     local filterlib = ffi.load(filterpath)
     ffi.cdef[[
-        void       *get_data(const char *);
-        const char *get_type(const char *);
-        const char *get_cast(const char *);
-        const char *get_dims(const char *);
+        void       *luaGetData(const char *);
+        const char *luaGetType(const char *);
+        const char *luaGetCast(const char *);
+        const char *luaGetDims(const char *);
     ]]
 
     lib.getData = function(name)
-        return ffi.cast(ffi.string(filterlib.get_cast(name)), filterlib.get_data(name))
+        return ffi.cast(ffi.string(filterlib.luaGetCast(name)), filterlib.luaGetData(name))
     end
 
     lib.getType = function(name)
-        return ffi.string(filterlib.get_type(name))
+        return ffi.string(filterlib.luaGetType(name))
     end
 
     lib.getDims = function(name)
-        local dims = ffi.string(filterlib.get_dims(name))
+        local dims = ffi.string(filterlib.luaGetDims(name))
         local t = {}
         for dim in string.gmatch(dims, "([^x]+)") do
             table.insert(t, dim)
