@@ -223,7 +223,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         auto dtype = output_dataset.getCastDatatype();
         char *bytecode = (char *)(((char *) *buf) + *buf_size - bytecode_size);
         if (! backend->run(
-            filterpath,input_datasets, output_dataset, dtype, bytecode, bytecode_size))
+            filterpath, input_datasets, output_dataset, dtype, bytecode, bytecode_size))
         {
             nbytes = 0;
         } 
