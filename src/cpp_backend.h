@@ -35,9 +35,6 @@ public:
     std::vector<std::string> udfDatasetNames(std::string udf_file);
 
 private:
-    // Write a data buffer to a temporary file on disk
-    std::string writeToDisk(const char *data, size_t size, std::string extension);
-
     // Compress a data buffer
     std::string compressBuffer(const char *data, size_t usize);
 
