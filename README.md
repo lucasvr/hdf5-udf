@@ -37,7 +37,10 @@ get started with UDF scripts.
 
 There is no difference between accessing a dataset that has been
 dynamically generated and a regular one. As shown in the image
-below, both are retrieved using the existing HDF5 API.
+below, both are retrieved using the existing HDF5 API. Note that
+differently from a regular HDF5 dataset (where the actual grid is
+stored on disk), HDF5-UDF datasets require only the bytecode (or
+compressed shared library) to persist on disk.
 
 ![](images/hdf5-udf.png)
 
