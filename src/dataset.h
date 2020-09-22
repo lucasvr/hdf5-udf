@@ -33,12 +33,12 @@ public:
     DatasetInfo();
     DatasetInfo(std::string in_name, std::vector<hsize_t> in_dims, std::string in_datatype);
 
-    size_t getGridSize();
-    const char *getDatatype();
-    size_t getHdf5Datatype();
-    hid_t getStorageSize();
-    const char *getCastDatatype();
-    void printInfo(std::string dataset_type);
+    size_t getGridSize() const;
+    const char *getDatatype() const;
+    size_t getHdf5Datatype() const;
+    hid_t getStorageSize() const;
+    const char *getCastDatatype() const;
+    void printInfo(std::string dataset_type) const;
 
     std::string name;                /* Dataset name */
     std::string datatype;            /* Datatype, given as string */

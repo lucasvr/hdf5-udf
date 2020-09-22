@@ -43,7 +43,7 @@ DatasetInfo::DatasetInfo(std::string in_name, std::vector<hsize_t> in_dims, std:
     dimensions_str = ss.str();
 }
 
-size_t DatasetInfo::getGridSize()
+size_t DatasetInfo::getGridSize() const
 {
     return std::accumulate(
         std::begin(dimensions),
@@ -51,7 +51,7 @@ size_t DatasetInfo::getGridSize()
         1, std::multiplies<hsize_t>());
 }
 
-const char *DatasetInfo::getDatatype()
+const char *DatasetInfo::getDatatype() const
 {
     for (auto &info: dataset_type_info)
         if (H5Tequal(info.hdf5_datatype_id, hdf5_datatype))
@@ -59,7 +59,7 @@ const char *DatasetInfo::getDatatype()
     return NULL;
 }
 
-size_t DatasetInfo::getHdf5Datatype()
+size_t DatasetInfo::getHdf5Datatype() const
 {
     for (auto &info: dataset_type_info)
         if (info.datatype.compare(datatype) == 0)
@@ -67,7 +67,7 @@ size_t DatasetInfo::getHdf5Datatype()
     return -1;
 }
 
-hid_t DatasetInfo::getStorageSize()
+hid_t DatasetInfo::getStorageSize() const
 {
     for (auto &info: dataset_type_info)
         if (info.datatype.compare(datatype) == 0)
@@ -75,7 +75,7 @@ hid_t DatasetInfo::getStorageSize()
     return -1;
 }
 
-const char *DatasetInfo::getCastDatatype()
+const char *DatasetInfo::getCastDatatype() const
 {
     for (auto &info: dataset_type_info)
         if (info.datatype.compare(datatype) == 0)
@@ -83,7 +83,7 @@ const char *DatasetInfo::getCastDatatype()
     return NULL;
 }
 
-void DatasetInfo::printInfo(std::string dataset_type)
+void DatasetInfo::printInfo(std::string dataset_type) const
 {
     printf("%s dataset: %s, resolution=%lld",
         dataset_type.c_str(), name.c_str(), dimensions[0]);

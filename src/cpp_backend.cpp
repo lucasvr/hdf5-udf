@@ -12,6 +12,7 @@
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <sys/wait.h>
+#include <sys/mman.h>
 #include <unistd.h>
 #include <limits.h>
 #include <string.h>
@@ -23,6 +24,7 @@
 #include <algorithm>
 #include "cpp_backend.h"
 #include "dataset.h"
+#include "sandbox.h"
 #include "miniz.h"
 
 /* This backend's name */
@@ -48,25 +50,43 @@ std::string CppBackend::compile(std::string udf_file, std::string template_file)
         return "";
     }
 
+    /* Get path to the syscall wrappers file */
+    struct stat statbuf;
+    auto sep = template_file.find_last_of('/');
+    if (sep == std::string::npos)
+    {
+        fprintf(stderr, "Error: %s is not an absolute path\n", udf_file.c_str());
+        unlink(cpp_file.c_str());
+        return "";
+    }
+    std::string syscall_wrappers_file = template_file.substr(0, sep) + "/syscall_wrappers.cpp";
+    if (stat(syscall_wrappers_file.c_str(), &statbuf) != 0)
+    {
+        fprintf(stderr, "Cannot access %s: %s\n", syscall_wrappers_file.c_str(), strerror(errno));
+        unlink(cpp_file.c_str());
+        return "";
+    }
+
     std::string output = udf_file + ".so";
     pid_t pid = fork();
     if (pid == 0)
     {
         // Child process
-        char *cmd[] = {
-            (char *) "g++",
-            (char *) "-rdynamic",
-            (char *) "-shared",
-            (char *) "-fPIC",
-            (char *) "-flto",
-            (char *) "-Os",
-            (char *) "-C",
-            (char *) "-o",
-            (char *) output.c_str(),
-            (char *) cpp_file.c_str(),
-            (char *) NULL
-        };
-        execvp(cmd[0], cmd);
+        std::vector<char *> cmd;
+        cmd.push_back((char *) "g++");
+        cmd.push_back((char *) "-rdynamic");
+        cmd.push_back((char *) "-shared");
+        cmd.push_back((char *) "-fPIC");
+        cmd.push_back((char *) "-flto");
+        cmd.push_back((char *) "-Os");
+        cmd.push_back((char *) "-C");
+        cmd.push_back((char *) "-o");
+        cmd.push_back((char *) output.c_str());
+        cmd.push_back((char *) cpp_file.c_str());
+        cmd.push_back((char *) syscall_wrappers_file.c_str());
+        cmd.push_back((char *) "-lsyscall_intercept");
+        cmd.push_back(NULL);
+        execvp(cmd[0], cmd.data());
     }
     else if (pid > 0)
     {
@@ -134,19 +154,29 @@ std::string CppBackend::decompressBuffer(const char *data, size_t csize)
     return uncompressed;
 }
 
+/* Helper class to manage mmap and munmap */
+class AnonymousMemoryMap {
+public:
+    AnonymousMemoryMap(size_t size) : mm_size(size) { }
+    ~AnonymousMemoryMap() { munmap(mm, mm_size); }
+
+    bool create()
+    {
+        mm = mmap(NULL, mm_size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+        if (mm == (void *) -1)
+            fprintf(stderr, "Failed to create anonymous mapping: %s\n", strerror(errno));
+        return mm != (void *) -1;
+    }
+
+    void *mm;
+    size_t mm_size;
+};
+
 /* Helper class to manage calls to dlopen and dlsym */
 class SharedLibraryManager {
 public:
-    SharedLibraryManager(std::string _so_file) :
-        so_file(_so_file),
-        so_handle(NULL) { }
-
-    ~SharedLibraryManager()
-    {
-        if (so_handle)
-            dlclose(so_handle);
-        unlink(so_file.c_str());
-    }
+    SharedLibraryManager(std::string _so_file) : so_file(_so_file), so_handle(NULL) { }
+    ~SharedLibraryManager() { if (so_handle) { dlclose(so_handle); } }
 
     bool open()
     {
@@ -200,40 +230,77 @@ bool CppBackend::run(
     }
     chmod(so_file.c_str(), 0755);
 
-    SharedLibraryManager shlib(so_file);
-    if (shlib.open() == false)
-        return false;
-
-    /* Get references to the UDF and the APIs defined in our C++ template file */
-    void (*udf)(void) = (void (*)()) shlib.loadsym("dynamic_dataset");
-    auto hdf5_udf_data =
-        static_cast<std::vector<void *>*>(shlib.loadsym("hdf5_udf_data"));
-    auto hdf5_udf_names =
-        static_cast<std::vector<const char *>*>(shlib.loadsym("hdf5_udf_names"));
-    auto hdf5_udf_types =
-        static_cast<std::vector<const char *>*>(shlib.loadsym("hdf5_udf_types"));
-    auto hdf5_udf_dims =
-        static_cast<std::vector<std::vector<hsize_t>>*>(shlib.loadsym("hdf5_udf_dims"));
-    if (! udf || ! hdf5_udf_data || ! hdf5_udf_names || ! hdf5_udf_types || ! hdf5_udf_dims)
-        return false;
-
-    /* Populate vector of dataset names, sizes, and types */
-    std::vector<DatasetInfo> dataset_info;
-    dataset_info.push_back(output_dataset);
-    dataset_info.insert(
-        dataset_info.end(), input_datasets.begin(), input_datasets.end());
-
-    for (size_t i=0; i<dataset_info.size(); ++i)
+    /*
+     * We want to make the output dataset writeable by the UDF. Because
+     * the UDF is run under a separate process we have to use a shared
+     * memory segment which both processes can read and write to.
+     */
+    size_t room_size = output_dataset.getGridSize() * output_dataset.getStorageSize();
+    AnonymousMemoryMap mm(room_size);
+    if (! mm.create())
     {
-        hdf5_udf_data->push_back(dataset_info[i].data);
-        hdf5_udf_names->push_back(dataset_info[i].name.c_str());
-        hdf5_udf_types->push_back(dataset_info[i].getDatatype());
-        hdf5_udf_dims->push_back(dataset_info[i].dimensions);
+        unlink(so_file.c_str());
+        return false;
     }
 
-    /* Execute the user-defined-function */
-    udf();
+    /*
+     * Execute the user-defined-function under a separate process so that
+     * seccomp can kill it (if needed) without crashing the entire program
+     */
+    pid_t pid = fork();
+    if (pid == 0)
+    {
+        SharedLibraryManager shlib(so_file);
+        if (shlib.open() == false)
+            return false;
 
+        /* Get references to the UDF and the APIs defined in our C++ template file */
+        void (*udf)(void) = (void (*)()) shlib.loadsym("dynamic_dataset");
+        auto hdf5_udf_data =
+            static_cast<std::vector<void *>*>(shlib.loadsym("hdf5_udf_data"));
+        auto hdf5_udf_names =
+            static_cast<std::vector<const char *>*>(shlib.loadsym("hdf5_udf_names"));
+        auto hdf5_udf_types =
+            static_cast<std::vector<const char *>*>(shlib.loadsym("hdf5_udf_types"));
+        auto hdf5_udf_dims =
+            static_cast<std::vector<std::vector<hsize_t>>*>(shlib.loadsym("hdf5_udf_dims"));
+        if (! udf || ! hdf5_udf_data || ! hdf5_udf_names || ! hdf5_udf_types || ! hdf5_udf_dims)
+            return false;
+
+        /* Let output_dataset.data point to the shared memory segment */
+        DatasetInfo output_dataset_copy = output_dataset;
+        output_dataset_copy.data = mm.mm;
+
+        /* Populate vector of dataset names, sizes, and types */
+        std::vector<DatasetInfo> dataset_info;
+        dataset_info.push_back(output_dataset_copy);
+        dataset_info.insert(
+            dataset_info.end(), input_datasets.begin(), input_datasets.end());
+
+        for (size_t i=0; i<dataset_info.size(); ++i)
+        {
+            hdf5_udf_data->push_back(dataset_info[i].data);
+            hdf5_udf_names->push_back(dataset_info[i].name.c_str());
+            hdf5_udf_types->push_back(dataset_info[i].getDatatype());
+            hdf5_udf_dims->push_back(dataset_info[i].dimensions);
+        }
+
+        /* Prepare the sandbox and run the UDF */
+        Sandbox sandbox;
+        if (sandbox.loadRules())
+            udf();
+
+        /* Exit the process without invoking any callbacks registered with atexit() */
+        _exit(0);
+    }
+    else if (pid > 0)
+    {
+        /* Update output HDF5 dataset with data from shared memory segment */
+        waitpid(pid, NULL, 0);
+        memcpy(output_dataset.data, mm.mm, room_size);
+    }
+
+    unlink(so_file.c_str());
     return true;   
 }
 
