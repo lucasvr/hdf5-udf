@@ -24,8 +24,10 @@
 #include <algorithm>
 #include "cpp_backend.h"
 #include "dataset.h"
-#include "sandbox.h"
 #include "miniz.h"
+#ifdef ENABLE_SANDBOX
+#include "sandbox.h"
+#endif
 
 /* This backend's name */
 std::string CppBackend::name()
@@ -72,21 +74,24 @@ std::string CppBackend::compile(std::string udf_file, std::string template_file)
     if (pid == 0)
     {
         // Child process
-        std::vector<char *> cmd;
-        cmd.push_back((char *) "g++");
-        cmd.push_back((char *) "-rdynamic");
-        cmd.push_back((char *) "-shared");
-        cmd.push_back((char *) "-fPIC");
-        cmd.push_back((char *) "-flto");
-        cmd.push_back((char *) "-Os");
-        cmd.push_back((char *) "-C");
-        cmd.push_back((char *) "-o");
-        cmd.push_back((char *) output.c_str());
-        cmd.push_back((char *) cpp_file.c_str());
-        cmd.push_back((char *) syscall_wrappers_file.c_str());
-        cmd.push_back((char *) "-lsyscall_intercept");
-        cmd.push_back(NULL);
-        execvp(cmd[0], cmd.data());
+        char *cmd[] = {
+            (char *) "g++",
+            (char *) "-rdynamic",
+            (char *) "-shared",
+            (char *) "-fPIC",
+            (char *) "-flto",
+            (char *) "-Os",
+            (char *) "-C",
+            (char *) "-o",
+            (char *) output.c_str(),
+            (char *) cpp_file.c_str(),
+#ifdef ENABLE_SANDBOX
+            (char *) syscall_wrappers_file.c_str(),
+            (char *) "-lsyscall_intercept",
+#endif
+            NULL
+        };
+        execvp(cmd[0], cmd);
     }
     else if (pid > 0)
     {
@@ -285,9 +290,13 @@ bool CppBackend::run(
             hdf5_udf_dims->push_back(dataset_info[i].dimensions);
         }
 
-        /* Prepare the sandbox and run the UDF */
+        /* Prepare the sandbox if needed and run the UDF */
+        bool ready = true;
+#ifdef ENABLE_SANDBOX
         Sandbox sandbox;
-        if (sandbox.loadRules())
+        ready = sandbox.loadRules();
+#endif
+        if (ready)
             udf();
 
         /* Exit the process without invoking any callbacks registered with atexit() */

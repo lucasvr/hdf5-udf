@@ -1,3 +1,6 @@
+# OPT_SANDBOX: 0=disable syscall filtering, 1=enable
+OPT_SANDBOX   := 1
+
 DESTDIR        = /usr/local
 
 CXX            = g++
@@ -6,10 +9,16 @@ CXXFLAGS       = $(shell pkg-config --cflags luajit) \
                  -fPIC -I. -Wall -O3 -g -ggdb
 LDFLAGS        = $(shell pkg-config --libs luajit) \
                  $(shell python3-config --ldflags --embed) \
-                 -ldl -lm -lhdf5 -lseccomp -Wl,--no-undefined
+                 -ldl -lm -lhdf5 -Wl,--no-undefined
 
 ALL_HEADERS    = $(wildcard *.h)
-COMMON_SOURCES = backend.cpp lua_backend.cpp cpp_backend.cpp python_backend.cpp dataset.cpp miniz.cpp sandbox.cpp
+COMMON_SOURCES = backend.cpp lua_backend.cpp cpp_backend.cpp python_backend.cpp dataset.cpp miniz.cpp
+
+ifeq ($(OPT_SANDBOX),1)
+CXXFLAGS       += -DENABLE_SANDBOX
+LDFLAGS        += -lseccomp
+COMMON_SOURCES +=  sandbox.cpp
+endif
 
 FILTER_TARGET  = libhdf5-udf.so
 FILTER_SOURCES = $(COMMON_SOURCES) hdf5-udf.cpp
