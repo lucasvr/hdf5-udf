@@ -27,7 +27,7 @@ extern "C" {
 
 static std::vector<std::string> files_allowed, dirs_allowed;
 
-static void print_syscall(std::string name, long arg)
+static void __attribute__((unused)) print_syscall(std::string name, long arg)
 {
     char *path = (char *) arg;
     syscall_no_intercept(SYS_write, 2, name.c_str(), name.size());
@@ -52,10 +52,10 @@ static int test_file_ok(long arg, long *ret)
 // that the user takes over the system call. 
 static int hook(long syscall_nr, long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *ret)
 {
-	(void) arg2;
-	(void) arg3;
-	(void) arg4;
-	(void) arg5;
+    (void) arg2;
+    (void) arg3;
+    (void) arg4;
+    (void) arg5;
     switch (syscall_nr)
     {
         case SYS_stat:
@@ -74,14 +74,6 @@ static __attribute__((constructor)) void init()
 {
     const char *files[] = {
         "/etc/resolv.conf",
-#if 0
-        "/etc/ld.so.cache",
-        "/etc/nsswitch.conf",
-        "/lib/libc.so*",
-        "/lib/ld-linux*.so*",
-        "/lib/libresolv.so*",
-        "/lib/libnss_files.so*",
-#endif
         NULL,
     };
 
