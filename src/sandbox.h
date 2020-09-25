@@ -10,14 +10,20 @@
 #define __sandbox_h
 
 #include <stdbool.h>
+#include <functional>
+#include <algorithm>
+#include <string>
+#include "sharedlib_manager.h"
 
 class Sandbox {
 public:
-    Sandbox();
-    ~Sandbox();
-    bool loadRules();
+    Sandbox() {}
+    ~Sandbox() {}
+    bool init(std::string filterpath);
+
 private:
-    void *wrapperh;
+    std::string extractSymbol(std::string elf, std::string symbol_name);
+    SharedLibraryManager shlib;
 };
 
 #endif

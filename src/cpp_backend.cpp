@@ -22,6 +22,7 @@
 #include <sstream>
 #include <string>
 #include <algorithm>
+#include "sharedlib_manager.h"
 #include "cpp_backend.h"
 #include "dataset.h"
 #include "miniz.h"
@@ -52,23 +53,6 @@ std::string CppBackend::compile(std::string udf_file, std::string template_file)
         return "";
     }
 
-    /* Get path to the syscall wrappers file */
-    struct stat statbuf;
-    auto sep = template_file.find_last_of('/');
-    if (sep == std::string::npos)
-    {
-        fprintf(stderr, "Error: %s is not an absolute path\n", udf_file.c_str());
-        unlink(cpp_file.c_str());
-        return "";
-    }
-    std::string syscall_wrappers_file = template_file.substr(0, sep) + "/syscall_wrappers.cpp";
-    if (stat(syscall_wrappers_file.c_str(), &statbuf) != 0)
-    {
-        fprintf(stderr, "Cannot access %s: %s\n", syscall_wrappers_file.c_str(), strerror(errno));
-        unlink(cpp_file.c_str());
-        return "";
-    }
-
     std::string output = udf_file + ".so";
     pid_t pid = fork();
     if (pid == 0)
@@ -85,10 +69,6 @@ std::string CppBackend::compile(std::string udf_file, std::string template_file)
             (char *) "-o",
             (char *) output.c_str(),
             (char *) cpp_file.c_str(),
-#ifdef ENABLE_SANDBOX
-            (char *) syscall_wrappers_file.c_str(),
-            (char *) "-lsyscall_intercept",
-#endif
             NULL
         };
         execvp(cmd[0], cmd);
@@ -177,34 +157,6 @@ public:
     size_t mm_size;
 };
 
-/* Helper class to manage calls to dlopen and dlsym */
-class SharedLibraryManager {
-public:
-    SharedLibraryManager(std::string _so_file) : so_file(_so_file), so_handle(NULL) { }
-    ~SharedLibraryManager() { if (so_handle) { dlclose(so_handle); } }
-
-    bool open()
-    {
-        (void) dlerror();
-        so_handle = dlopen(so_file.c_str(), RTLD_NOW);
-        if (! so_handle)
-            fprintf(stderr, "Failed to load %s: %s\n", so_file.c_str(), dlerror());
-        return so_handle != NULL;
-    }
-
-    void *loadsym(std::string name)
-    {
-        (void) dlerror();
-        void *symbol = dlsym(so_handle, name.c_str());
-        if (! symbol)
-            fprintf(stderr, "%s\n", dlerror());
-        return symbol;
-    }
-private:
-    std::string so_file;
-    void *so_handle;
-};
-
 /* Execute the user-defined-function embedded in the given buffer */
 bool CppBackend::run(
     const std::string filterpath,
@@ -255,8 +207,8 @@ bool CppBackend::run(
     pid_t pid = fork();
     if (pid == 0)
     {
-        SharedLibraryManager shlib(so_file);
-        if (shlib.open() == false)
+        SharedLibraryManager shlib;
+        if (shlib.open(so_file) == false)
             return false;
 
         /* Get references to the UDF and the APIs defined in our C++ template file */
@@ -294,7 +246,7 @@ bool CppBackend::run(
         bool ready = true;
 #ifdef ENABLE_SANDBOX
         Sandbox sandbox;
-        ready = sandbox.loadRules();
+        ready = sandbox.init(filterpath);
 #endif
         if (ready)
             udf();
