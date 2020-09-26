@@ -38,6 +38,7 @@ public:
 
 private:
     void printPyObject(PyObject *obj);
+    bool executeUDF(PyObject *loadlib, PyObject *udf, std::string filterpath);
 };
 
 #endif /* __python_backend_h */

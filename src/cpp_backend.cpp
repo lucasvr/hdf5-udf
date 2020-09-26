@@ -24,6 +24,7 @@
 #include <algorithm>
 #include "sharedlib_manager.h"
 #include "cpp_backend.h"
+#include "anon_mmap.h"
 #include "dataset.h"
 #include "miniz.h"
 #ifdef ENABLE_SANDBOX
@@ -139,24 +140,6 @@ std::string CppBackend::decompressBuffer(const char *data, size_t csize)
     return uncompressed;
 }
 
-/* Helper class to manage mmap and munmap */
-class AnonymousMemoryMap {
-public:
-    AnonymousMemoryMap(size_t size) : mm_size(size) { }
-    ~AnonymousMemoryMap() { munmap(mm, mm_size); }
-
-    bool create()
-    {
-        mm = mmap(NULL, mm_size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
-        if (mm == (void *) -1)
-            fprintf(stderr, "Failed to create anonymous mapping: %s\n", strerror(errno));
-        return mm != (void *) -1;
-    }
-
-    void *mm;
-    size_t mm_size;
-};
-
 /* Execute the user-defined-function embedded in the given buffer */
 bool CppBackend::run(
     const std::string filterpath,
@@ -252,7 +235,7 @@ bool CppBackend::run(
             udf();
 
         /* Exit the process without invoking any callbacks registered with atexit() */
-        _exit(0);
+        _exit(ready ? 0 : 1);
     }
     else if (pid > 0)
     {

@@ -21,7 +21,11 @@
 #include <string>
 #include <algorithm>
 #include "python_backend.h"
+#include "anon_mmap.h"
 #include "dataset.h"
+#ifdef ENABLE_SANDBOX
+#include "sandbox.h"
+#endif
 
 // Dataset names, sizes, and types
 static std::vector<DatasetInfo> dataset_info;
@@ -171,8 +175,22 @@ bool PythonBackend::run(
         return false;
     }
 
-    // Populate vector of dataset names, sizes, and types
-    dataset_info.push_back(output_dataset);
+    /*
+     * We want to make the output dataset writeable by the UDF. Because
+     * the UDF is run under a separate process we have to use a shared
+     * memory segment which both processes can read and write to.
+     */
+    size_t room_size = output_dataset.getGridSize() * output_dataset.getStorageSize();
+    AnonymousMemoryMap mm(room_size);
+    if (! mm.create())
+        return false;
+
+    // Let output_dataset.data point to the shared memory segment
+    DatasetInfo output_dataset_copy = output_dataset;
+    output_dataset_copy.data = mm.mm;
+
+    // Populate global vector of dataset names, sizes, and types
+    dataset_info.push_back(output_dataset_copy);
     dataset_info.insert(
         dataset_info.end(), input_datasets.begin(), input_datasets.end());
 
@@ -229,31 +247,12 @@ bool PythonBackend::run(
         fprintf(stderr, "Error: dynamic_dataset is not a callable function\n");
     else
     {
-        PyObject *callret;
-
-        // Run 'lib.load(filterpath)'
-        PyObject *pyargs = PyTuple_New(1);
-        PyObject *pypath = Py_BuildValue("s", filterpath.c_str());
-        PyTuple_SetItem(pyargs, 0, pypath);
-        callret = PyObject_CallObject(loadlib, pyargs);
-        if (callret)
-            Py_DECREF(callret);
-
-        // Run 'dynamic_dataset()'
-        callret = PyObject_CallObject(udf, NULL);
-        if (callret)
+        retval = executeUDF(loadlib, udf, filterpath);
+        if (retval == true)
         {
-            Py_DECREF(callret);
-            retval = true;
+            // Update output HDF5 dataset with data from shared memory segment
+            memcpy(output_dataset.data, mm.mm, room_size);
         }
-        else
-        {
-            // Function call terminated by an exception
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pypath);
-        Py_DECREF(pyargs);
     }
 
     Py_DECREF(module);
@@ -262,6 +261,59 @@ bool PythonBackend::run(
     dlclose(libpython);
 
     return retval;
+}
+
+/* Coordinate the execution of the UDF under a separate process */
+bool PythonBackend::executeUDF(PyObject *loadlib, PyObject *udf, std::string filterpath)
+{
+    /*
+     * Execute the user-defined-function under a separate process so that
+     * seccomp can kill it (if needed) without crashing the entire program
+     */
+    pid_t pid = fork();
+    if (pid == 0)
+    {
+        // Run 'lib.load(filterpath)' from our udf_template.py
+        // TODO: load the template straight from /usr/share, as
+        // the function that comes with the UDF may not be trustable.
+        PyObject *pyargs = PyTuple_New(1);
+        PyObject *pypath = Py_BuildValue("s", filterpath.c_str());
+        PyTuple_SetItem(pyargs, 0, pypath);
+        PyObject *callret = PyObject_CallObject(loadlib, pyargs);
+        if (callret)
+            Py_DECREF(callret);
+
+        bool ready = true;
+#ifdef ENABLE_SANDBOX
+        Sandbox sandbox;
+        ready = sandbox.init(filterpath);
+#endif
+        if (ready)
+        {
+            // Run 'dynamic_dataset()' defined by the user
+            callret = PyObject_CallObject(udf, NULL);
+            if (callret)
+                Py_DECREF(callret);
+            else
+            {
+                // Function call terminated by an exception
+                PyErr_Print();
+                PyErr_Clear();
+                ready = false;
+            }
+            Py_DECREF(pypath);
+            Py_DECREF(pyargs);
+        }
+        // Exit the process without invoking any callbacks registered with atexit()
+        _exit(ready ? 0 : 1);
+    }
+    else if (pid > 0)
+    {
+        int status;
+        waitpid(pid, &status, 0);
+        return WIFEXITED(status) ? WEXITSTATUS(status) == 0 : false;
+    }
+    return false;
 }
 
 void PythonBackend::printPyObject(PyObject *obj)

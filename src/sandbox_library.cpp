@@ -139,6 +139,7 @@ bool syscall_filter_init()
 
     // Fundamental system calls we want to allow
     ALLOW(brk, 0);
+    ALLOW(exit_group, 0);
 
     // Sockets-related system calls
     ALLOW(socket, 0);
