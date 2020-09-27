@@ -1,23 +1,18 @@
 # HDF5-UDF
 
 HDF5-UDF is a mechanism to dynamically generate HDF5 datasets through
-user-defined functions written in Lua. UDF is compiled into bytecode
-form using LuaJIT and the result is embedded into HDF5. A supporting
-library gives access to existing datasets from Lua code so that data
-analysis and derivation of other data can be produced. Access to HDF5
-is made through Foreign Function Interfaces (FFIs), meaning that there
-is no measurable overhead when accessing input and output datasets from Lua.
+user-defined functions (UDFs) written in Lua, Python, or C/C++.
 
-A similar mechanism exists to write user-defined-functions in Python.
-The UDF is compiled into bytecode (`.pyc`) and embedded into HDF5.
-The CFFI interface is used to exchange data between the HDF5-UDF
-engine and Python code.
+User-defined functions are compiled into executable form and the result
+is embedded into HDF5. A supporting library gives access to existing datasets
+from user code so that data analysis and derivation of other data can be produced.
 
-HDF5-UDF also allows user-defined-functions to be written in C/C++.
-Such functions are compiled into shared libraries, compressed, and embedded
-into HDF5 just like in the LuaJIT backend. The difference is that, unlike
-a LuaJIT bytecode, shared libraries are compiled to the target
-architecture, hence are not as portable.
+Access to HDF5 is made through Foreign Function Interfaces (FFIs) in Python and
+Lua, meaning that there is no measurable overhead when accessing input and output
+datasets from such languages. UDFs written in C/C++ are compiled into shared libraries,
+compressed, and embedded into HDF5 just like in the Python and Lua backends. The
+difference is that, unlike a LuaJIT bytecode, for instance, shared libraries are
+compiled to the target architecture, hence are not as portable.
 
 The Lua, C/C++, and Python APIs are identical and provide the following simple
 functions to interface with HDF5 datasets:
