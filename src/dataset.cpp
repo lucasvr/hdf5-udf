@@ -53,33 +53,37 @@ size_t DatasetInfo::getGridSize() const
 
 const char *DatasetInfo::getDatatype() const
 {
-    for (auto &info: dataset_type_info)
-        if (H5Tequal(info.hdf5_datatype_id, hdf5_datatype))
-            return info.datatype.c_str();
+    if (hdf5_datatype != -1)
+        for (auto &info: dataset_type_info)
+            if (H5Tequal(info.hdf5_datatype_id, hdf5_datatype))
+                return info.datatype.c_str();
     return NULL;
 }
 
 size_t DatasetInfo::getHdf5Datatype() const
 {
-    for (auto &info: dataset_type_info)
-        if (info.datatype.compare(datatype) == 0)
-            return info.hdf5_datatype_id;
+    if (datatype.size())
+        for (auto &info: dataset_type_info)
+            if (info.datatype.compare(datatype) == 0)
+                return info.hdf5_datatype_id;
     return -1;
 }
 
 hid_t DatasetInfo::getStorageSize() const
 {
-    for (auto &info: dataset_type_info)
-        if (info.datatype.compare(datatype) == 0)
-            return info.datatype_size;
+    if (datatype.size())
+        for (auto &info: dataset_type_info)
+            if (info.datatype.compare(datatype) == 0)
+                return info.datatype_size;
     return -1;
 }
 
 const char *DatasetInfo::getCastDatatype() const
 {
-    for (auto &info: dataset_type_info)
-        if (info.datatype.compare(datatype) == 0)
-            return info.declaration.c_str();
+    if (datatype.size())
+        for (auto &info: dataset_type_info)
+            if (info.datatype.compare(datatype) == 0)
+                return info.declaration.c_str();
     return NULL;
 }
 
