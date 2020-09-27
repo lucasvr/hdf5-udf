@@ -19,8 +19,12 @@
 #include <sstream>
 #include <algorithm>
 #include "lua_backend.h"
+#include "anon_mmap.h"
 #include "dataset.h"
 #include "lua.hpp"
+#ifdef ENABLE_SANDBOX
+#include "sandbox.h"
+#endif
 
 /* Lua context */
 static lua_State *State;
@@ -189,9 +193,21 @@ bool LuaBackend::run(
     lua_pushcfunction(L, luaopen_table);
     lua_call(L,0,0);
 
+    // We want to make the output dataset writeable by the UDF. Because
+    // the UDF is run under a separate process we have to use a shared
+    // memory segment which both processes can read and write to.
+    size_t room_size = output_dataset.getGridSize() * output_dataset.getStorageSize();
+    AnonymousMemoryMap mm(room_size);
+    if (! mm.create())
+        return false;
+
+    // Let output_dataset.data point to the shared memory segment
+    DatasetInfo output_dataset_copy = output_dataset;
+    output_dataset_copy.data = mm.mm;
+
     DatasetInfo empty_entry;
     std::vector<DatasetInfo> dataset_info;
-    dataset_info.push_back(output_dataset);
+    dataset_info.push_back(output_dataset_copy);
     dataset_info.insert(
         dataset_info.end(), input_datasets.begin(), input_datasets.end());
     dataset_info.push_back(empty_entry);
@@ -239,27 +255,52 @@ bool LuaBackend::run(
         return false;
     }
 
-    // Initialize the UDF library
-    lua_getglobal(L, "init");
-    lua_pushstring(L, filterpath.c_str());
-    if (lua_pcall(L, 1, 0, 0) != 0)
+    // Execute the user-defined-function under a separate process so that
+    // seccomp can kill it (if needed) without crashing the entire program
+    bool ret = false;
+    pid_t pid = fork();
+    if (pid == 0)
     {
-        fprintf(stderr, "Failed to invoke the init callback: %s\n", lua_tostring(L, -1));
-        lua_close(L);
-        return false;
-    }
+        bool ready = true;
+#ifdef ENABLE_SANDBOX
+        Sandbox sandbox;
+        ready = sandbox.init(filterpath);
+#endif
+        if (ready)
+        {
+            // Initialize the UDF library
+            lua_getglobal(L, "init");
+            lua_pushstring(L, filterpath.c_str());
+            if (lua_pcall(L, 1, 0, 0) != 0)
+            {
+                fprintf(stderr, "Failed to invoke the init callback: %s\n", lua_tostring(L, -1));
+                lua_close(L);
+                _exit(1);
+            }
 
-    // Call the UDF entry point
-    lua_getglobal(L, "dynamic_dataset");
-    if (lua_pcall(L, 0, 0, 0) != 0)
+            // Call the UDF entry point
+            lua_getglobal(L, "dynamic_dataset");
+            if (lua_pcall(L, 0, 0, 0) != 0)
+            {
+                fprintf(stderr, "Failed to invoke the dynamic_dataset callback: %s\n", lua_tostring(L, -1));
+                lua_close(L);
+                _exit(1);
+            }
+        }
+        _exit(0);
+    }
+    else if (pid > 0)
     {
-        fprintf(stderr, "Failed to invoke the dynamic_dataset callback: %s\n", lua_tostring(L, -1));
-        lua_close(L);
-        return false;
+        int status;
+        waitpid(pid, &status, 0);
+        ret = WIFEXITED(status) ? WEXITSTATUS(status) == 0 : false;
+
+        // Update output HDF5 dataset with data from shared memory segment
+        memcpy(output_dataset.data, mm.mm, room_size);
     }
     lua_close(L);
 
-    return true;   
+    return ret;
 }
 
 /* Scan the UDF file for references to HDF5 dataset names */
