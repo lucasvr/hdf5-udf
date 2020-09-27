@@ -8,9 +8,15 @@
 #include <algorithm>
 #include <fstream>
 #include "backend.h"
+#ifdef ENABLE_CPP
 #include "cpp_backend.h"
+#endif
+#ifdef ENABLE_LUA
 #include "lua_backend.h"
+#endif
+#ifdef ENABLE_PYTHON
 #include "python_backend.h"
+#endif
 
 std::string Backend::assembleUDF(
     std::string udf_file, std::string template_file, std::string placeholder, std::string extension)
@@ -79,12 +85,18 @@ std::string Backend::writeToDisk(const char *data, size_t size, std::string exte
 // Get a backend by their name (e.g., "LuaJIT")
 Backend *getBackendByName(std::string name)
 {
+#ifdef ENABLE_LUA
     if (name.compare("LuaJIT") == 0)
         return static_cast<Backend *>(new LuaBackend());
-    else if (name.compare("Python") == 0)
+#endif
+#ifdef ENABLE_PYTHON
+    if (name.compare("Python") == 0)
         return static_cast<Backend *>(new PythonBackend());
-    else if (name.compare("C++") == 0)
+#endif
+#ifdef ENABLE_CPP
+    if (name.compare("C++") == 0)
         return static_cast<Backend *>(new CppBackend());
+#endif
     return NULL;
 }
 
@@ -104,11 +116,17 @@ Backend *getBackendByFileExtension(std::string name)
     };
 
     auto ext = name.substr(sep);
+#ifdef ENABLE_LUA
     if (sameString(ext, ".lua"))
         return static_cast<Backend *>(new LuaBackend());
-    else if (sameString(ext, ".py"))
+#endif
+#ifdef ENABLE_PYTHON
+    if (sameString(ext, ".py"))
         return static_cast<Backend *>(new PythonBackend());
-    else if (sameString(ext, ".cpp"))
+#endif
+#ifdef ENABLE_CPP
+    if (sameString(ext, ".cpp"))
         return static_cast<Backend *>(new CppBackend());
+#endif
     return NULL;
 }

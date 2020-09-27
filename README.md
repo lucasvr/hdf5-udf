@@ -134,15 +134,6 @@ Also, make sure to read the template files for
 [C/C++](https://github.com/lucasvr/hdf5-udf/blob/master/src/udf_template.cpp)
 to learn more about the APIs behind the `lib` interface.
 
-# Building the code
-
-Simply run `make` followed by `make install`, optionally providing an alternative
-destination directory other than `/usr/local`:
-
-```
-$ make
-$ make install DESTDIR=/installation/path
-```
 
 # Configuration and execution
 

@@ -2,8 +2,10 @@
 # configuration and build options
 ##################################
 
-# OPT_SANDBOX: 0=disable syscall filtering, 1=enable
-OPT_SANDBOX   := 1
+OPT_SANDBOX   := 1 # enable/disable syscall filtering
+OPT_PYTHON    := 1 # enable/disable Python backend
+OPT_LUA       := 1 # enable/disable Lua/LuaJIT backend
+OPT_CPP       := 1 # enable/disable C/C++ backend
 
 DESTDIR        = /usr/local
 
@@ -17,14 +19,28 @@ LDFLAGS        = $(shell pkg-config --libs luajit) \
                  -ldl -lm -lhdf5 -Wl,--no-undefined
 
 ALL_HEADERS    = $(wildcard *.h)
-COMMON_SOURCES = backend.cpp lua_backend.cpp cpp_backend.cpp \
-                 python_backend.cpp dataset.cpp miniz.cpp
+COMMON_SOURCES = backend.cpp dataset.cpp
+
+ifeq ($(strip $(OPT_PYTHON)),1)
+CXXFLAGS       += -DENABLE_PYTHON
+COMMON_SOURCES += python_backend.cpp
+endif
+
+ifeq ($(strip $(OPT_LUA)),1)
+CXXFLAGS       += -DENABLE_LUA
+COMMON_SOURCES += lua_backend.cpp
+endif
+
+ifeq ($(strip $(OPT_CPP)),1)
+CXXFLAGS       += -DENABLE_CPP
+COMMON_SOURCES += cpp_backend.cpp miniz.cpp
+endif
 
 ######################
 # libhdf5-udf-sandbox
 ######################
 
-ifeq ($(OPT_SANDBOX),1)
+ifeq ($(strip $(OPT_SANDBOX)),1)
 CXXFLAGS       += -DENABLE_SANDBOX
 COMMON_SOURCES +=  sandbox.cpp
 
