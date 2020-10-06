@@ -43,7 +43,6 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-
 	hsize_t dims[2] = {0, 0};
 	hid_t space_id = H5Dget_space(dataset_id);
 	int ndims = H5Sget_simple_extent_ndims(space_id);
@@ -57,10 +56,18 @@ int main(int argc, char **argv)
 	uint32_t *rdata = new uint32_t[dims[0] * dims[1]];
 	memset(rdata, 0, sizeof(uint32_t) * dims[0] * dims[1]);
 	H5Dread(dataset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata);
+
+	// The Tux dataset needs to be stretched a little bit so it looks prettier
+	// on the console. It also looks better when rendered as solid blocks instead
+	// of a collection of 0s and 1s.
+	bool is_tux = hdf5_dataset.compare("Tux") == 0;
 	for (size_t i=0; i<dims[0]*dims[1]; ++i) {
 		if (i && i%dims[0] == 0)
 			printf("\n");
-		printf("%d", rdata[i]);
+		if (is_tux)
+			printf("%s", rdata[i] == 1 ? "  " : "\xE2\x96\x92\xE2\x96\x92");
+		else
+			printf("%d", rdata[i]);
 	}
 	printf("\n");
 
