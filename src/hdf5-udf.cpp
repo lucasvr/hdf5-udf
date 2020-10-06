@@ -97,9 +97,12 @@ hid_t getDatasetHandle(std::string dataset, bool *handle_from_procfs)
     return (hid_t) -1;
 }
 
-std::vector<DatasetInfo> readHdf5Datasets(hid_t file_id, std::vector<std::string> &names)
+std::vector<DatasetInfo> readHdf5Datasets(
+    hid_t file_id,
+    std::vector<std::string> &input_names,
+    std::vector<std::string> &scratch_names)
 {
-    auto readHdf5Dataset = [&](hid_t file_id, std::string dname)
+    auto readHdf5Dataset = [&](hid_t file_id, std::string dname, bool read_data)
     {
         Benchmark benchmark;
         DatasetInfo out;
@@ -132,16 +135,20 @@ std::vector<DatasetInfo> readHdf5Datasets(hid_t file_id, std::vector<std::string
         }
 
         /* Read the dataset */
-        if (H5Dread(dset_id, out.hdf5_datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata) < 0)
+        if (read_data)
         {
-            fprintf(stderr, "Failed to read HDF5 dataset\n");
-            free(rdata);
-            rdata = NULL;
+            if (H5Dread(dset_id, out.hdf5_datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata) < 0)
+            {
+                fprintf(stderr, "Failed to read HDF5 dataset\n");
+                free(rdata);
+                rdata = NULL;
+            }
+            else
+                benchmark.print("Time to read dataset from disk");
         }
         else
-        {
-            benchmark.print("Time to read dataset from disk");
-        }
+            memset(rdata, 0, n_elements * H5Tget_size(out.hdf5_datatype));
+
         H5Sclose(space_id);
         H5Dclose(dset_id);
 
@@ -150,18 +157,36 @@ std::vector<DatasetInfo> readHdf5Datasets(hid_t file_id, std::vector<std::string
         return out;
     };
 
+    bool error = false;
     std::vector<DatasetInfo> out;
-    for (auto name: names)
+    for (auto name: input_names)
     {
-        auto info = readHdf5Dataset(file_id, name);
-        if (info.data == NULL) {
+        auto info = readHdf5Dataset(file_id, name, true);
+        if (info.data == NULL)
+        {
             fprintf(stderr, "Failed to read input dataset %s from HDF5 file\n", name.c_str());
-            for (auto &entry: out)
-                free(entry.data);
-            out.clear();
+            error = true;
             break;
         }
         out.push_back(info);
+    }
+    for (auto name: scratch_names)
+    {
+        auto info = readHdf5Dataset(file_id, name, false);
+        if (info.data == NULL)
+        {
+            fprintf(stderr, "Failed to allocate scratch dataset for %s\n", name.c_str());
+            error = true;
+            break;
+        }
+        out.push_back(info);
+    }
+
+    if (error)
+    {
+        for (auto &entry: out)
+            free(entry.data);
+        out.clear();
     }
     return out;
 }
@@ -177,7 +202,8 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
 
         /* Retrieve metadata stored in the JSON payload */
         int bytecode_size = jas["bytecode_size"].get<int>();
-        auto names = jas["input_datasets"].get<std::vector<std::string>>();
+        auto input_names = jas["input_datasets"].get<std::vector<std::string>>();
+        auto scratch_names = jas["scratch_datasets"].get<std::vector<std::string>>();
         auto datatype = jas["output_datatype"].get<std::string>();
         auto resolution = jas["output_resolution"].get<std::vector<hsize_t>>();
         auto output_name = jas["output_dataset"].get<std::string>();
@@ -205,7 +231,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
             return 0;
 
         /* Allocate input and output grids */
-        auto input_datasets = readHdf5Datasets(file_id, names);
+        auto input_datasets = readHdf5Datasets(file_id, input_names, scratch_names);
         DatasetInfo output_dataset(output_name, resolution, datatype);
         output_dataset.hdf5_datatype = output_dataset.getHdf5Datatype();
         output_dataset.data = (void *) malloc(

@@ -429,9 +429,13 @@ int main(int argc, char **argv)
         }
 
         /* Prepare data for JSON payload */
-        std::vector<std::string> input_dataset_names;
+        std::vector<std::string> input_dataset_names, scratch_dataset_names;
         std::transform(input_datasets.begin(), input_datasets.end(), std::back_inserter(input_dataset_names),
             [](DatasetInfo info) -> std::string { return info.name; });
+
+        for (auto &other: virtual_datasets)
+            if (other.name.compare(info.name) != 0)
+                scratch_dataset_names.push_back(other.name);
 
         /* JSON Payload */
         json jas;
@@ -439,6 +443,7 @@ int main(int argc, char **argv)
         jas["output_resolution"] = info.dimensions;
         jas["output_datatype"] = info.datatype;
         jas["input_datasets"] = input_dataset_names;
+        jas["scratch_datasets"] = scratch_dataset_names;
         jas["bytecode_size"] = bytecode.length();
         jas["backend"] = backend->name();
 
