@@ -128,7 +128,7 @@ std::string template_path(std::string backend_extension, std::string argv0)
 {
     char dirname_argv0[PATH_MAX], tmp[PATH_MAX];
     memset(dirname_argv0, 0, sizeof(dirname_argv0));
-    if (realpath(argv0.c_str(), dirname_argv0) < 0)
+    if (! realpath(argv0.c_str(), dirname_argv0))
     {
         fprintf(stderr, "Error resolving path %s: %s\n", argv0.c_str(), strerror(errno));
         return "";
