@@ -101,7 +101,7 @@ $(BIN_TARGET): $(BIN_OBJS)
 $(SANDBOX_OBJS) $(BIN_OBJS) $(FILTER_OBJS): $(ALL_HEADERS)
 
 clean:
-	rm -f $(BIN_TARGET) $(FILTER_TARGET) $(WRAPPER_TARGET) *.o
+	rm -f $(BIN_TARGET) $(FILTER_TARGET) $(SANDBOX_TARGET) $(WRAPPER_TARGET) *.o
 
 install:
 	@install -v -d $(DESTDIR)/bin $(DESTDIR)/share/hdf5-udf $(DESTDIR)/hdf5/lib/plugin
