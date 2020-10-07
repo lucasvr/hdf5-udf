@@ -9,14 +9,23 @@ OPT_CPP       := 1 # enable/disable C/C++ backend
 
 DESTDIR        = /usr/local
 
+# Starting with Python 3.8, `python3-config --ldflags` no longer links to libpython;
+# that functionality is now provided by `python3-config --embed`, which didn't exist
+# prior to 3.8.
+ifeq ($(shell python3-config --help | grep embed),)
+PYTHON_LDFLAGS = $(shell python3-config --ldflags)
+else
+PYTHON_LDFLAGS = $(shell python3-config --ldflags --embed)
+endif
+
 CXX            = g++
 OBJCOPY        = objcopy
-CXXFLAGS       = $(shell pkg-config --cflags luajit) \
+CXXFLAGS       = $(shell pkg-config --cflags luajit hdf5) \
                  $(shell python3-config --includes) \
                  -fPIC -I. -Wall -O3 -g -ggdb
-LDFLAGS        = $(shell pkg-config --libs luajit) \
-                 $(shell python3-config --ldflags --embed) \
-                 -ldl -lm -lhdf5 -Wl,--no-undefined
+LDFLAGS        = $(shell pkg-config --libs luajit hdf5) \
+                 $(PYTHON_LDFLAGS) \
+                 -ldl -lm -Wl,--no-undefined
 
 ALL_HEADERS    = $(wildcard *.h)
 COMMON_SOURCES = backend.cpp dataset.cpp
