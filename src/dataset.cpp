@@ -9,9 +9,11 @@
 #include "dataset.h"
 
 static std::vector<DatasetTypeInfo> dataset_type_info = {
+    {"int8",   "int8_t*",   H5T_STD_I8LE,   sizeof(int8_t)},
     {"int16",  "int16_t*",  H5T_STD_I16LE,  sizeof(int16_t)},
     {"int32",  "int32_t*",  H5T_STD_I32LE,  sizeof(int32_t)},
     {"int64",  "int64_t*",  H5T_STD_I64LE,  sizeof(int64_t)},
+    {"uint8",  "uint8_t*",  H5T_STD_U8LE,   sizeof(uint8_t)},
     {"uint16", "uint16_t*", H5T_STD_U16LE,  sizeof(uint16_t)},
     {"uint32", "uint32_t*", H5T_STD_U32LE,  sizeof(uint32_t)},
     {"uint64", "uint64_t*", H5T_STD_U64LE,  sizeof(uint64_t)},

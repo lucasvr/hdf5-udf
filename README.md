@@ -44,9 +44,11 @@ compressed shared library) to persist on disk.
 The following dataset types map to their corresponding little-endian
 definitions in HDF5:
 
+- `int8` (`H5T_STD_I8LE`)
 - `int16` (`H5T_STD_I16LE`)
 - `int32` (`H5T_STD_I32LE`)
 - `int64` (`H5T_STD_I64LE`)
+- `uint8` (`H5T_STD_U8LE`)
 - `uint16` (`H5T_STD_U16LE`)
 - `uint32` (`H5T_STD_U32LE`)
 - `uint64` (`H5T_STD_U64LE`)
