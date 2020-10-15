@@ -90,7 +90,7 @@ Backend *getBackendByName(std::string name)
         return static_cast<Backend *>(new LuaBackend());
 #endif
 #ifdef ENABLE_PYTHON
-    if (name.compare("Python") == 0)
+    if (name.compare("CPython") == 0)
         return static_cast<Backend *>(new PythonBackend());
 #endif
 #ifdef ENABLE_CPP

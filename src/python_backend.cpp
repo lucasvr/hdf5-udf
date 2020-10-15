@@ -70,7 +70,7 @@ extern "C" const char *pythonGetDims(const char *element)
 /* This backend's name */
 std::string PythonBackend::name()
 {
-    return "Python";
+    return "CPython";
 }
 
 /* Extension managed by this backend */
