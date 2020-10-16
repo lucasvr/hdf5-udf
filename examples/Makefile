@@ -15,6 +15,7 @@ files: $(CREATE_BIN)
 	./$(CREATE_BIN) example-simple_vector.h5
 	./$(CREATE_BIN) example-sine_wave.h5
 	./$(CREATE_BIN) example-socket.h5
+	./$(CREATE_BIN) example-doom.h5
 	./$(CREATE_BIN) example-add_datasets.h5 2
 
 clean:
