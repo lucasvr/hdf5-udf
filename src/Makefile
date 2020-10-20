@@ -106,5 +106,7 @@ clean:
 install:
 	@install -v -d $(DESTDIR)/bin $(DESTDIR)/share/hdf5-udf $(DESTDIR)/hdf5/lib/plugin
 	@install -v -t $(DESTDIR)/bin $(BIN_TARGET)
-	@install -v -t $(DESTDIR)/share/hdf5-udf udf_template.{lua,cpp,py}
+	@install -v -t $(DESTDIR)/share/hdf5-udf udf_template.lua
+	@install -v -t $(DESTDIR)/share/hdf5-udf udf_template.cpp
+	@install -v -t $(DESTDIR)/share/hdf5-udf udf_template.py
 	@install -v -t $(DESTDIR)/hdf5/lib/plugin $(FILTER_TARGET)
