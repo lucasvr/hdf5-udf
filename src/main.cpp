@@ -251,7 +251,17 @@ int main(int argc, char **argv)
     {
         DatasetInfo info;
         info.name = name;
-        if (dataset_exists(hdf5_file, name))
+
+        /* If this dataset is scheduled for removal, then assume it's not an input dataset */
+        bool is_input_dataset = true;
+        for (auto &deletename: delete_list)
+            if (name.compare(deletename) == 0)
+            {
+                is_input_dataset = false;
+                break;
+            }
+
+        if (dataset_exists(hdf5_file, name) && is_input_dataset)
         {
             /* Open HDF5 file */
             hid_t file_id = H5Fopen(hdf5_file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
@@ -367,6 +377,28 @@ int main(int argc, char **argv)
         exit(1);
     }
 
+    /* Delete datasets that we'll overwrite next */
+    if (delete_list.size())
+    {
+        hid_t file_id = H5Fopen(hdf5_file.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+        if (file_id < 0)
+        {
+            fprintf(stderr, "Error opening %s\n", hdf5_file.c_str());
+            exit(1);
+        }
+        for (auto &info: delete_list)
+        {
+            /* Delete existing dataset so its contents can be overwritten */
+            herr_t status = H5Ldelete(file_id, info.c_str(), H5P_DEFAULT);
+            if (status < 0)
+            {
+                fprintf(stderr, "Failed to delete existing virtual dataset %s\n", info.c_str());
+                exit(1);
+            }
+        }
+        H5Fclose(file_id);
+    }
+
     /* Create the virtual datasets */
     for (auto &info: virtual_datasets)
     {
@@ -407,17 +439,6 @@ int main(int argc, char **argv)
         {
             fprintf(stderr, "Failed to set chunk size\n");
             exit(1);
-        }
-
-        if (std::find(delete_list.begin(), delete_list.end(), info.name) != delete_list.end())
-        {
-            /* Delete existing dataset so its contents can be overwritten */
-            status = H5Ldelete(file_id, info.name.c_str(), H5P_DEFAULT);
-            if (status < 0)
-            {
-                fprintf(stderr, "Failed to delete existing virtual dataset %s\n", info.name.c_str());
-                exit(1);
-            }
         }
 
         /* Create virtual dataset */
