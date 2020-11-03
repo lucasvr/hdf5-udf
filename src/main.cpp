@@ -28,7 +28,6 @@
 #include "json.hpp"
 
 using json = nlohmann::json;
-using namespace std;
 
 /* Virtual dataset parser */
 class DatasetOptionsParser {
@@ -56,7 +55,7 @@ bool DatasetOptionsParser::parse(std::string text, DatasetInfo &out)
 bool DatasetOptionsParser::parseName(std::string text, DatasetInfo &out)
 {
     auto sep = text.find_first_of(":");
-    if (sep == string::npos)
+    if (sep == std::string::npos)
         out.name = text;
     else
         out.name = text.substr(0, sep);
@@ -66,7 +65,7 @@ bool DatasetOptionsParser::parseName(std::string text, DatasetInfo &out)
 bool DatasetOptionsParser::parseDimensions(std::string text, DatasetInfo &out)
 {
     auto sep = text.find_first_of(":");
-    if (sep == string::npos)
+    if (sep == std::string::npos)
     {
         /* No dimensions declared in the input string (not an error) */
         return true;
@@ -99,7 +98,7 @@ bool DatasetOptionsParser::parseDimensions(std::string text, DatasetInfo &out)
 bool DatasetOptionsParser::parseDataType(std::string text, DatasetInfo &out)
 {
     auto sep = text.find_last_of(":");
-    if (sep == string::npos)
+    if (sep == std::string::npos)
     {
         /* No datatype declared in the input string (not an error) */
         return true;
@@ -114,11 +113,73 @@ bool DatasetOptionsParser::parseDataType(std::string text, DatasetInfo &out)
     return true;
 }
 
+/* Open group. Expects either a simple name as in "ds" or the full path ("/group/ds") */
+hid_t open_group(hid_t file_id, std::string path, bool print_errors)
+{
+    /* Split input path by '/' delimiter, populating @groups */
+    std::stringstream input(path);
+    std::vector<std::string> groups;
+    std::string group_name;
+
+    groups.push_back("/");
+    while (std::getline(input, group_name, '/'))
+    {
+        if (group_name.size())
+            groups.push_back(group_name);
+    }
+    groups.pop_back();
+
+    /* Open intermediate groups */
+    hid_t parent_id = file_id;
+    std::vector<hid_t> group_ids;
+    for (size_t i=0; i<groups.size(); ++i)
+    {
+        group_ids.push_back(H5Gopen(parent_id, groups[i].c_str(), H5P_DEFAULT));
+        if (group_ids.back() < 0)
+        {
+            if (print_errors)
+                fprintf(stderr, "Failed to open group '%s' in '%s'\n",
+                    groups[i].c_str(), path.c_str());
+            break;
+        }
+        parent_id = group_ids.back();
+    }
+
+    for (size_t i=0; i<group_ids.size()-1; ++i)
+        H5Gclose(group_ids[i]);
+    return group_ids.back();
+}
+
+/* Open dataset. Expects either a simple name as in "ds" or the full path ("/group/ds") */
+hid_t open_dataset(hid_t file_id, std::string path, bool print_errors)
+{
+    hid_t dset_id = -1;
+    hid_t group_id = open_group(file_id, path, print_errors);
+    if (group_id >= 0)
+    {
+        auto index = path.find_last_of("/");
+        auto dataset_name = index >= 0 ? path.substr(index+1) : path;
+        dset_id = H5Dopen(group_id, dataset_name.c_str(), H5P_DEFAULT);
+        if (dset_id < 0 && print_errors)
+            fprintf(stderr, "Error opening dataset %s\n", path.c_str());
+        H5Gclose(group_id);
+    }
+    return dset_id;
+}
+
 /* Check if a dataset exist in a HDF5 file */
 bool dataset_exists(std::string filename, std::string name)
 {
     hid_t file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-    bool exists = H5Lexists(file_id, name.c_str(), H5P_DEFAULT ) > 0;
+    hid_t group_id = open_group(file_id, name, true);
+    bool exists = false;
+    if (group_id >= 0)
+    {
+        auto index = name.find_last_of("/");
+        auto dataset_name = index >= 0 ? name.substr(index+1) : name;
+        exists = H5Lexists(group_id, name.c_str(), H5P_DEFAULT);
+        H5Gclose(group_id);
+    }
     H5Fclose(file_id);
     return exists;
 }
@@ -185,11 +246,12 @@ int main(int argc, char **argv)
             "Formatting options for <virtual_dataset>:\n"
             "  dataset_name:resolution:type   dataset_name: name of the virtual dataset\n"
             "                                 resolution: XRES, XRESxYRES, or XRESxYRESxZRES\n"
-            "                                 type: [u]int16, [u]int32, [u]int64, float, or double\n\n"
+            "                                 type: [u]int8, [u]int16, [u]int32, [u]int64, float, or double\n\n"
             "Examples:\n"
             "%s sample.h5 simple_vector.lua Simple:500:float\n"
-            "%s sample.h5 sine_wave.lua SineWave:100x10:int32\n",
-            argv[0], argv[0], argv[0]);
+            "%s sample.h5 sine_wave.lua SineWave:100x10:int32\n"
+            "%s sample.h5 virtual.py /Group/Name/VirtualDataset:100x100:uint8\n",
+            argv[0], argv[0], argv[0], argv[0]);
         exit(1);
     }
 
@@ -272,7 +334,7 @@ int main(int argc, char **argv)
             }
 
             /* Retrieve dataset information */
-            hid_t dset_id = H5Dopen(file_id, info.name.c_str(), H5P_DEFAULT);
+            hid_t dset_id = open_dataset(file_id, info.name, true);
             if (dset_id < 0)
             {
                 fprintf(stderr, "Error opening dataset %s from file %s\n",
@@ -386,16 +448,23 @@ int main(int argc, char **argv)
             fprintf(stderr, "Error opening %s\n", hdf5_file.c_str());
             exit(1);
         }
+        hid_t group_id = open_group(file_id, hdf5_file, true);
+        if (group_id < 0)
+        {
+            fprintf(stderr, "Unable to find path to %s\n", hdf5_file.c_str());
+            exit(1);
+        }
         for (auto &info: delete_list)
         {
             /* Delete existing dataset so its contents can be overwritten */
-            herr_t status = H5Ldelete(file_id, info.c_str(), H5P_DEFAULT);
+            herr_t status = H5Ldelete(group_id, info.c_str(), H5P_DEFAULT);
             if (status < 0)
             {
                 fprintf(stderr, "Failed to delete existing virtual dataset %s\n", info.c_str());
                 exit(1);
             }
         }
+        H5Gclose(group_id);
         H5Fclose(file_id);
     }
 

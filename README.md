@@ -137,6 +137,15 @@ Also, make sure to read the template files for
 to learn more about the APIs behind the `lib` interface.
 
 
+# Support for HDF5 groups
+
+HDF5-UDF also supports datasets stored in a non-flat hierarchy. The API accepts
+dataset names that are prefixed by their group names, as in
+`lib.getData("/group/name/dataset")`. It is also possible to store a UDF dataset
+on a given group by using the same syntax on the command line, such as 
+`/group/name/dataset:resolution:datatype`. Note that the given group must already
+exist: `hdf5-udf` will not attempt to create them for you.
+
 # Configuration and execution
 
 If the program has been installed to a directory other than `/usr/local`, then
