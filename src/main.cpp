@@ -536,6 +536,7 @@ int main(int argc, char **argv)
         jas["scratch_datasets"] = scratch_dataset_names;
         jas["bytecode_size"] = bytecode.length();
         jas["backend"] = backend->name();
+        jas["api_version"] = 1;
 
         std::string jas_str = jas.dump();
         size_t payload_size = jas_str.length() + bytecode.size() + 1;
