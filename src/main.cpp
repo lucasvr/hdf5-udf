@@ -171,6 +171,11 @@ hid_t open_dataset(hid_t file_id, std::string path, bool print_errors)
 bool dataset_exists(std::string filename, std::string name)
 {
     hid_t file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    if (file_id < 0)
+    {
+        fprintf(stderr, "Failed to open file %s\n", filename.c_str());
+        return false;
+    }
     hid_t group_id = open_group(file_id, name, true);
     bool exists = false;
     if (group_id >= 0)
@@ -315,15 +320,15 @@ int main(int argc, char **argv)
         info.name = name;
 
         /* If this dataset is scheduled for removal, then assume it's not an input dataset */
-        bool is_input_dataset = true;
+        bool is_valid_candidate = true;
         for (auto &deletename: delete_list)
             if (name.compare(deletename) == 0)
             {
-                is_input_dataset = false;
+                is_valid_candidate = false;
                 break;
             }
 
-        if (dataset_exists(hdf5_file, name) && is_input_dataset)
+        if (dataset_exists(hdf5_file, name) && is_valid_candidate)
         {
             /* Open HDF5 file */
             hid_t file_id = H5Fopen(hdf5_file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
