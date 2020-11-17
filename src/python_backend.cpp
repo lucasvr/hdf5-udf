@@ -19,6 +19,8 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <locale>
+#include <codecvt>
 #include <algorithm>
 #include "python_backend.h"
 #include "anon_mmap.h"
@@ -286,7 +288,7 @@ bool PythonBackend::executeUDF(PyObject *loadlib, PyObject *udf, std::string fil
         bool ready = true;
 #ifdef ENABLE_SANDBOX
         Sandbox sandbox;
-        ready = sandbox.init(filterpath);
+        ready = sandbox.init(filterpath, pathsAllowed());
 #endif
         if (ready)
         {
@@ -314,6 +316,29 @@ bool PythonBackend::executeUDF(PyObject *loadlib, PyObject *udf, std::string fil
         return WIFEXITED(status) ? WEXITSTATUS(status) == 0 : false;
     }
     return false;
+}
+
+/* List of paths we need to access (called after Py_Initialize()) */
+std::vector<std::string> PythonBackend::pathsAllowed()
+{
+    std::vector<std::string> paths_allowed;
+    std::wstringstream input(Py_GetPath());
+    std::wstring path;
+
+    // wstring -> string converter
+    std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
+
+    while (std::getline(input, path, L':'))
+    {
+        std::stringstream ss1, ss2, ss3;
+        ss1 << converter.to_bytes(path) << "/pycparser";
+        ss2 << converter.to_bytes(path) << "/pycparser/*";
+        ss3 << converter.to_bytes(path) << "/pycparser/__pycache__/*";
+        paths_allowed.push_back(ss1.str());
+        paths_allowed.push_back(ss2.str());
+        paths_allowed.push_back(ss3.str());
+    }
+    return paths_allowed;
 }
 
 void PythonBackend::printPyObject(PyObject *obj)

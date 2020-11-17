@@ -264,7 +264,7 @@ bool LuaBackend::run(
         bool ready = true;
 #ifdef ENABLE_SANDBOX
         Sandbox sandbox;
-        ready = sandbox.init(filterpath);
+        ready = sandbox.init(filterpath, std::vector<std::string>());
 #endif
         if (ready)
         {

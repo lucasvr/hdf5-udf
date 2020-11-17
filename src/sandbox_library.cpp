@@ -29,10 +29,8 @@
 #include <vector>
 #include <string>
 
-// List of files allowed to be accessed by the UDF. Wildcards are allowed.
-static std::vector<std::string> files_allowed {
-    "/etc/resolv.conf",    
-};
+// List of files allowed to be accessed by the UDF
+static std::vector<std::string> files_allowed;
 
 extern "C" {
 
@@ -49,7 +47,7 @@ static void __attribute__((unused)) print_syscall(std::string name, long arg)
     syscall_no_intercept(SYS_write, 2, "\n", 1);   
 }
 
-static int syscall_intercept(
+static int syscall_intercept_hook(
     long syscall_nr,
     long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
     long *ret)
@@ -68,7 +66,7 @@ static int syscall_intercept(
         *ret = -EPERM;
         return 0;
     };
- 
+
     // A non-zero return value returned by the callback function is used to signal
     // to the intercepting library that the specific system call was ignored by the
     // user and the original syscall should be executed. A zero return value signals
@@ -87,13 +85,11 @@ static int syscall_intercept(
     }
 }
 
-static __attribute__((constructor)) void syscall_intercept_init()
+// Entry point, called from Sandbox::init()
+bool sandbox_init_syscall_intercept(std::vector<std::string> paths_allowed)
 {
-    std::vector<std::string> files(files_allowed.begin(), files_allowed.end());
-    files_allowed.clear();
-
-    // Resolve wildcards in files[]
-    for (auto &path: files)
+    // Resolve wildcards in paths_allowed[]
+    for (auto &path: paths_allowed)
     {
         // Update list of files the program is allowed to open
         if (path.find("*") == std::string::npos)
@@ -110,9 +106,9 @@ static __attribute__((constructor)) void syscall_intercept_init()
     }
 
     // Set up our system call hook
-    intercept_hook_point = &syscall_intercept;
+    intercept_hook_point = &syscall_intercept_hook;
+    return true;
 }
-
 
 ////////////////////////////////////
 // System call filtering interface
@@ -125,7 +121,8 @@ static __attribute__((constructor)) void syscall_intercept_init()
     } \
 } while (0)
 
-bool syscall_filter_init()
+// Entry point, called from Sandbox::init()
+bool sandbox_init_seccomp()
 {
     scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_KILL_PROCESS);
 

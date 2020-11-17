@@ -37,6 +37,7 @@ public:
     std::vector<std::string> udfDatasetNames(std::string udf_file);
 
 private:
+    std::vector<std::string> pathsAllowed();
     void printPyObject(PyObject *obj);
     bool executeUDF(PyObject *loadlib, PyObject *udf, std::string filterpath);
 };
