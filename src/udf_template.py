@@ -6,19 +6,24 @@
 # HDF5 filter callbacks and main interface with the Python API.
 #
 
-import os
-from cffi import FFI
+# Note: python_backend.cpp loads the "cffi" module for us. By delegating that
+# task to the C code we can keep strict sandboxing rules, as the import process
+# requires access to the filesystem (i.e., readdir, stat, open, etc)
 
 class PythonLib:
     def load(self, filterpath):
-        self.ffi = FFI()
+        # self.cffi is initialized from C code
+        # self.ffi = cffi.FFI()
+
         self.ffi.cdef("""
             void       *pythonGetData(const char *);
             const char *pythonGetType(const char *);
             const char *pythonGetCast(const char *);
             const char *pythonGetDims(const char *);
             """)
-        self.filterlib = self.ffi.dlopen(filterpath)
+
+        # self.filterlib is initialized from C code
+        # self.filterlib = self.ffi.dlopen(filterpath)
 
     def getData(self, name):
         name = self.ffi.new("char[]", name.encode("utf-8"))
