@@ -138,6 +138,10 @@ bool sandbox_init_seccomp()
     ALLOW(brk, 0);
     ALLOW(exit_group, 0);
 
+    // Terminal-related system calls
+    ALLOW(ioctl, 1, SCMP_A1(SCMP_CMP_EQ, TIOCGWINSZ));
+    ALLOW(ioctl, 1, SCMP_A1(SCMP_CMP_EQ, TCGETS));
+
     // Sockets-related system calls
     ALLOW(socket, 0);
     ALLOW(setsockopt, 0);
