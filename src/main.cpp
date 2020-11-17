@@ -273,6 +273,15 @@ int main(int argc, char **argv)
     const int first_dataset_index = 3;
     bool overwrite = false;
 
+    struct stat statbuf;
+    std::vector<std::string> input_files = {hdf5_file, udf_file};
+    for (auto input_file: input_files)
+        if (stat(input_file.c_str(), &statbuf) < 0)
+        {
+            fprintf(stderr, "%s: %s\n", input_file.c_str(), strerror(errno));
+            exit(1);
+        }
+
     Backend *backend = getBackendByFileExtension(udf_file);
     if (! backend)
     {
