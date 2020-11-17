@@ -24,10 +24,15 @@
 #include <sys/ioctl.h>
 #include <seccomp.h>
 #include <syscall.h>
+#include <signal.h>
 #include <libsyscall_intercept_hook_point.h>
 #include <algorithm>
 #include <vector>
 #include <string>
+
+#ifndef SYS_SECCOMP
+#define SYS_SECCOMP 1
+#endif
 
 // List of files allowed to be accessed by the UDF
 static std::vector<std::string> files_allowed;
@@ -63,7 +68,7 @@ static int syscall_intercept_hook(
         for (auto &p: files_allowed)
             if (p.compare(path) == 0)
                 return 1;
-        *ret = -EPERM;
+        *ret = -EACCES;
         return 0;
     };
 
@@ -121,10 +126,40 @@ bool sandbox_init_syscall_intercept(std::vector<std::string> paths_allowed)
     } \
 } while (0)
 
+static void unallowed_syscall_handler(int signum, siginfo_t *info, void *ucontext)
+{
+    if (info->si_code == SYS_SECCOMP)
+    {
+        // Note: not every function is async-signal-safe (i.e., functions which can
+        // be safely called within a signal handler). For instance, buffered I/O and
+        // memory allocation are not -- and we use both here for the sake of convenience.
+        // If the program gets interrupted by another signal while we call one of those
+        // functions and the new signal handler also executes one of those functions
+        // chances are that we'll end up with memory corruption. On the good side, we're
+        // just about to kill the process anyway, so this may not hurt at all.
+        char *name = seccomp_syscall_resolve_num_arch(info->si_arch, info->si_syscall);
+        fprintf(stderr, "UDF attempted to execute blocked syscall %s\n", name);
+        free(name);
+        _exit(1);
+    }
+}
+
 // Entry point, called from Sandbox::init()
 bool sandbox_init_seccomp()
 {
-    scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_KILL_PROCESS);
+    // Let the process receive a SIGSYS when it executes a
+    // system call that's not allowed.
+    scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_TRAP);
+
+    struct sigaction action;
+    memset(&action, 0, sizeof(action));
+    action.sa_flags = SA_SIGINFO;
+    action.sa_sigaction = unallowed_syscall_handler;
+    if (sigaction(SIGSYS, &action, NULL) < 0)
+    {
+        fprintf(stderr, "Failed setting a handler for SIGSYS: %s\n", strerror(errno));
+        return false;
+    }
 
     // One particular use case of HDF5-UDF is to retrieve data
     // from servers exposed on the Internet and to provide that
