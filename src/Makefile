@@ -105,7 +105,7 @@ clean:
 	rm -f $(BIN_TARGET) $(FILTER_TARGET) $(SANDBOX_TARGET) $(WRAPPER_TARGET) *.o
 
 install:
-	@install -v -d $(DESTDIR)/bin $(DESTDIR)/share/hdf5-udf $(DESTDIR)/hdf5/lib/plugin
+	@install -v -d $(DESTDIR)/bin $(DESTDIR)/share/hdf5-udf $(PLUGINDIR)
 	@install -v -t $(DESTDIR)/bin $(BIN_TARGET)
 	@install -v -t $(DESTDIR)/share/hdf5-udf udf_template.lua
 	@install -v -t $(DESTDIR)/share/hdf5-udf udf_template.cpp
