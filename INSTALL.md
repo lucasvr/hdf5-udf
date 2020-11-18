@@ -4,7 +4,8 @@
 
 The HDF5-UDF package and the syscall_intercept dependency are both hosted
 on a PPA repository. Please run the following commands to include that PPA
-on the list of sources searched by `apt`:
+on the list of sources searched by `apt` (note that the `apt-key` command
+depends on the `gnupg` package):
 
 ```
 $ echo "deb https://lucasvr.gobolinux.org/debian/repo/ /" >> /etc/apt/sources.list.d/internal.list
@@ -15,8 +16,7 @@ And then install the binary packages with:
 
 ```
 $ apt update
-$ apt install libsyscall-intercept0
-$ apt install hdf5-udf
+$ apt install -y libsyscall-intercept0 hdf5-udf
 ```
 
 # Building from the source code
