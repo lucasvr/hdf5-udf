@@ -1,5 +1,5 @@
-%define pre_dot   .alpha
-%define pre_slash -alpha
+#%define pre_dot   .alpha
+#%define pre_slash -alpha
 
 Name:           hdf5-udf
 Version:        1.0
