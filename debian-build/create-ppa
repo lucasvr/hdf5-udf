@@ -1,0 +1,85 @@
+#!/bin/bash
+
+# Create an authenticated APT repository. Instructions adapted from
+# https://medium.com/sqooba/create-your-own-custom-and-authenticated-apt-repository-1e4a4cf0b864
+#
+# Lucas C. Villa Real <lucasvr@gobolinux.org>
+
+set -e
+
+# TODO: we currently support a single arch only
+ROOT=$PWD/repo
+ARCHS=(amd64)
+
+# Basic checks
+if [ $# -lt 1 ]
+then
+    echo "Syntax: $0 <file.deb> [file.deb...]"
+    exit 1
+fi
+
+NAME="Lucas C. Villa Real"
+COMMENT="HDF5-UDF"
+EMAIL="lucasvr@gmail.com"
+
+# Setup GPG key
+for line in "cert-digest-algo SHA256" "digest-algo SHA256"
+do
+    if ! grep -q "^${line}" $HOME/.gnupg/gpg.conf
+    then
+        echo "${line}" >> $HOME/.gnupg/gpg.conf
+    fi
+done
+
+KEY_ID=$(gpg --list-secret-keys "${NAME} (${COMMENT})" | head -n2 | tail -n1 | awk {'print $1'})
+if [ -z "$KEY_ID" ]
+then
+    echo -n "Enter your passphrase: "
+    read PASSPHRASE
+
+    # Prompt-less generation of a GPG key
+    cat > gpg.batch << "    EOF"
+    %echo Generating a standard key
+    Key-Type: RSA
+    Key-Length: 4096
+    Key-Usage: encrypt,sign,auth
+    Name-Real: ${NAME}
+    Name-Comment: ${COMMENT}
+    Name-Email: ${EMAIL}
+    Expire-Date: 0
+    Passphrase: ${PASSPHRASE}
+    # Do a commit here, so that we can later print "done" :-)
+    %commit
+    %echo done
+    EOF
+
+    # Generate the key
+    gpg --verbose --generate-key --batch gpg.batch
+    KEY_ID=$(gpg --list-secret-keys "${NAME} (${COMMENT})" | head -n2 | tail -n1 | awk {'print $1'})
+
+    rm -f gpg.batch
+fi
+
+# Export the key
+rm -rf -- "$ROOT"
+mkdir -p "$ROOT"
+gpg --verbose --output $ROOT/KEY.gpg --armor --export "${KEY_ID}"
+
+# Begin preparation of the repository
+for arch in ${ARCHS[@]}
+do
+    mkdir -vp $ROOT/$arch
+    cp -v $@ $ROOT/$arch
+    cd $ROOT >& /dev/null
+
+    # Build the Packages file
+    apt-ftparchive --arch $arch packages $arch > Packages
+    gzip -k -f Packages
+
+    # Build the Release file and sign it
+    apt-ftparchive release . > Release
+    gpg --verbose --default-key ${KEY_ID} -abs -o Release.gpg Release
+    gpg --verbose --default-key ${KEY_ID} --clearsign -o InRelease Release
+    cd - >& /dev/null
+done
+
