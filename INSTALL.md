@@ -1,4 +1,27 @@
-# Requirements
+# Installing from the binary package
+
+## Debian and Ubuntu
+
+The HDF5-UDF package and the syscall_intercept dependency are both hosted
+on a PPA repository. Please run the following commands to include that PPA
+on the list of sources searched by `apt`:
+
+```
+$ echo "deb https://lucasvr.gobolinux.org/debian/repo/ /" >> /etc/apt/sources.list.d/internal.list
+$ wget -q -O - https://lucasvr.gobolinux.org/debian/repo/KEY.gpg | apt-key add -
+```
+
+And then install the binary packages with:
+
+```
+$ apt update
+$ apt install libsyscall-intercept0
+$ apt install hdf5-udf
+```
+
+# Building from the source code
+
+## Requirements
 
 HDF5-UDF comes with three backends, each of which requiring different
 pieces of software to allow the embedding of bytecode and their execution:
@@ -18,7 +41,7 @@ Please follow your distribution instructions to install these packages.
 Also, make sure that you install both regular and development packages.
 
 
-# Building the code
+## Building the code
 
 Simply run `make` followed by `make install`, optionally providing an alternative
 destination directory other than `/usr/local`:
