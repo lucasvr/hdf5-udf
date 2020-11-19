@@ -4,19 +4,20 @@
 
 The HDF5-UDF package and the syscall_intercept dependency are both hosted
 on a PPA repository. Please run the following commands to include that PPA
-on the list of sources searched by `apt` (note that the `apt-key` command
-depends on the `gnupg` package):
+on the list of sources searched by `apt`:
 
 ```
+$ apt install -y wget gnupg
 $ echo "deb https://lucasvr.gobolinux.org/debian/repo/ /" >> /etc/apt/sources.list.d/internal.list
 $ wget -q -O - https://lucasvr.gobolinux.org/debian/repo/KEY.gpg | apt-key add -
 ```
 
-And then install the binary packages with:
+And then install the binary packages (along with LuaJIT, so that you can
+write and read UDFs written in the Lua language) with:
 
 ```
 $ apt update
-$ apt install -y hdf5-udf libsyscall-intercept0
+$ apt install -y hdf5-udf libsyscall-intercept0 luajit
 ```
 
 Last, but not least, make sure that the `cffi` Python package is installed so
