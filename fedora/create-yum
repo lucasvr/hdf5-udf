@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# Create a YUM repository to host the RPM/SRPM packages.
+#
+# Lucas C. Villa Real <lucasvr@gobolinux.org>
+
+set -e
+
+ROOT=$PWD/repo
+
+# Basic checks
+if [ $# -lt 1 ]
+then
+    echo "Syntax: $0 <file.rpm> [file.rpm...]"
+    exit 1
+fi
+
+NAME="Lucas C. Villa Real"
+COMMENT="HDF5-UDF"
+EMAIL="lucasvr@gmail.com"
+
+# Install required packages
+if $(which yum)
+then
+    yum install -y yum-utils createrepo rpm-sign
+else
+    echo "WARNING: Will sign packages, but won't create a YUM repository"
+fi
+
+# Setup GPG key
+for line in "cert-digest-algo SHA256" "digest-algo SHA256"
+do
+    if ! grep -q "^${line}" $HOME/.gnupg/gpg.conf
+    then
+        echo "${line}" >> $HOME/.gnupg/gpg.conf
+    fi
+done
+
+KEY_ID=$(gpg --list-secret-keys "${NAME} (${COMMENT})" | head -n2 | tail -n1 | awk {'print $1'})
+if [ -z "$KEY_ID" ]
+then
+    echo -n "Enter your passphrase: "
+    read PASSPHRASE
+
+    # Prompt-less generation of a GPG key
+    cat > gpg.batch << "    EOF"
+    %echo Generating a standard key
+    Key-Type: RSA
+    Key-Length: 4096
+    Key-Usage: encrypt,sign,auth
+    Name-Real: ${NAME}
+    Name-Comment: ${COMMENT}
+    Name-Email: ${EMAIL}
+    Expire-Date: 0
+    Passphrase: ${PASSPHRASE}
+    # Do a commit here, so that we can later print "done" :-)
+    %commit
+    %echo done
+    EOF
+
+    # Generate the key
+    gpg --verbose --generate-key --batch gpg.batch
+    KEY_ID=$(gpg --list-secret-keys "${NAME} (${COMMENT})" | head -n2 | tail -n1 | awk {'print $1'})
+
+    rm -f gpg.batch
+fi
+
+# Export the key
+rm -rf -- "$ROOT"
+mkdir -p "$ROOT"
+gpg --verbose --output $ROOT/KEY.gpg --armor --export "${KEY_ID}"
+
+# Setup the GPG name
+if ! grep -q "^%_gpg_name ${KEY_ID}" $HOME/.rpmmacros 2> /dev/null
+then
+    echo "%_gpg_name ${KEY_ID}" >> $HOME/.rpmmacros
+fi
+
+# Copy and sign RPM files
+cp -va "$@" "$ROOT"
+rpm --addsign -v $ROOT/*.rpm
+
+if $(which createrepo)
+then
+    # Create the repository
+    createrepo -v -s sha256 "$ROOT"
+fi
