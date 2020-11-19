@@ -1,6 +1,9 @@
 #%%define pre_dot   .alpha
 #%%define pre_slash -alpha
 
+# 'strip' deletes the ELF section that holds the sandbox shared library, so disable it.
+%define debug_package %{nil}
+
 Name:           hdf5-udf
 Version:        1.0
 Release:        1%{?pre_dot}%{?dist}
@@ -32,12 +35,12 @@ make %{?_smp_mflags}
 
 %install
 rm -rf $RPM_BUILD_ROOT
-make install DESTDIR="%{?buildroot}/usr" INSTALL="/usr/bin/install -p"
+make install DESTDIR="%{?buildroot}/usr" PLUGINDIR="%{?buildroot}/usr/local/hdf5/lib/plugin" INSTALL="/usr/bin/install -p"
 
 %files
 %{_bindir}/%{name}
 %{_datadir}/%{name}/*
-%{_usr}/hdf5/lib/plugin/libhdf5-udf.so
+%{_usr}/local/hdf5/lib/plugin/libhdf5-udf.so
 
 %changelog
 * Thu Oct 08 2020 Lucas C. Villa Real <lucasvr@gobolinux.org>
