@@ -47,7 +47,7 @@ export DH_VERBOSE = 1
 # debmake generated override targets
 # Use "make prefix=/usr" (override prefix=/usr/local in Makefile)
 override_dh_auto_install:
-	dh_auto_install -- prefix=/usr
+	dh_auto_install -- prefix=/usr PLUGINDIR=/usr/local/hdf5/lib/plugin
 
 # Do not install python .pyc .pyo if they exist
 #override_dh_install:
