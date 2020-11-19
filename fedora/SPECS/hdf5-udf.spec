@@ -35,7 +35,7 @@ make %{?_smp_mflags}
 
 %install
 rm -rf $RPM_BUILD_ROOT
-make install DESTDIR="%{?buildroot}/usr" PLUGINDIR="%{?buildroot}/usr/local/hdf5/lib/plugin" INSTALL="/usr/bin/install -p"
+make install DESTDIR="%{?buildroot}" prefix="/usr" PLUGINDIR="%{_usr}/local/hdf5/lib/plugin" INSTALL="/usr/bin/install -p"
 
 %files
 %{_bindir}/%{name}
