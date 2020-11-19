@@ -167,7 +167,8 @@ static void teardown(std::vector<PyObject *> decref, void *libpython)
     for (auto mod = decref.rbegin(); mod != decref.rend(); ++mod)
         Py_XDECREF(*mod);
     Py_Finalize();
-    dlclose(libpython);
+    if (libpython)
+        dlclose(libpython);
 }
 
 /* Execute the user-defined-function embedded in the given buffer */
@@ -249,6 +250,12 @@ bool PythonBackend::run(
     // Load essential modules prior to the launch of the user-defined-function
     // so we can keep strict sandbox rules for third-party code.
     PyObject *cffi_module = PyImport_ImportModule("cffi");
+    if (! cffi_module)
+    {
+        fprintf(stderr, "Failed to import the cffi module\n");
+        teardown(decref, libpython);
+        return false;
+    }
     decref.push_back(cffi_module);
 
     // From the documentation: unlike other functions that steal references,
@@ -269,6 +276,12 @@ bool PythonBackend::run(
 
     // Get a reference to cffi.FFI().dlopen()
     PyObject *ffi_dlopen = ffi_instance ? PyObject_GetAttrString(ffi_instance, "dlopen") : NULL;
+    if (! ffi_dlopen)
+    {
+        fprintf(stderr, "Failed to retrieve method cffi.FFI().dlopen()\n");
+        teardown(decref, libpython);
+        return false;
+    }
 
     // Get handles for lib.load() and for the dynamic_dataset() UDF entry point
     bool retval = false;
