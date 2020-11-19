@@ -7,8 +7,9 @@ OPT_PYTHON    := 1 # enable/disable Python backend
 OPT_LUA       := 1 # enable/disable Lua/LuaJIT backend
 OPT_CPP       := 1 # enable/disable C/C++ backend
 
-DESTDIR        = /usr/local
-PLUGINDIR      = $(DESTDIR)/hdf5/lib/plugin
+DESTDIR        =
+prefix         = /usr/local
+PLUGINDIR      = $(prefix)/hdf5/lib/plugin
 
 # Starting with Python 3.8, `python3-config --ldflags` no longer links to libpython;
 # that functionality is now provided by `python3-config --embed`, which didn't exist
@@ -105,9 +106,9 @@ clean:
 	rm -f $(BIN_TARGET) $(FILTER_TARGET) $(SANDBOX_TARGET) $(WRAPPER_TARGET) *.o
 
 install:
-	@install -v -d $(DESTDIR)/bin $(DESTDIR)/share/hdf5-udf $(PLUGINDIR)
-	@install -v -t $(DESTDIR)/bin $(BIN_TARGET)
-	@install -v -t $(DESTDIR)/share/hdf5-udf udf_template.lua
-	@install -v -t $(DESTDIR)/share/hdf5-udf udf_template.cpp
-	@install -v -t $(DESTDIR)/share/hdf5-udf udf_template.py
-	@install -v -t $(PLUGINDIR) $(FILTER_TARGET)
+	@install -v -d $(DESTDIR)$(prefix)/bin $(DESTDIR)$(prefix)/share/hdf5-udf $(DESTDIR)$(PLUGINDIR)
+	@install -v -t $(DESTDIR)$(prefix)/bin $(BIN_TARGET)
+	@install -v -t $(DESTDIR)$(prefix)/share/hdf5-udf udf_template.lua
+	@install -v -t $(DESTDIR)$(prefix)/share/hdf5-udf udf_template.cpp
+	@install -v -t $(DESTDIR)$(prefix)/share/hdf5-udf udf_template.py
+	@install -v -t $(DESTDIR)$(PLUGINDIR) $(FILTER_TARGET)
