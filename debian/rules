@@ -49,6 +49,9 @@ export DH_VERBOSE = 1
 override_dh_auto_install:
 	dh_auto_install -- prefix=/usr PLUGINDIR=/usr/local/hdf5/lib/plugin
 
+# Allow the installation of plugin files to /usr/local
+override_dh_usrlocal:
+
 # Do not install python .pyc .pyo if they exist
 #override_dh_install:
 #	dh_install --list-missing -X.pyc -X.pyo
