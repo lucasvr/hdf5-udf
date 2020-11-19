@@ -16,7 +16,44 @@ And then install the binary packages with:
 
 ```
 $ apt update
-$ apt install -y libsyscall-intercept0 hdf5-udf
+$ apt install -y hdf5-udf libsyscall-intercept0
+```
+
+Last, but not least, make sure that the `cffi` Python package is installed so
+that Python UDFs can run as expected:
+
+```
+$ pip3 install cffi
+```
+
+## Fedora and RHEL
+
+We host the HDF5-UDF and the syscall_intercept dependency on a YUM
+repository. Please run the following commands to let your system
+search for packages on that location:
+
+```
+$ wget -q -O /etc/pki/rpm-gpg/RPM-GPG-KEY-hdf5-udf https://lucasvr.gobolinux.org/fedora/repo/KEY.gpg
+$ cat << EOF > /etc/yum.repos.d/hdf5-udf.repo
+[HDF5-UDF]
+name=HDF5-UDF RPM Server
+baseurl=https://lucasvr.gobolinux.org/fedora/repo
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-hdf5-udf
+EOF
+```
+
+And now you are ready to install the packages with YUM:
+
+```
+$ yum install -y hdf5-udf libsyscall_intercept
+```
+
+Last, please make sure that the `cffi` Python package is installed with:
+
+```
+$ pip3 install cffi
 ```
 
 # Building from the source code
