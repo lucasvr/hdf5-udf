@@ -211,6 +211,12 @@ bool PythonBackend::run(
     // Workaround for CFFI import errors due to missing symbols. We force libpython
     // to be loaded and for all symbols to be resolved by dlopen()
     void *libpython = dlopen("libpython3.so", RTLD_NOW | RTLD_GLOBAL);
+    if (! libpython)
+    {
+        char libname[64];
+        snprintf(libname, sizeof(libname)-1, "libpython3.%d.so", PY_MINOR_VERSION);
+        libpython = dlopen(libname, RTLD_NOW | RTLD_GLOBAL);
+    }
 
     // Init Python interpreter
     Py_Initialize();
