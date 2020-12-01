@@ -364,7 +364,7 @@ int main(int argc, char **argv)
             /* Check that the input dataset's datatype is supported by our implementation */
             auto datatype_ptr = info.getDatatype();
             if (datatype_ptr == NULL) {
-                fprintf(stderr, "Unsupported HDF5 datatype %jd\n", info.hdf5_datatype);
+                fprintf(stderr, "Unsupported HDF5 datatype %#lx\n", info.hdf5_datatype);
                 exit(1);
             }
             info.datatype = datatype_ptr;
