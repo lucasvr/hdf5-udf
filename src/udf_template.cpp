@@ -58,4 +58,6 @@ UserDefinedLibrary lib;
 
 // User-Defined Function
 
+// compound_declarations_placeholder
+
 // user_callback_placeholder

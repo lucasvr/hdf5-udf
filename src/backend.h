@@ -13,6 +13,15 @@
 #include <string>
 #include "dataset.h"
 
+struct AssembleData {
+    std::string udf_file;
+    std::string template_file;
+    std::string compound_declarations;
+    std::string callback_placeholder;
+    std::string compound_placeholder;
+    std::string extension;
+};
+
 class Backend {
 public:
     // Backend name (e.g., "LuaJIT")
@@ -60,16 +69,14 @@ public:
     // file into one, saving the result to a temporary file on disk that ends on the
     // on the provided extension. The user-defined-function is injected in the template
     // file right where the placeholder string is found.
-    std::string assembleUDF(
-        std::string udf_file,
-        std::string template_file,
-        std::string compound_declarations,
-        std::string placeholder,
-        std::string extension);
+    std::string assembleUDF(const AssembleData &data);
 
     // Helper function: save a data blob to a temporary file on disk whose name ends
     // on the given extension.
     std::string writeToDisk(const char *data, size_t size, std::string extension);
+
+    // Helper function: converts a string into a valid C variable name
+    std::string sanitizedName(std::string name);
 };
 
 // Get a backend by their name (e.g., "LuaJIT")

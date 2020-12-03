@@ -122,9 +122,15 @@ std::string LuaBackend::compile(
     std::string template_file,
     std::string compound_declarations)
 {
-    std::string placeholder = "-- user_callback_placeholder";
-    auto lua_file = Backend::assembleUDF(
-        udf_file, template_file, compound_declarations, placeholder, this->extension());
+    AssembleData data = {
+        .udf_file = udf_file,
+        .template_file = template_file,
+        .compound_declarations = compound_declarations,
+        .callback_placeholder = "-- user_callback_placeholder",
+        .compound_placeholder = "",
+        .extension = this->extension()
+    };
+    auto lua_file = Backend::assembleUDF(data);
     if (lua_file.size() == 0)
     {
         fprintf(stderr, "Will not be able to compile the UDF code\n");
