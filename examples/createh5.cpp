@@ -123,8 +123,8 @@ int create_compound_dataset(hid_t file_id, int count)
 
     for (int i=0; i<dim0; ++i) {
         data[i].serial_no = i;
-        data[i].temperature = dim0/(i+1);
-        data[i].pressure = dim0/((i+1)*2);
+        data[i].temperature = dim0/(i+1.0);
+        data[i].pressure = dim0/((i+1)*2.0);
     }
 
     char name[64];
