@@ -82,10 +82,14 @@ std::string PythonBackend::extension()
 }
 
 /* Compile Python to a bytecode. Returns the bytecode as a string object. */
-std::string PythonBackend::compile(std::string udf_file, std::string template_file)
+std::string PythonBackend::compile(
+    std::string udf_file,
+    std::string template_file,
+    std::string compound_declarations)
 {
     std::string placeholder = "# user_callback_placeholder";
-    auto py_file = Backend::assembleUDF(udf_file, template_file, placeholder, this->extension());
+    auto py_file = Backend::assembleUDF(
+        udf_file, template_file, compound_declarations, placeholder, this->extension());
     if (py_file.size() == 0)
     {
         fprintf(stderr, "Will not be able to compile the UDF code\n");
@@ -458,4 +462,10 @@ std::vector<std::string> PythonBackend::udfDatasetNames(std::string udf_file)
         }
     }
     return output;
+}
+
+// Create a textual declaration of a struct given a compound map
+std::string PythonBackend::compoundToStruct(const DatasetInfo info)
+{
+    return std::string("");
 }

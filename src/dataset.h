@@ -14,17 +14,11 @@
 #include <numeric>
 #include <sstream>
 
-struct DatasetTypeInfo {
-    DatasetTypeInfo(std::string dtype, std::string ddeclaration, hid_t did, hid_t dsize) :
-        datatype(dtype),
-        declaration(ddeclaration),
-        hdf5_datatype_id(did),
-        datatype_size(dsize) { }
-
-    std::string datatype;
-    std::string declaration;
-    hid_t hdf5_datatype_id;
-    hid_t datatype_size;
+struct CompoundMember {
+    std::string name;
+    std::string type;
+    size_t offset;
+    size_t size;
 };
 
 /* Dataset information */
@@ -39,12 +33,14 @@ public:
     hid_t getStorageSize() const;
     const char *getCastDatatype() const;
     void printInfo(std::string dataset_type) const;
+    std::vector<CompoundMember> getCompoundMembers() const;
 
     std::string name;                /* Dataset name */
     std::string datatype;            /* Datatype, given as string */
     std::string dimensions_str;      /* Dimensions, given as string */
     hid_t hdf5_datatype;             /* Datatype, given as HDF5 type */
     std::vector<hsize_t> dimensions; /* Dataset dimensions */
+    std::vector<CompoundMember> members; /* Compound member names and types */
     void *data;                      /* Allocated buffer to hold dataset data */
 };
 

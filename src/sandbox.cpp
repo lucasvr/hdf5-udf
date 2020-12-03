@@ -24,7 +24,7 @@ class DummyBackend : public Backend {
 public:
     std::string name() { return ""; }
     std::string extension() { return ""; }
-    std::string compile(std::string udf_file, std::string template_file) { return ""; }
+    std::string compile(std::string udf_file, std::string template_file, std::string cdecl) { return ""; }
     bool run(
         const std::string filterpath,
         const std::vector<DatasetInfo> input_datasets,

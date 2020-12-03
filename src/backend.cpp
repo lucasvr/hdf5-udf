@@ -19,7 +19,11 @@
 #endif
 
 std::string Backend::assembleUDF(
-    std::string udf_file, std::string template_file, std::string placeholder, std::string extension)
+    std::string udf_file,
+    std::string template_file,
+    std::string compound_declarations,
+    std::string placeholder,
+    std::string extension)
 {
     std::ifstream ifs(udf_file);
     if (! ifs.is_open())
@@ -52,9 +56,11 @@ std::string Backend::assembleUDF(
     }
 
     /* Embed UDF string in the template */
+    if (compound_declarations.size())
+        inputFileBuffer = compound_declarations + "\n" + inputFileBuffer;
     auto completeCode = udf.replace(start, placeholder.length(), inputFileBuffer);
 
-    /* Compile the code */
+    /* Write the final code to disk */
     auto out_file = writeToDisk(completeCode.data(), completeCode.size(), extension);
     if (out_file.size() == 0)
     {

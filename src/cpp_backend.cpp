@@ -44,10 +44,14 @@ std::string CppBackend::extension()
 }
 
 /* Compile C to a shared object using GCC. Returns the shared object as a string. */
-std::string CppBackend::compile(std::string udf_file, std::string template_file)
+std::string CppBackend::compile(
+    std::string udf_file,
+    std::string template_file,
+    std::string compound_declarations)
 {
     std::string placeholder = "// user_callback_placeholder";
-    auto cpp_file = Backend::assembleUDF(udf_file, template_file, placeholder, this->extension());
+    auto cpp_file = Backend::assembleUDF(
+        udf_file, template_file, compound_declarations, placeholder, this->extension());
     if (cpp_file.size() == 0)
     {
         fprintf(stderr, "Will not be able to compile the UDF code\n");
@@ -318,4 +322,64 @@ std::vector<std::string> CppBackend::udfDatasetNames(std::string udf_file)
         close(pipefd[1]);
     }
     return output;
+}
+
+static std::string sanitizedName(std::string name)
+{
+    // Truncate the string at any of the following tokens
+    const char *truncate_at[] = {"(", "[", NULL};
+    for (int i=0; truncate_at[i] != NULL; ++i)
+        while (true)
+        {
+            auto index = name.find(truncate_at[i]);
+            if (index == std::string::npos)
+                break;
+            name = name.substr(0, index);
+        }
+
+    // Replace the following tokens by an underscore
+    const char *replace_at[] = {"-", " ", NULL};
+    for (int i=0; replace_at[i] != NULL; ++i)
+        while (true)
+        {
+            auto index = name.find(replace_at[i]);
+            if (index == std::string::npos)
+                break;
+            name.replace(index, 1, "_");
+        }
+
+    // Remove unwanted tokens from the end of the string
+    for (size_t i=name.size()-1; i>=0; --i)
+    {
+        if (name[i] != '_')
+            break;
+        name = name.substr(0, i);
+    }
+
+    // Put string to lowercase
+    std::transform(name.begin(), name.end(), name.begin(),
+        [](unsigned char c){ return std::tolower(c); });
+
+    return name;
+}
+
+/* Create a textual declaration of a struct given a compound map */
+std::string CppBackend::compoundToStruct(const DatasetInfo info)
+{
+    std::string cstruct = "struct compound_" + sanitizedName(info.name) + " {\n";
+    size_t current_offset = 0;
+    int pad = 0;
+    for (auto &member: info.members)
+    {
+        if (member.offset > current_offset)
+        {
+            auto size = member.offset - current_offset;
+            cstruct += "  char _pad" + std::to_string(pad) +"["+ std::to_string(size) +"];\n";
+            pad++;
+        }
+        current_offset += member.offset + member.size;
+        cstruct += "  " + member.type + " " + sanitizedName(member.name) + ";\n";
+    }
+    cstruct += "};\n";
+    return cstruct;
 }
