@@ -12,11 +12,12 @@ READ_OBJ   = $(patsubst %.cpp,%.o, $(READ_SRC))
 all: $(CREATE_BIN) $(READ_BIN)
 
 files: $(CREATE_BIN)
-	./$(CREATE_BIN) example-simple_vector.h5
-	./$(CREATE_BIN) example-sine_wave.h5
-	./$(CREATE_BIN) example-socket.h5
-	./$(CREATE_BIN) example-doom.h5
-	./$(CREATE_BIN) example-add_datasets.h5 2
+	./$(CREATE_BIN) --out=example-simple_vector.h5
+	./$(CREATE_BIN) --out=example-sine_wave.h5
+	./$(CREATE_BIN) --out=example-socket.h5
+	./$(CREATE_BIN) --out=example-doom.h5
+	./$(CREATE_BIN) --out=example-add_datasets.h5 --count=2
+	./$(CREATE_BIN) --out=example-compound.h5 --compound --count=1
 
 clean:
 	rm -f $(CREATE_BIN) $(READ_BIN) *.o
