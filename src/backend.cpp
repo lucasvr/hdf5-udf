@@ -81,8 +81,6 @@ std::string Backend::assembleUDF(const AssembleData &data)
         return "";
     }
 
-    writeToDisk(completeCode.data(), completeCode.size(), data.extension + ".tmp");
-
     return out_file;
 }
 
