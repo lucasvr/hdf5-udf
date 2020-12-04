@@ -18,13 +18,12 @@
 #include "python_backend.h"
 #endif
 
-std::string Backend::assembleUDF(
-    std::string udf_file, std::string template_file, std::string placeholder, std::string extension)
+std::string Backend::assembleUDF(const AssembleData &data)
 {
-    std::ifstream ifs(udf_file);
+    std::ifstream ifs(data.udf_file);
     if (! ifs.is_open())
     {
-        fprintf(stderr, "Failed to open %s\n", udf_file.c_str());
+        fprintf(stderr, "Failed to open %s\n", data.udf_file.c_str());
         return "";
     }
     std::string inputFileBuffer(
@@ -32,30 +31,50 @@ std::string Backend::assembleUDF(
         (std::istreambuf_iterator<char>()));
 
     /* Basic check: does the template file exist? */
-    if (template_file.size() == 0)
+    if (data.template_file.size() == 0)
     {
         fprintf(stderr, "Failed to find UDF template file\n");
         return "";
     }
-    std::ifstream ifstr(template_file);
+    std::ifstream ifstr(data.template_file);
     std::string udf(
 		(std::istreambuf_iterator<char>(ifstr)),
         (std::istreambuf_iterator<char>()));
 
-    /* Basic check: is the template string present in the template file? */
-    auto start = udf.find(placeholder);
-    if (start == std::string::npos)
+    /* Check if the compound declaration placeholder present in the template file */
+    auto compound_start = udf.find(data.compound_placeholder);
+    if (compound_start == std::string::npos)
     {
-        fprintf(stderr, "Failed to find placeholder string in %s\n",
-            template_file.c_str());
+        fprintf(stderr, "Failed to find compound placeholder string in %s\n",
+            data.template_file.c_str());
+        return "";
+    }
+
+    /* Replace compound placeholder with actual declaration string */
+    if (data.compound_declarations.size()) {
+        udf = udf.replace(
+            compound_start,
+            data.compound_placeholder.length(),
+            data.compound_declarations);
+    }
+
+    /* Check if the template string is present in the template file */
+    auto callback_start = udf.find(data.callback_placeholder);
+    if (callback_start == std::string::npos)
+    {
+        fprintf(stderr, "Failed to find callback placeholder string in %s\n",
+            data.template_file.c_str());
         return "";
     }
 
     /* Embed UDF string in the template */
-    auto completeCode = udf.replace(start, placeholder.length(), inputFileBuffer);
+    auto completeCode = udf.replace(
+        callback_start,
+        data.callback_placeholder.length(),
+        inputFileBuffer);
 
-    /* Compile the code */
-    auto out_file = writeToDisk(completeCode.data(), completeCode.size(), extension);
+    /* Write the final code to disk */
+    auto out_file = writeToDisk(completeCode.data(), completeCode.size(), data.extension);
     if (out_file.size() == 0)
     {
         fprintf(stderr, "Will not be able to compile the UDF code\n");
@@ -80,6 +99,45 @@ std::string Backend::writeToDisk(const char *data, size_t size, std::string exte
     tmpfile.flush();
     tmpfile.close();
     return std::string(path);
+}
+
+std::string Backend::sanitizedName(std::string name)
+{
+    // Truncate the string at any of the following tokens
+    const char *truncate_at[] = {"(", "[", NULL};
+    for (int i=0; truncate_at[i] != NULL; ++i)
+        while (true)
+        {
+            auto index = name.find(truncate_at[i]);
+            if (index == std::string::npos)
+                break;
+            name = name.substr(0, index);
+        }
+
+    // Replace the following tokens by an underscore
+    const char *replace_at[] = {"-", " ", NULL};
+    for (int i=0; replace_at[i] != NULL; ++i)
+        while (true)
+        {
+            auto index = name.find(replace_at[i]);
+            if (index == std::string::npos)
+                break;
+            name.replace(index, 1, "_");
+        }
+
+    // Remove unwanted tokens from the end of the string
+    for (size_t i=name.size()-1; i>=0; --i)
+    {
+        if (name[i] != '_')
+            break;
+        name = name.substr(0, i);
+    }
+
+    // Put string to lowercase
+    std::transform(name.begin(), name.end(), name.begin(),
+        [](unsigned char c){ return std::tolower(c); });
+
+    return name;
 }
 
 // Get a backend by their name (e.g., "LuaJIT")

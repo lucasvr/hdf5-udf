@@ -20,6 +20,7 @@ class PythonLib:
             const char *pythonGetType(const char *);
             const char *pythonGetCast(const char *);
             const char *pythonGetDims(const char *);
+            // compound_declarations_placeholder
             """)
 
         # self.filterlib is initialized from C code

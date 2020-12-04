@@ -23,6 +23,7 @@
 #include <codecvt>
 #include <algorithm>
 #include "python_backend.h"
+#include "cpp_backend.h"
 #include "anon_mmap.h"
 #include "dataset.h"
 #ifdef ENABLE_SANDBOX
@@ -31,6 +32,9 @@
 
 // Dataset names, sizes, and types
 static std::vector<DatasetInfo> dataset_info;
+
+// Buffer used to hold the compound-to-struct name produced by pythonGetCast()
+static char compound_cast_name[256];
 
 /* Functions exported to the Python template library (udf_template.py) */
 extern "C" void *pythonGetData(const char *element)
@@ -53,9 +57,22 @@ extern "C" const char *pythonGetType(const char *element)
 
 extern "C" const char *pythonGetCast(const char *element)
 {
-    for (size_t i=0; i<dataset_info.size(); ++i)
+    for (size_t i=0; i<dataset_info.size(); ++i) {
         if (dataset_info[i].name.compare(element) == 0)
-            return dataset_info[i].getCastDatatype();
+        {
+            auto cast = dataset_info[i].getCastDatatype();
+            if (! strcmp(cast, "void*"))
+            {
+                // Cast compound structure
+                PythonBackend backend;
+                memset(compound_cast_name, 0, sizeof(compound_cast_name));
+                snprintf(compound_cast_name, sizeof(compound_cast_name)-1,
+                    "struct compound_%s *", backend.sanitizedName(element).c_str());
+                return compound_cast_name;
+            }
+            return cast;
+        }
+    }
     fprintf(stderr, "%s: dataset %s not found\n", __func__, element);
     return NULL;
 }
@@ -82,10 +99,20 @@ std::string PythonBackend::extension()
 }
 
 /* Compile Python to a bytecode. Returns the bytecode as a string object. */
-std::string PythonBackend::compile(std::string udf_file, std::string template_file)
+std::string PythonBackend::compile(
+    std::string udf_file,
+    std::string template_file,
+    std::string compound_declarations)
 {
-    std::string placeholder = "# user_callback_placeholder";
-    auto py_file = Backend::assembleUDF(udf_file, template_file, placeholder, this->extension());
+    AssembleData data = {
+        .udf_file = udf_file,
+        .template_file = template_file,
+        .compound_declarations = compound_declarations,
+        .callback_placeholder = "# user_callback_placeholder",
+        .compound_placeholder = "// compound_declarations_placeholder",
+        .extension = this->extension()
+    };
+    auto py_file = Backend::assembleUDF(data);
     if (py_file.size() == 0)
     {
         fprintf(stderr, "Will not be able to compile the UDF code\n");
@@ -458,4 +485,24 @@ std::vector<std::string> PythonBackend::udfDatasetNames(std::string udf_file)
         }
     }
     return output;
+}
+
+// Create a textual declaration of a struct given a compound map
+std::string PythonBackend::compoundToStruct(const DatasetInfo info)
+{
+    std::string cstruct = "struct compound_" + sanitizedName(info.name) + " { ";
+    size_t current_offset = 0, pad = 0;
+    for (auto &member: info.members)
+    {
+        if (member.offset > current_offset)
+        {
+            auto size = member.offset - current_offset;
+            cstruct += "char _pad" + std::to_string(pad) +"["+ std::to_string(size) +"]; ";
+            pad++;
+        }
+        current_offset += member.offset + member.size;
+        cstruct += member.type + " " + sanitizedName(member.name) + "; ";
+    }
+    cstruct += "};\n";
+    return cstruct;
 }

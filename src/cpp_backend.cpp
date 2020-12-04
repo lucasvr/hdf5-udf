@@ -44,10 +44,20 @@ std::string CppBackend::extension()
 }
 
 /* Compile C to a shared object using GCC. Returns the shared object as a string. */
-std::string CppBackend::compile(std::string udf_file, std::string template_file)
+std::string CppBackend::compile(
+    std::string udf_file,
+    std::string template_file,
+    std::string compound_declarations)
 {
-    std::string placeholder = "// user_callback_placeholder";
-    auto cpp_file = Backend::assembleUDF(udf_file, template_file, placeholder, this->extension());
+    AssembleData data = {
+        .udf_file = udf_file,
+        .template_file = template_file,
+        .compound_declarations = compound_declarations,
+        .callback_placeholder = "// user_callback_placeholder",
+        .compound_placeholder = "// compound_declarations_placeholder",
+        .extension = this->extension()
+    };
+    auto cpp_file = Backend::assembleUDF(data);
     if (cpp_file.size() == 0)
     {
         fprintf(stderr, "Will not be able to compile the UDF code\n");
@@ -318,4 +328,24 @@ std::vector<std::string> CppBackend::udfDatasetNames(std::string udf_file)
         close(pipefd[1]);
     }
     return output;
+}
+
+/* Create a textual declaration of a struct given a compound map */
+std::string CppBackend::compoundToStruct(const DatasetInfo info)
+{
+    std::string cstruct = "struct compound_" + sanitizedName(info.name) + " {\n";
+    size_t current_offset = 0, pad = 0;
+    for (auto &member: info.members)
+    {
+        if (member.offset > current_offset)
+        {
+            auto size = member.offset - current_offset;
+            cstruct += "  char _pad" + std::to_string(pad) +"["+ std::to_string(size) +"];\n";
+            pad++;
+        }
+        current_offset += member.offset + member.size;
+        cstruct += "  " + member.type + " " + sanitizedName(member.name) + ";\n";
+    }
+    cstruct += "};\n";
+    return cstruct;
 }

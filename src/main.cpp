@@ -323,6 +323,7 @@ int main(int argc, char **argv)
     /* Identify virtual dataset name(s) and input dataset(s) that the UDF code depends on */
     std::vector<std::string> dataset_names = backend->udfDatasetNames(udf_file);
     std::vector<DatasetInfo> input_datasets;
+    std::string compound_declarations = "";
     for (auto &name: dataset_names)
     {
         DatasetInfo info;
@@ -363,11 +364,23 @@ int main(int argc, char **argv)
 
             /* Check that the input dataset's datatype is supported by our implementation */
             auto datatype_ptr = info.getDatatype();
-            if (datatype_ptr == NULL) {
-                fprintf(stderr, "Unsupported HDF5 datatype %jd\n", info.hdf5_datatype);
+            if (datatype_ptr == NULL)
+            {
+                fprintf(stderr, "Unsupported HDF5 datatype %#lx\n", info.hdf5_datatype);
                 exit(1);
             }
             info.datatype = datatype_ptr;
+            if (info.datatype.compare("compound") == 0)
+            {
+                info.members = info.getCompoundMembers();
+                if (info.members.size() == 0)
+                {
+                    fprintf(stderr, "Failed to parse dataset %s from file %s\n",
+                        info.name.c_str(), hdf5_file.c_str());
+                    exit(1);
+                }
+                compound_declarations += backend->compoundToStruct(info);
+            }
 
             input_datasets.push_back(info);
             H5Sclose(space_id);
@@ -446,7 +459,7 @@ int main(int argc, char **argv)
 
     /* Compile the UDF source file */
     auto template_file = template_path(backend->extension(), argv[0]);
-    auto bytecode = backend->compile(udf_file, template_file);
+    auto bytecode = backend->compile(udf_file, template_file, compound_declarations);
     if (bytecode.size() == 0)
     {
         fprintf(stderr, "Failed to compile UDF file\n");
@@ -554,7 +567,9 @@ int main(int argc, char **argv)
 
         std::string jas_str = jas.dump();
         size_t payload_size = jas_str.length() + bytecode.size() + 1;
-        printf("%s dataset header:\n%s\n", info.name.c_str(), jas.dump(4).c_str());
+        printf("\n%s dataset header:\n%s\n", info.name.c_str(), jas.dump(4).c_str());
+        if (compound_declarations.size())
+            printf("\nCompound data structures available to the UDF:\n%s\n", compound_declarations.c_str());
 
         /* Sanity check: the JSON and the bytecode must fit in the dataset */
         hsize_t grid_size = std::accumulate(std::begin(info.dimensions), std::end(info.dimensions), 1, std::multiplies<hsize_t>());

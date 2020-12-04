@@ -19,7 +19,10 @@ public:
     std::string extension();
 
     // Compile an input file into executable form
-    std::string compile(std::string udf_file, std::string template_file);
+    std::string compile(
+        std::string udf_file,
+        std::string template_file,
+        std::string compound_declarations);
 
     // Execute a user-defined-function
     bool run(
@@ -33,6 +36,9 @@ public:
     // Scan the UDF file for references to HDF5 dataset names.
     // We use this to store the UDF dependencies in the JSON payload.
     std::vector<std::string> udfDatasetNames(std::string udf_file);
+
+    // Create a textual declaration of a struct given a compound map
+    std::string compoundToStruct(const DatasetInfo info);
 
 private:
     // Compress a data buffer

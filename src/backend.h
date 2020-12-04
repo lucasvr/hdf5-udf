@@ -13,6 +13,15 @@
 #include <string>
 #include "dataset.h"
 
+struct AssembleData {
+    std::string udf_file;
+    std::string template_file;
+    std::string compound_declarations;
+    std::string callback_placeholder;
+    std::string compound_placeholder;
+    std::string extension;
+};
+
 class Backend {
 public:
     // Backend name (e.g., "LuaJIT")
@@ -26,7 +35,10 @@ public:
     }
 
     // Compile an input file into executable form
-    virtual std::string compile(std::string udf_file, std::string template_file) {
+    virtual std::string compile(
+        std::string udf_file,
+        std::string template_file,
+        std::string compound_declarations) {
         return "";
     }
 
@@ -48,19 +60,23 @@ public:
         return std::vector<std::string>();
     }
 
+    // Create a textual declaration of a struct given a compound map
+    virtual std::string compoundToStruct(const DatasetInfo info) {
+        return std::string("");
+    }
+
     // Helper function: combine the UDF template file and the user-defined-function
     // file into one, saving the result to a temporary file on disk that ends on the
     // on the provided extension. The user-defined-function is injected in the template
     // file right where the placeholder string is found.
-    std::string assembleUDF(
-        std::string udf_file,
-        std::string template_file,
-        std::string placeholder,
-        std::string extension);
+    std::string assembleUDF(const AssembleData &data);
 
     // Helper function: save a data blob to a temporary file on disk whose name ends
     // on the given extension.
     std::string writeToDisk(const char *data, size_t size, std::string extension);
+
+    // Helper function: converts a string into a valid C variable name
+    std::string sanitizedName(std::string name);
 };
 
 // Get a backend by their name (e.g., "LuaJIT")
