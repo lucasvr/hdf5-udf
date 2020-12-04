@@ -16,6 +16,7 @@ function init(filterpath)
         const char *luaGetType(const char *);
         const char *luaGetCast(const char *);
         const char *luaGetDims(const char *);
+        // compound_declarations_placeholder
     ]]
 
     lib.getData = function(name)

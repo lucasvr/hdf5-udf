@@ -29,6 +29,9 @@
 /* Lua context */
 static lua_State *State;
 
+// Buffer used to hold the compound-to-struct name produced by luaGetCast()
+static char compound_cast_name[256];
+
 #define DATA_OFFSET(i)        (void *) (((char *) &State) + i)
 #define NAME_OFFSET(i)        (void *) (((char *) &State) + 100 + i)
 #define DIMS_OFFSET(i)        (void *) (((char *) &State) + 200 + i)
@@ -86,7 +89,17 @@ extern "C" const char *luaGetCast(const char *element)
         /* Set register key to get dataset type */
         lua_pushlightuserdata(State, CAST_OFFSET(index));
         lua_gettable(State, LUA_REGISTRYINDEX);
-        return lua_tostring(State, -1);
+        const char *cast = lua_tostring(State, -1);
+        if (! strcmp(cast, "void*"))
+        {
+            // Cast compound structure
+            LuaBackend backend;
+            memset(compound_cast_name, 0, sizeof(compound_cast_name));
+            snprintf(compound_cast_name, sizeof(compound_cast_name)-1,
+                "struct compound_%s *", backend.sanitizedName(element).c_str());
+            return compound_cast_name;
+        }
+        return cast;
     }
     return NULL;
 }
@@ -127,7 +140,7 @@ std::string LuaBackend::compile(
         .template_file = template_file,
         .compound_declarations = compound_declarations,
         .callback_placeholder = "-- user_callback_placeholder",
-        .compound_placeholder = "",
+        .compound_placeholder = "// compound_declarations_placeholder",
         .extension = this->extension()
     };
     auto lua_file = Backend::assembleUDF(data);
@@ -369,5 +382,19 @@ std::vector<std::string> LuaBackend::udfDatasetNames(std::string udf_file)
 // Create a textual declaration of a struct given a compound map
 std::string LuaBackend::compoundToStruct(const DatasetInfo info)
 {
-    return std::string("");
+    std::string cstruct = "struct compound_" + sanitizedName(info.name) + " { ";
+    size_t current_offset = 0, pad = 0;
+    for (auto &member: info.members)
+    {
+        if (member.offset > current_offset)
+        {
+            auto size = member.offset - current_offset;
+            cstruct += "char _pad" + std::to_string(pad) +"["+ std::to_string(size) +"]; ";
+            pad++;
+        }
+        current_offset += member.offset + member.size;
+        cstruct += member.type + " " + sanitizedName(member.name) + "; ";
+    }
+    cstruct += "};\n";
+    return cstruct;
 }
