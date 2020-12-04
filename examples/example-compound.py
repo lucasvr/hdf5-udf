@@ -3,7 +3,7 @@
 #
 # To embed it in an existing HDF5 file, run:
 # $ make files
-# $ hdf5-udf example-compound.h5 example-compound.c Temperature:50:double
+# $ hdf5-udf example-compound.h5 example-compound.py Temperature:1000:double
 #
 # Underneath, hdf5-udf converts the compound into a named
 # class that can be used by getData<>() through the Foreign
