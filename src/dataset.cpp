@@ -21,7 +21,7 @@ struct DatasetTypeInfo {
     hid_t datatype_size;
 };
 
-static std::vector<DatasetTypeInfo> dataset_type_info = {
+static std::vector<DatasetTypeInfo> numerical_types = {
     {"int8",   "int8_t*",   H5T_STD_I8LE,   sizeof(int8_t)},
     {"int16",  "int16_t*",  H5T_STD_I16LE,  sizeof(int16_t)},
     {"int32",  "int32_t*",  H5T_STD_I32LE,  sizeof(int32_t)},
@@ -34,7 +34,7 @@ static std::vector<DatasetTypeInfo> dataset_type_info = {
     {"double", "double*",   H5T_IEEE_F64LE, sizeof(double)},
 };
 
-static DatasetTypeInfo compound_type_info = {
+static DatasetTypeInfo compound_type = {
     "compound", "void*", H5T_COMPOUND, -1
 };
 
@@ -73,11 +73,11 @@ size_t DatasetInfo::getGridSize() const
 const char *DatasetInfo::getDatatype() const
 {
     if (hdf5_datatype != -1) {
-        for (auto &info: dataset_type_info)
+        for (auto &info: numerical_types)
             if (H5Tequal(info.hdf5_datatype_id, hdf5_datatype))
                 return info.datatype.c_str();
         if (H5Tget_class(hdf5_datatype) == H5T_COMPOUND)
-            return compound_type_info.datatype.c_str();
+            return compound_type.datatype.c_str();
     }
     return NULL;
 }
@@ -85,11 +85,11 @@ const char *DatasetInfo::getDatatype() const
 size_t DatasetInfo::getHdf5Datatype() const
 {
     if (datatype.size()) {
-        for (auto &info: dataset_type_info)
+        for (auto &info: numerical_types)
             if (info.datatype.compare(datatype) == 0)
                 return info.hdf5_datatype_id;
         if (H5Tget_class(hdf5_datatype) == H5T_COMPOUND)
-            return compound_type_info.hdf5_datatype_id;
+            return compound_type.hdf5_datatype_id;
     }
     return -1;
 }
@@ -97,11 +97,11 @@ size_t DatasetInfo::getHdf5Datatype() const
 hid_t DatasetInfo::getStorageSize() const
 {
     if (datatype.size()) {
-        for (auto &info: dataset_type_info)
+        for (auto &info: numerical_types)
             if (info.datatype.compare(datatype) == 0)
                 return info.datatype_size;
         if (H5Tget_class(hdf5_datatype) == H5T_COMPOUND)
-            return compound_type_info.datatype_size;
+            return compound_type.datatype_size;
     }
     return -1;
 }
@@ -109,11 +109,11 @@ hid_t DatasetInfo::getStorageSize() const
 const char *DatasetInfo::getCastDatatype() const
 {
     if (datatype.size()) {
-        for (auto &info: dataset_type_info)
+        for (auto &info: numerical_types)
             if (info.datatype.compare(datatype) == 0)
                 return info.declaration.c_str();
         if (H5Tget_class(hdf5_datatype) == H5T_COMPOUND)
-            return compound_type_info.declaration.c_str();
+            return compound_type.declaration.c_str();
     }
     return NULL;
 }
