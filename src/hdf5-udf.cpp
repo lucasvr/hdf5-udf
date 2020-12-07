@@ -27,6 +27,28 @@
 using namespace std;
 using json = nlohmann::json;
 
+struct DatasetHandle {
+    DatasetHandle() :
+        dset_id(-1),
+        space_id(-1),
+        stringtype_id(-1)
+    {
+    }
+
+    ~DatasetHandle() {
+        if (space_id >= 0)
+            H5Sclose(space_id);
+        if (dset_id >= 0)
+            H5Dclose(dset_id);
+    }
+    hid_t dset_id;
+    hid_t space_id;
+    hid_t stringtype_id;
+};
+
+void releaseHdf5Datasets(
+    std::vector<DatasetHandle *> &handles, std::vector<DatasetInfo> &info);
+
 std::string getFilterPath()
 {
     std::vector<std::string> paths;
@@ -97,98 +119,98 @@ hid_t getDatasetHandle(std::string dataset, bool *handle_from_procfs)
     return (hid_t) -1;
 }
 
-std::vector<DatasetInfo> readHdf5Datasets(
+bool readHdf5Datasets(
     hid_t file_id,
     std::vector<std::string> &input_names,
-    std::vector<std::string> &scratch_names)
+    std::vector<std::string> &scratch_names,
+    std::vector<DatasetHandle *> &out_handles,
+    std::vector<DatasetInfo> &out_info)
 {
     auto readHdf5Dataset = [&](hid_t file_id, std::string dname, bool read_data)
     {
         Benchmark benchmark;
-        DatasetInfo out;
+        auto handle = new DatasetHandle;
 
         /* Open .h5 file in read-only mode */
-        hid_t dset_id = H5Dopen(file_id, dname.data(), H5P_DEFAULT);
-        if (dset_id < 0)
+        handle->dset_id = H5Dopen(file_id, dname.data(), H5P_DEFAULT);
+        if (handle->dset_id < 0)
         {
             fprintf(stderr, "Failed to open dataset for reading\n");
-            return out;
+            delete handle;
+            return false;
         }
 
+        /* Set space id */
+        handle->space_id = H5Dget_space(handle->dset_id);
+
         /* Retrieve datatype */
-        out.hdf5_datatype = H5Dget_type(dset_id);
-        out.datatype = out.getDatatype();
+        DatasetInfo info;
+        info.hdf5_datatype = H5Dget_type(handle->dset_id);
+        info.datatype = info.getDatatype();
 
         /* Retrieve number of dimensions and compute total grid size, in bytes */
-        hid_t space_id = H5Dget_space(dset_id);
-        out.dimensions.resize(H5Sget_simple_extent_ndims(space_id));
-        H5Sget_simple_extent_dims(space_id, out.dimensions.data(), NULL);
+        info.dimensions.resize(H5Sget_simple_extent_ndims(handle->space_id));
+        H5Sget_simple_extent_dims(handle->space_id, info.dimensions.data(), NULL);
         hsize_t n_elements = std::accumulate(
-            std::begin(out.dimensions), std::end(out.dimensions), 1, std::multiplies<hsize_t>());
+            std::begin(info.dimensions), std::end(info.dimensions), 1, std::multiplies<hsize_t>());
 
         /* Allocate enough memory so we can read this dataset */
-        void *rdata = (void *) malloc(n_elements * H5Tget_size(out.hdf5_datatype));
+        void *rdata = (void *) malloc(n_elements * H5Tget_size(info.hdf5_datatype));
         if (! rdata)
         {
             fprintf(stderr, "Not enough memory while allocating room for dataset\n");
-            return out;
+            delete handle;
+            return false;
         }
 
         /* Read the dataset */
         if (read_data)
         {
-            if (H5Dread(dset_id, out.hdf5_datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata) < 0)
+            if (H5Dread(handle->dset_id, info.hdf5_datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata) < 0)
             {
                 fprintf(stderr, "Failed to read HDF5 dataset\n");
                 free(rdata);
-                rdata = NULL;
+                delete handle;
+                return false;
             }
-            else
-                benchmark.print("Time to read dataset from disk");
+            benchmark.print("Time to read dataset from disk");
         }
         else
-            memset(rdata, 0, n_elements * H5Tget_size(out.hdf5_datatype));
+            memset(rdata, 0, n_elements * H5Tget_size(info.hdf5_datatype));
 
-        H5Sclose(space_id);
-        H5Dclose(dset_id);
-
-        out.name = dname;
-        out.data = rdata;
-        return out;
+        info.name = dname;
+        info.data = rdata;
+        out_info.push_back(info);
+        out_handles.push_back(handle);
+        return true;
     };
 
-    bool error = false;
-    std::vector<DatasetInfo> out;
+    std::vector<DatasetHandle *> out;
     for (auto name: input_names)
-    {
-        auto info = readHdf5Dataset(file_id, name, true);
-        if (info.data == NULL)
+        if (readHdf5Dataset(file_id, name, true) == false)
         {
             fprintf(stderr, "Failed to read input dataset %s from HDF5 file\n", name.c_str());
-            error = true;
-            break;
+            releaseHdf5Datasets(out_handles, out_info);
+            return false;
         }
-        out.push_back(info);
-    }
     for (auto name: scratch_names)
-    {
-        auto info = readHdf5Dataset(file_id, name, false);
-        if (info.data == NULL)
+        if (readHdf5Dataset(file_id, name, false) == false)
         {
             fprintf(stderr, "Failed to allocate scratch dataset for %s\n", name.c_str());
-            error = true;
-            break;
+            releaseHdf5Datasets(out_handles, out_info);
+            return false;
         }
-        out.push_back(info);
-    }
+    return true;
+}
 
-    if (error)
-    {
-        for (auto &entry: out)
-            free(entry.data);
-        out.clear();
-    }
-    return out;
+void releaseHdf5Datasets(std::vector<DatasetHandle *> &handles, std::vector<DatasetInfo> &info)
+{
+    for (auto &entry: handles)
+        free(entry);
+    for (auto &entry: info)
+        free(entry.data);
+    handles.clear();
+    info.clear();
 }
 
 static size_t
@@ -231,7 +253,18 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
             return 0;
 
         /* Allocate input and output grids */
-        auto input_datasets = readHdf5Datasets(file_id, input_names, scratch_names);
+        std::vector<DatasetHandle *> input_handles;
+        std::vector<DatasetInfo> input_info;
+        auto ok = readHdf5Datasets(
+            file_id, input_names, scratch_names, input_handles, input_info);
+        if (! ok)
+        {
+            fprintf(stderr, "Failed to process input/scratch datasets\n");
+            if (handle_from_procfs)
+                H5Fclose(file_id);
+            return 0;
+        }
+
         DatasetInfo output_dataset(output_name, resolution, datatype);
         output_dataset.hdf5_datatype = output_dataset.getHdf5Datatype();
         output_dataset.data = (void *) malloc(
@@ -239,6 +272,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         if (! output_dataset.data)
         {
             fprintf(stderr, "Not enough memory allocating output grid\n");
+            releaseHdf5Datasets(input_handles, input_info);
             if (handle_from_procfs)
                 H5Fclose(file_id);
             return 0;
@@ -249,7 +283,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         auto dtype = output_dataset.getCastDatatype();
         char *bytecode = (char *)(((char *) *buf) + *buf_size - bytecode_size);
         if (! backend->run(
-            filterpath, input_datasets, output_dataset, dtype, bytecode, bytecode_size))
+            filterpath, input_info, output_dataset, dtype, bytecode, bytecode_size))
         {
             nbytes = 0;
         } 
@@ -266,9 +300,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         }
 
         /* Release memory used by auxiliary datasets */
-        for (size_t i=0; i<input_datasets.size(); ++i)
-            free(input_datasets[i].data);
-
+        releaseHdf5Datasets(input_handles, input_info);
         if (handle_from_procfs)
             H5Fclose(file_id);
     }
