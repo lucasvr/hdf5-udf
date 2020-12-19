@@ -217,7 +217,7 @@ bool readHdf5Datasets(
 void releaseHdf5Datasets(std::vector<DatasetHandle *> &handles, std::vector<DatasetInfo> &info)
 {
     for (auto &entry: handles)
-        free(entry);
+        delete entry;
     for (auto &entry: info)
         free(entry.data);
     handles.clear();
