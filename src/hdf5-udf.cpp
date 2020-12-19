@@ -108,12 +108,23 @@ hid_t getDatasetHandle(std::string dataset, bool *handle_from_procfs)
 
     for (auto &fname: getProcCandidates())
     {
+        // Disable error messages while we probe the candidate file
+        H5E_auto2_t old_func;
+        void *old_client_data;
+        H5Eget_auto2(H5E_DEFAULT, &old_func, &old_client_data);
+        H5Eset_auto2(H5E_DEFAULT, NULL, NULL);
+
         hid_t file_id = H5Fopen(fname.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+
+        // Enable error messages again
+        H5Eset_auto(H5E_DEFAULT, old_func, old_client_data);
+
         if (file_id >= 0 && H5Lexists(file_id, dataset.c_str(), H5P_DEFAULT ) > 0) {
             *handle_from_procfs = true;
             return file_id;
         }
-        H5Fclose(file_id);
+        if (file_id >= 0)
+            H5Fclose(file_id);
     }
     fprintf(stderr, "Failed to identify underlying HDF5 file\n");
     return (hid_t) -1;
