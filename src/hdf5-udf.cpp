@@ -28,10 +28,9 @@ using namespace std;
 using json = nlohmann::json;
 
 struct DatasetHandle {
-    DatasetHandle() :
-        dset_id(-1),
-        space_id(-1),
-        stringtype_id(-1)
+    DatasetHandle(hid_t dset, hid_t space) :
+        dset_id(dset),
+        space_id(space)
     {
     }
 
@@ -43,7 +42,6 @@ struct DatasetHandle {
     }
     hid_t dset_id;
     hid_t space_id;
-    hid_t stringtype_id;
 };
 
 void releaseHdf5Datasets(
@@ -140,28 +138,26 @@ bool readHdf5Datasets(
     auto readHdf5Dataset = [&](hid_t file_id, std::string dname, bool read_data)
     {
         Benchmark benchmark;
-        auto handle = new DatasetHandle;
 
         /* Open .h5 file in read-only mode */
-        handle->dset_id = H5Dopen(file_id, dname.data(), H5P_DEFAULT);
-        if (handle->dset_id < 0)
+        hid_t dset_id = H5Dopen(file_id, dname.data(), H5P_DEFAULT);
+        if (dset_id < 0)
         {
             fprintf(stderr, "Failed to open dataset for reading\n");
-            delete handle;
             return false;
         }
 
         /* Set space id */
-        handle->space_id = H5Dget_space(handle->dset_id);
+        hid_t space_id = H5Dget_space(dset_id);
 
         /* Retrieve datatype */
         DatasetInfo info;
-        info.hdf5_datatype = H5Dget_type(handle->dset_id);
+        info.hdf5_datatype = H5Dget_type(dset_id);
         info.datatype = info.getDatatype();
 
         /* Retrieve number of dimensions and compute total grid size, in bytes */
-        info.dimensions.resize(H5Sget_simple_extent_ndims(handle->space_id));
-        H5Sget_simple_extent_dims(handle->space_id, info.dimensions.data(), NULL);
+        info.dimensions.resize(H5Sget_simple_extent_ndims(space_id));
+        H5Sget_simple_extent_dims(space_id, info.dimensions.data(), NULL);
         hsize_t n_elements = std::accumulate(
             std::begin(info.dimensions), std::end(info.dimensions), 1, std::multiplies<hsize_t>());
 
@@ -170,9 +166,11 @@ bool readHdf5Datasets(
         if (! rdata)
         {
             fprintf(stderr, "Not enough memory while allocating room for dataset\n");
-            delete handle;
             return false;
         }
+
+        /* Our dataset handle deallocator */
+        auto handle = new DatasetHandle(dset_id, space_id);
 
         /* Read the dataset */
         if (read_data)
