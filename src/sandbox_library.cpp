@@ -193,6 +193,10 @@ bool sandbox_init_seccomp()
     ALLOW(sendmsg, 0);
     ALLOW(close, 0);
 
+    // File descriptor operations
+    ALLOW(fcntl, 0);
+    ALLOW(fcntl64, 0);
+
     // System calls issued by gethostbyname(). Some of these could be potentially
     // misused by malicious user-defined functions; we rely on the syscall-intercept
     // routines above to check their string-based arguments to decide to allow or
