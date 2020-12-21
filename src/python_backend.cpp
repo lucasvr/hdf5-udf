@@ -490,18 +490,26 @@ std::vector<std::string> PythonBackend::udfDatasetNames(std::string udf_file)
 // Create a textual declaration of a struct given a compound map
 std::string PythonBackend::compoundToStruct(const DatasetInfo info)
 {
-    std::string cstruct = "struct compound_" + sanitizedName(info.name) + " { ";
+    // Python's CFFI cdef() does not recognize packing attributes
+    // such as __attribute__((pack)) or #pragma pack. Rather, it
+    // provides a special argument 'packed=True' that instructs
+    // the parser to align all structure fields at a byte boundary.
+    // Packing is needed so that UDFs can iterate over the binary
+    // data retrieved by H5Dread() with just a struct pointer.
+    std::string cstruct = "struct compound_" + sanitizedName(info.name) + " {\n";
     size_t current_offset = 0, pad = 0;
     for (auto &member: info.members)
     {
         if (member.offset > current_offset)
         {
             auto size = member.offset - current_offset;
-            cstruct += "char _pad" + std::to_string(pad) +"["+ std::to_string(size) +"]; ";
-            pad++;
+            cstruct += "  char _pad" + std::to_string(pad++) +"["+ std::to_string(size) +"];\n";
         }
-        current_offset += member.offset + member.size;
-        cstruct += member.type + " " + sanitizedName(member.name) + "; ";
+        current_offset = member.offset + member.size;
+        cstruct += "  " + member.type + " " + sanitizedName(member.name);
+        if (member.is_char_array)
+            cstruct += "[" + std::to_string(member.size) + "]";
+        cstruct += ";\n";
     }
     cstruct += "};\n";
     return cstruct;

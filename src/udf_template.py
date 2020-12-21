@@ -21,7 +21,7 @@ class PythonLib:
             const char *pythonGetCast(const char *);
             const char *pythonGetDims(const char *);
             // compound_declarations_placeholder
-            """)
+            """, packed=True)
 
         # self.filterlib is initialized from C code
         # self.filterlib = self.ffi.dlopen(filterpath)
