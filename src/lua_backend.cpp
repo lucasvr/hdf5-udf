@@ -309,6 +309,9 @@ bool LuaBackend::run(
                 lua_close(L);
                 _exit(1);
             }
+
+            // Flush stdout buffer so we don't miss any messages echoed by the UDF
+            fflush(stdout);
         }
         _exit(0);
     }

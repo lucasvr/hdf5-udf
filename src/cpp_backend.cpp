@@ -244,6 +244,10 @@ bool CppBackend::run(
         if (ready)
             udf();
 
+            // Flush stdout buffer so we don't miss any messages echoed by the UDF
+            fflush(stdout);
+        }
+
         /* Exit the process without invoking any callbacks registered with atexit() */
         _exit(ready ? 0 : 1);
     }
