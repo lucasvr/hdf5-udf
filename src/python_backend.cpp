@@ -269,6 +269,7 @@ bool PythonBackend::run(
         teardown(decref, libpython);
         return false;
     }
+    decref.push_back(obj);
 
     PyObject *module = PyImport_ExecCodeModule("udf_module", obj);
     if (! module)
@@ -315,6 +316,7 @@ bool PythonBackend::run(
         teardown(decref, libpython);
         return false;
     }
+    decref.push_back(ffi_dlopen);
 
     // Get handles for lib.load() and for the dynamic_dataset() UDF entry point
     bool retval = false;
@@ -345,7 +347,6 @@ bool PythonBackend::run(
         PyTuple_SetItem(pyargs, 0, pypath);
         PyObject *dlopen_ret = PyObject_CallObject(ffi_dlopen, pyargs);
         decref.push_back(pyargs);
-        decref.push_back(pypath);
         if (dlopen_ret)
         {
             decref.push_back(dlopen_ret);
@@ -392,23 +393,20 @@ bool PythonBackend::executeUDF(PyObject *loadlib, PyObject *udf, std::string fil
             PyObject *pyargs = PyTuple_New(1);
             PyObject *pypath = Py_BuildValue("s", filterpath.c_str());
             PyTuple_SetItem(pyargs, 0, pypath);
-            PyObject *callret = PyObject_CallObject(loadlib, pyargs);
-            if (callret)
-                Py_DECREF(callret);
+            PyObject *loadret = PyObject_CallObject(loadlib, pyargs);
 
             // Run 'dynamic_dataset()' defined by the user
-            callret = PyObject_CallObject(udf, NULL);
-            if (callret)
-                Py_DECREF(callret);
-            else
+            PyObject *callret = PyObject_CallObject(udf, NULL);
+            if (! callret)
             {
                 // Function call terminated by an exception
                 PyErr_Print();
                 PyErr_Clear();
                 ready = false;
             }
-            Py_DECREF(pypath);
-            Py_DECREF(pyargs);
+            Py_XDECREF(loadret);
+            Py_XDECREF(callret);
+            Py_XDECREF(pyargs);
         }
         // Exit the process without invoking any callbacks registered with atexit()
         _exit(ready ? 0 : 1);
