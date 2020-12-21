@@ -80,6 +80,7 @@ std::string CppBackend::compile(
             (char *) "-o",
             (char *) output.c_str(),
             (char *) cpp_file.c_str(),
+            (char *) "-lm",
             NULL
         };
         execvp(cmd[0], cmd);
@@ -242,6 +243,8 @@ bool CppBackend::run(
         ready = sandbox.init(filterpath, std::vector<std::string>());
 #endif
         if (ready)
+        {
+            // Run the UDF
             udf();
 
             // Flush stdout buffer so we don't miss any messages echoed by the UDF

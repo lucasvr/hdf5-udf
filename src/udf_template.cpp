@@ -6,6 +6,7 @@
 // HDF5 filter callbacks and main interface with the C++ API.
 //
 #include <sys/types.h>
+#include <math.h>
 #include <string>
 #include <vector>
 
