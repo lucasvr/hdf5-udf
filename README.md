@@ -39,22 +39,6 @@ compressed shared library) to persist on disk.
 
 ![](images/hdf5-udf.png)
 
-## Supported dataset types
-
-The following dataset types map to their corresponding little-endian
-definitions in HDF5:
-
-- `int8` (`H5T_STD_I8LE`)
-- `int16` (`H5T_STD_I16LE`)
-- `int32` (`H5T_STD_I32LE`)
-- `int64` (`H5T_STD_I64LE`)
-- `uint8` (`H5T_STD_U8LE`)
-- `uint16` (`H5T_STD_U16LE`)
-- `uint32` (`H5T_STD_U32LE`)
-- `uint64` (`H5T_STD_U64LE`)
-- `float` (`H5T_IEEE_F32LE`)
-- `double` (`H5T_IEEE_F64LE`)
-
 # Examples
 
 When `hdf5-udf` is executed with the user-provided Lua file as input, it
@@ -68,7 +52,7 @@ The following are simple examples that should get you started into writing
 your own functions. More examples are given in the "examples" directory of
 this project.
 
-## Declare a dynamic dataset "C" as the sum of datasets "A" and "B"
+## Declare a dynamic dataset "C" as the sum of datasets "A" and "B", in Lua
 ```
 function dynamic_dataset()
     local a_data = lib.getData("A")
@@ -81,19 +65,7 @@ function dynamic_dataset()
 end
 ```
 
-## Same user-defined-function as before, but written in Python
-```
-def dynamic_dataset():
-    a_data = lib.getData("A")
-    b_data = lib.getData("B")
-    c_data = lib.getData("C")
-    n = lib.getDims("C")[0] * lib.getDims("C")[1]
-
-    for i in range(n):
-        c_data[i] = a_data[i] + b_data[i]
-```
-
-## Same user-defined-function as before, but written in C++
+## Same UDF as before, but written in C++
 ```
 extern "C" void dynamic_dataset()
 {
@@ -107,7 +79,20 @@ extern "C" void dynamic_dataset()
 }
 ```
 
-## Declare dynamic datasets "B" and "C" as variations of dataset "A"
+
+## Same UDF as before, but adding up the "foo" and "bar" members from Compound datasets "A" and "B", in Python
+```
+def dynamic_dataset():
+    a_data = lib.getData("A")
+    b_data = lib.getData("B")
+    c_data = lib.getData("C")
+    n = lib.getDims("C")[0] * lib.getDims("C")[1]
+
+    for i in range(n):
+        c_data[i] = a_data[i].foo + b_data[i].bar
+```
+
+## Declare dynamic datasets "B" and "C" as variations of dataset "A", in Lua
 ```
 function dynamic_dataset()
     local a_data = lib.getData("A")
@@ -145,6 +130,22 @@ dataset names that are prefixed by their group names, as in
 on a given group by using the same syntax on the command line, such as 
 `/group/name/dataset:resolution:datatype`. Note that the given group must already
 exist: `hdf5-udf` will not attempt to create them for you.
+
+## Supported dataset types
+
+The following dataset types map to their corresponding little-endian
+definitions in HDF5:
+
+- `int8` (`H5T_STD_I8LE`)
+- `int16` (`H5T_STD_I16LE`)
+- `int32` (`H5T_STD_I32LE`)
+- `int64` (`H5T_STD_I64LE`)
+- `uint8` (`H5T_STD_U8LE`)
+- `uint16` (`H5T_STD_U16LE`)
+- `uint32` (`H5T_STD_U32LE`)
+- `uint64` (`H5T_STD_U64LE`)
+- `float` (`H5T_IEEE_F32LE`)
+- `double` (`H5T_IEEE_F64LE`)
 
 # Configuration and execution
 
