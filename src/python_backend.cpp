@@ -283,7 +283,9 @@ bool PythonBackend::run(
 
     // Load essential modules prior to the launch of the user-defined-function
     // so we can keep strict sandbox rules for third-party code.
-    PyObject *cffi_module = PyImport_ImportModule("cffi");
+    PyObject *module_name = PyUnicode_FromString("cffi");
+    decref.push_back(module_name);
+    PyObject *cffi_module = PyImport_Import(module_name);
     if (! cffi_module)
     {
         fprintf(stderr, "Failed to import the cffi module\n");
