@@ -3,7 +3,7 @@
  *
  * To embed it in an existing HDF5 file, run:
  * $ make files
- * $ hdf5-udf example-compound.h5 example-compound.cpp Temperature:1000:double
+ * $ hdf5-udf example-compound-nostring_simple.h5 example-compound.cpp Temperature:1000:double
  *
  * Underneath, hdf5-udf converts the compound into a named
  * structure that can be used by getData<>(). Member names

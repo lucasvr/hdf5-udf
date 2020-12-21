@@ -17,7 +17,12 @@ files: $(CREATE_BIN)
 	./$(CREATE_BIN) --out=example-socket.h5
 	./$(CREATE_BIN) --out=example-doom.h5
 	./$(CREATE_BIN) --out=example-add_datasets.h5 --count=2
-	./$(CREATE_BIN) --out=example-compound.h5 --compound --count=1
+	./$(CREATE_BIN) --out=example-compound-nostring_simple.h5 --compound=NOSTRING_SIMPLE --count=1
+	./$(CREATE_BIN) --out=example-compound-string_simple.h5 --compound=STRING_SIMPLE --count=1
+	./$(CREATE_BIN) --out=example-compound-varstring_simple.h5 --compound=VARSTRING_SIMPLE --count=1
+	./$(CREATE_BIN) --out=example-compound-nostring_mixed.h5 --compound=NOSTRING_MIXED --count=1
+	./$(CREATE_BIN) --out=example-compound-string_mixed.h5 --compound=STRING_MIXED --count=1
+	./$(CREATE_BIN) --out=example-compound-varstring_mixed.h5 --compound=VARSTRING_MIXED --count=1
 
 clean:
 	rm -f $(CREATE_BIN) $(READ_BIN) *.o
