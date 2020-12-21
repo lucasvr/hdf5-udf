@@ -76,6 +76,7 @@ std::string CppBackend::compile(
             (char *) "-fPIC",
             (char *) "-flto",
             (char *) "-Os",
+            (char *) "-s",
             (char *) "-C",
             (char *) "-o",
             (char *) output.c_str(),
