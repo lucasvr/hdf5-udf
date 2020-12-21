@@ -19,6 +19,7 @@ struct CompoundMember {
     std::string type;
     size_t offset;
     size_t size;
+    bool is_char_array;
 };
 
 /* Dataset information */

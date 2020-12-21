@@ -6,6 +6,7 @@
  * High-level interfaces for information retrieval from HDF5 datasets.
  */
 
+#include <string.h>
 #include "dataset.h"
 
 struct DatasetTypeInfo {
@@ -34,8 +35,10 @@ static std::vector<DatasetTypeInfo> numerical_types = {
     {"double", "double*",   H5T_IEEE_F64LE, sizeof(double)},
 };
 
-static DatasetTypeInfo compound_type = {
-    "compound", "void*", H5T_COMPOUND, -1
+// misc_types are looked up by HDF5 *class* rather than *datatype*
+static std::vector<DatasetTypeInfo> misc_types = {
+    {"compound",  "void*", H5T_COMPOUND, -1},
+    {"varstring", "char*", H5T_C_S1,     -1},
 };
 
 DatasetInfo::DatasetInfo() :
@@ -70,14 +73,24 @@ size_t DatasetInfo::getGridSize() const
         1, std::multiplies<hsize_t>());
 }
 
+static bool sameDatatype(hid_t a, hid_t b)
+{
+    if (a == H5T_COMPOUND)
+        return H5Tget_class(b) == H5T_COMPOUND;
+    else if (a == H5T_C_S1)
+        return H5Tget_class(b) == H5T_STRING;
+    return H5Tequal(a, b);
+}
+
 const char *DatasetInfo::getDatatype() const
 {
     if (hdf5_datatype != -1) {
         for (auto &info: numerical_types)
             if (H5Tequal(info.hdf5_datatype_id, hdf5_datatype))
                 return info.datatype.c_str();
-        if (H5Tget_class(hdf5_datatype) == H5T_COMPOUND)
-            return compound_type.datatype.c_str();
+        for (auto &info: misc_types)
+            if (sameDatatype(info.hdf5_datatype_id, hdf5_datatype))
+                return info.datatype.c_str();
     }
     return NULL;
 }
@@ -88,8 +101,9 @@ size_t DatasetInfo::getHdf5Datatype() const
         for (auto &info: numerical_types)
             if (info.datatype.compare(datatype) == 0)
                 return info.hdf5_datatype_id;
-        if (H5Tget_class(hdf5_datatype) == H5T_COMPOUND)
-            return compound_type.hdf5_datatype_id;
+        for (auto &info: misc_types)
+            if (sameDatatype(info.hdf5_datatype_id, hdf5_datatype))
+                return info.hdf5_datatype_id;
     }
     return -1;
 }
@@ -100,8 +114,9 @@ hid_t DatasetInfo::getStorageSize() const
         for (auto &info: numerical_types)
             if (info.datatype.compare(datatype) == 0)
                 return info.datatype_size;
-        if (H5Tget_class(hdf5_datatype) == H5T_COMPOUND)
-            return compound_type.datatype_size;
+        for (auto &info: misc_types)
+            if (sameDatatype(info.hdf5_datatype_id, hdf5_datatype))
+                return info.datatype_size;
     }
     return -1;
 }
@@ -112,8 +127,9 @@ const char *DatasetInfo::getCastDatatype() const
         for (auto &info: numerical_types)
             if (info.datatype.compare(datatype) == 0)
                 return info.declaration.c_str();
-        if (H5Tget_class(hdf5_datatype) == H5T_COMPOUND)
-            return compound_type.declaration.c_str();
+        for (auto &info: misc_types)
+            if (sameDatatype(info.hdf5_datatype_id, hdf5_datatype))
+                return info.declaration.c_str();
     }
     return NULL;
 }
@@ -136,6 +152,9 @@ std::vector<CompoundMember> DatasetInfo::getCompoundMembers() const
         char *name = H5Tget_member_name(hdf5_datatype, i);
         hid_t type = H5Tget_member_type(hdf5_datatype, i);
         size_t off = H5Tget_member_offset(hdf5_datatype, i);
+        hid_t hclass = H5Tget_member_class(hdf5_datatype, i);
+        bool is_varstring = H5Tis_variable_str(type);
+        size_t size = H5Tget_size(type);
 
         // Get this member's data type (e.g., 'int64', 'float') so we can lookup
         // its cast data type (e.g., 'int64_t*', 'float*') and storage size next.
@@ -144,27 +163,26 @@ std::vector<CompoundMember> DatasetInfo::getCompoundMembers() const
         member_info.datatype = member_info.getDatatype() ? : "";
         if (member_info.datatype.size() == 0)
         {
-            fprintf(stderr, "Unsupported HDF5 datatype %#lx from compound member %s\n",
+            fprintf(stderr, "Unsupported HDF5 datatype %#lx of compound member '%s'\n",
                 type, name);
             H5free_memory(name);
             return std::vector<CompoundMember>();
         }
 
-        // Take the pointer token ('*') off the cast data type string
+        // Take the pointer token ('*') off the cast data type string iff
+        // the datatype is not a variable-sized string or a compound.
         std::string decl_datatype = member_info.getCastDatatype() ? : "";
         auto ptr_token = decl_datatype.find("*");
-        if (ptr_token != std::string::npos)
+        if (ptr_token != std::string::npos && ! is_varstring && hclass != H5T_COMPOUND)
             decl_datatype = decl_datatype.substr(0, ptr_token);
-
-        // Retrieve this member's storage size
-        size_t size = member_info.getStorageSize();
 
         // Push member information into the output vector
         CompoundMember member = {
             .name = name,
             .type = decl_datatype,
             .offset = off,
-            .size = size
+            .size = size,
+            .is_char_array = hclass == H5T_STRING && is_varstring == false,
         };
         members.push_back(member);
         H5free_memory(name);
