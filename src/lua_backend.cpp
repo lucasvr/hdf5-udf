@@ -174,8 +174,6 @@ std::string LuaBackend::compile(
         struct stat statbuf;
         std::string bytecode;
         if (stat(output.c_str(), &statbuf) == 0) {
-            printf("Bytecode has %ld bytes\n", statbuf.st_size);
-
             std::ifstream data(output, std::ifstream::binary);
             std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(data), {});
             bytecode.assign(buffer.begin(), buffer.end());
