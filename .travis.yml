@@ -1,0 +1,19 @@
+language: cpp
+
+compiler:
+- clang
+
+before_install:
+- sudo apt install -y wget gnupg
+- echo "deb https://lucasvr.gobolinux.org/debian/repo/ /" | sudo tee -a /etc/apt/sources.list
+- wget -q -O - https://lucasvr.gobolinux.org/debian/repo/KEY.gpg | sudo apt-key add -
+- sudo apt-get -qq update
+- sudo apt install -y libsyscall-intercept0 libsyscall-intercept-dev luajit libluajit-5.1-dev libseccomp-dev libhdf5-dev hdf5-tools python3-pip
+- sudo pip3 install cffi
+
+script:
+- make CXX=clang++
+- pushd test; ./run_tests.sh || travis_terminate 1; popd
+
+env:
+- HDF5_PLUGIN_PATH=$PWD/src PATH=$PATH:$PWD/src LD_LIBRARY_PATH=/usr/lib/python3.5/config-3.5m-x86_64-linux-gnu
