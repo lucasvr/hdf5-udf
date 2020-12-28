@@ -91,6 +91,12 @@ std::string CppBackend::compile(
         // Parent
         int exit_status;
         wait4(pid, &exit_status, 0, NULL);
+        if (exit_status != 0)
+        {
+            fprintf(stderr, "Failed to compile the UDF\n");
+            unlink(cpp_file.c_str());
+            return "";
+        }
 
         // Read generated shared library
         struct stat statbuf;
@@ -106,7 +112,7 @@ std::string CppBackend::compile(
         // Compress the data
         return compressBuffer(bytecode.data(), bytecode.size());
     }
-    fprintf(stderr, "Failed to execute g++\n");
+    fprintf(stderr, "Failed to execute the C++ compiler\n");
     return "";
 }
 
@@ -308,8 +314,16 @@ std::vector<std::string> CppBackend::udfDatasetNames(std::string udf_file)
             ssize_t n = read(pipefd[0], buf, sizeof(buf));
             if (n < 0 && errno == EWOULDBLOCK)
             {
-                if (waitpid(pid, NULL, WNOHANG) == pid)
+                int exit_status = 0;
+                if (waitpid(pid, &exit_status, WNOHANG) == pid)
+                {
+                    if (exit_status != 0)
+                    {
+                        fprintf(stderr, "Failed to run the C++ preprocessor\n");
+                        return output;
+                    }
                     break;
+                }
                 continue;
             }
             else if (n <= 0)
