@@ -139,6 +139,12 @@ std::string PythonBackend::compile(
         // Parent
         int exit_status;
         wait4(pid, &exit_status, 0, NULL);
+        if (exit_status != 0)
+        {
+            fprintf(stderr, "Failed to build the UDF\n");
+            unlink(py_file.c_str());
+            return "";
+        }
 
         // Find the bytecode
         auto sep = py_file.find_last_of('/');
