@@ -68,16 +68,24 @@ std::string CppBackend::compile(
     pid_t pid = fork();
     if (pid == 0)
     {
-        // Child process
+        // Child process. Note that, when building with Clang, we disable
+        // -flto. That's because Travis CI, at the very least, ships without
+        // Clang's Gold Linker, leading to compile-time failures. We're taking
+        // a more safe path here to avoid having to workaround Travis' limitations.
         char *cmd[] = {
+#ifdef __clang__
+            (char *) "clang++",
+            (char *) "-O3",
+#else
             (char *) "g++",
+            (char *) "-flto",
+            (char *) "-Os",
+            (char *) "-C",
+#endif
             (char *) "-rdynamic",
             (char *) "-shared",
             (char *) "-fPIC",
-            (char *) "-flto",
-            (char *) "-Os",
             (char *) "-s",
-            (char *) "-C",
             (char *) "-o",
             (char *) output.c_str(),
             (char *) cpp_file.c_str(),
@@ -294,9 +302,13 @@ std::vector<std::string> CppBackend::udfDatasetNames(std::string udf_file)
         close(pipefd[0]);
         close(pipefd[1]);
         char *cmd[] = {
+#ifdef __clang__
+            (char *) "clang++",
+#else
             (char *) "g++",
             (char *) "-fpreprocessed",
             (char *) "-dD",
+#endif
             (char *) "-E",
             (char *) udf_file.c_str(),
             (char *) NULL
