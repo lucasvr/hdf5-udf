@@ -241,6 +241,13 @@ bool PythonBackend::run(
     // List of objects we have to Py_DECREF() on exit
     std::vector<PyObject *> decref;
 
+    // We currently depend on Python 3
+    if (PY_MAJOR_VERSION != 3)
+    {
+        fprintf(stderr, "Error: Python3 is required\n");
+        return false;
+    }
+
     // Workaround for CFFI import errors due to missing symbols. We force libpython
     // to be loaded and for all symbols to be resolved by dlopen()
     void *libpython = dlopen("libpython3.so", RTLD_NOW | RTLD_GLOBAL);
@@ -249,15 +256,32 @@ bool PythonBackend::run(
         char libname[64];
         snprintf(libname, sizeof(libname)-1, "libpython3.%d.so", PY_MINOR_VERSION);
         libpython = dlopen(libname, RTLD_NOW | RTLD_GLOBAL);
+        if (! libpython)
+            fprintf(stderr, "Warning: could not load %s\n", libname);
     }
 
     // Init Python interpreter
     Py_Initialize();
 
-    // We have to check whether this offset is fixed at all times or if can
-    // change. Some docs mention an offset of 8 bytes, for instance.
-    bytecode = &bytecode[16];
-    bytecode_size -= 16;
+    // The offset to the actual bytecode may change across Python versions.
+    // Please look under $python_sources/Lib/importlib/_bootstrap_external.py
+    // for the implementation of _validate_bytecode_header() so you can identify
+    // the right offset for a version of Python not featured in the list below.
+    size_t bytecode_start;
+    switch (PY_MINOR_VERSION)
+    {
+        case 5:
+            bytecode_start = 12;
+            break;
+        case 8:
+            bytecode_start = 16;
+            break;
+        default:
+            // Educated guess
+            bytecode_start = 16;
+    }
+    bytecode = &bytecode[bytecode_start];
+    bytecode_size -= bytecode_start;
 
     // Get a reference to the code object we compiled before
     PyObject *obj = PyMarshal_ReadObjectFromString(bytecode, bytecode_size);
