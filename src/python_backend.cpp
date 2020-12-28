@@ -288,13 +288,8 @@ bool PythonBackend::run(
     if (! obj)
     {
         PyObject *err = PyErr_Occurred();
-        if (err && (
-            PyErr_GivenExceptionMatches(err, PyExc_EOFError) ||
-            PyErr_GivenExceptionMatches(err, PyExc_ValueError) ||
-            PyErr_GivenExceptionMatches(err, PyExc_TypeError)))
-        {
+        if (err)
             PyErr_Print();
-        }
         PyErr_Clear();
         teardown(decref, libpython);
         return false;
