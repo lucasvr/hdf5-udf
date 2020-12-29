@@ -26,6 +26,7 @@ struct CompoundMember {
 class DatasetInfo {
 public:
     DatasetInfo();
+    DatasetInfo(hid_t in_hdf5_datatype);
     DatasetInfo(std::string in_name, std::vector<hsize_t> in_dims, std::string in_datatype);
 
     size_t getGridSize() const;

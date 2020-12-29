@@ -150,16 +150,20 @@ bool readHdf5Datasets(
         /* Set space id */
         hid_t space_id = H5Dget_space(dset_id);
 
-        /* Retrieve datatype */
-        DatasetInfo info;
-        info.hdf5_datatype = H5Dget_type(dset_id);
-        info.datatype = info.getDatatype();
-
-        /* Retrieve number of dimensions and compute total grid size, in bytes */
-        info.dimensions.resize(H5Sget_simple_extent_ndims(space_id));
-        H5Sget_simple_extent_dims(space_id, info.dimensions.data(), NULL);
+        /* Store dataset dimensions in a vector object and compute total grid size, in bytes */
+        std::vector<hsize_t> dims;
+        dims.resize(H5Sget_simple_extent_ndims(space_id));
+        H5Sget_simple_extent_dims(space_id, dims.data(), NULL);
         hsize_t n_elements = std::accumulate(
-            std::begin(info.dimensions), std::end(info.dimensions), 1, std::multiplies<hsize_t>());
+            std::begin(dims), std::end(dims), 1, std::multiplies<hsize_t>());
+
+        /*
+         * Retrieve datatype. Note that we use the full constructor
+         * so that the DatasetInfo's dimensions_str member is built.
+         */
+        DatasetInfo tmp(H5Dget_type(dset_id));
+        DatasetInfo info(dname, dims, tmp.getDatatype());
+        info.hdf5_datatype = tmp.hdf5_datatype;
 
         /* Allocate enough memory so we can read this dataset */
         void *rdata = (void *) malloc(n_elements * H5Tget_size(info.hdf5_datatype));
@@ -187,7 +191,6 @@ bool readHdf5Datasets(
         else
             memset(rdata, 0, n_elements * H5Tget_size(info.hdf5_datatype));
 
-        info.name = dname;
         info.data = rdata;
         out_info.push_back(info);
         out_handles.push_back(handle);

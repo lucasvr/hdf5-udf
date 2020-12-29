@@ -49,6 +49,11 @@ DatasetInfo::DatasetInfo() :
 {
 }
 
+DatasetInfo::DatasetInfo(hid_t in_hdf5_datatype) :
+    hdf5_datatype(in_hdf5_datatype)
+{
+}
+
 DatasetInfo::DatasetInfo(std::string in_name, std::vector<hsize_t> in_dims, std::string in_datatype) :
     name(in_name),
     datatype(in_datatype),
