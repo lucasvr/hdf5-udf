@@ -1,7 +1,7 @@
 // hdf5-udf <file.h5> test-compound-string.cpp Temperature.cpp:1000:double
 extern "C" void dynamic_dataset()
 {
-    auto compound = lib.getData<compound_dataset1>("Dataset1");
+    auto compound = lib.getData<dataset1_t>("Dataset1");
     auto udf_data = lib.getData<double>("Temperature.cpp");
     auto udf_dims = lib.getDims("Temperature.cpp");
 

@@ -25,7 +25,7 @@
 # }
 # 
 # is converted into the following structure:
-# struct compound_dataset1 {
+# struct dataset1_t {
 #     int64_t serial_number;
 #     double temperature;
 #     double pressure;

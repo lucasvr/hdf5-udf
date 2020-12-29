@@ -370,7 +370,7 @@ std::string CppBackend::compoundToStruct(const DatasetInfo info)
     // We use GCC's __attribute__((packed)) to ensure the structure
     // is byte-aligned. This is required so that we can iterate over
     // the data retrieved by H5Dread() with just a struct pointer.
-    std::string cstruct = "struct __attribute__((packed)) compound_" + sanitizedName(info.name) + " {\n";
+    std::string cstruct = "struct __attribute__((packed)) " + sanitizedName(info.name) + "_t {\n";
     size_t current_offset = 0, pad = 0;
     for (auto &member: info.members)
     {

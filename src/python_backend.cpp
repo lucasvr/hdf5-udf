@@ -67,7 +67,7 @@ extern "C" const char *pythonGetCast(const char *element)
                 PythonBackend backend;
                 memset(compound_cast_name, 0, sizeof(compound_cast_name));
                 snprintf(compound_cast_name, sizeof(compound_cast_name)-1,
-                    "struct compound_%s *", backend.sanitizedName(element).c_str());
+                    "struct %s_t *", backend.sanitizedName(element).c_str());
                 return compound_cast_name;
             }
             return cast;
@@ -524,7 +524,7 @@ std::string PythonBackend::compoundToStruct(const DatasetInfo info)
     // the parser to align all structure fields at a byte boundary.
     // Packing is needed so that UDFs can iterate over the binary
     // data retrieved by H5Dread() with just a struct pointer.
-    std::string cstruct = "struct compound_" + sanitizedName(info.name) + " {\n";
+    std::string cstruct = "struct " + sanitizedName(info.name) + "_t {\n";
     size_t current_offset = 0, pad = 0;
     for (auto &member: info.members)
     {

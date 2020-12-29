@@ -23,8 +23,8 @@
  *  }
  * }
  * 
- * may be converted into this named structure:
- * struct compound_dataset1 {
+ * will be converted into this named structure:
+ * struct dataset1_t {
  *     int64_t serial_number;
  *     char _pad0[16];
  *     double temperature;
@@ -42,7 +42,7 @@
 
 extern "C" void dynamic_dataset()
 {
-    auto compound = lib.getData<compound_dataset1>("Dataset1");
+    auto compound = lib.getData<dataset1_t>("Dataset1");
     auto udf_data = lib.getData<double>("Temperature");
     auto udf_dims = lib.getDims("Temperature");
 
