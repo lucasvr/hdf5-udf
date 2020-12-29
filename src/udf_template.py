@@ -26,6 +26,11 @@ class PythonLib:
         # self.filterlib is initialized from C code
         # self.filterlib = self.ffi.dlopen(filterpath)
 
+    def string(self, structure):
+        # Strings are embedded in a structure with a single
+        # 'value' member.
+        return self.ffi.string(structure.value).decode("utf-8")
+
     def getData(self, name):
         name = self.ffi.new("char[]", name.encode("utf-8"))
         cast = self.filterlib.pythonGetCast(name)

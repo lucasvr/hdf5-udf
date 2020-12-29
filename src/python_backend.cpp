@@ -61,9 +61,10 @@ extern "C" const char *pythonGetCast(const char *element)
         if (dataset_info[i].name.compare(element) == 0)
         {
             auto cast = dataset_info[i].getCastDatatype();
-            if (! strcmp(cast, "void*"))
+            if (! strcmp(cast, "void*") || ! strcmp(cast, "char*"))
             {
-                // Cast compound structure
+                // Cast compound structure or the structure that supports
+                // the declaration of string datasets
                 PythonBackend backend;
                 memset(compound_cast_name, 0, sizeof(compound_cast_name));
                 snprintf(compound_cast_name, sizeof(compound_cast_name)-1,
