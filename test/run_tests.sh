@@ -2,6 +2,8 @@
 
 # High-level regression test suite for HDF5-UDF.
 
+set -e
+
 # Logging (GoboLinux style)
 colorGray="\033[1;30m"
 colorBoldBlue="\033[1;34m"
@@ -75,18 +77,26 @@ function Run_Test() {
         Log_Normal "Writing UDF" "${test_info}"
         hdf5-udf ${test_name}.h5 ${file_name}.${backend} ${dataset_info}
 
+        validated=0
         Log_Normal "Reading UDF" "${test_info}"
         Read_Dataset /${dataset_name} ${test_name}.h5 > $RESULT_STDOUT
         if [ -e ${test_name}.stdout.${backend} ]
         then
             diff -q $RESULT_STDOUT ${test_name}.stdout.${backend} || Die "Validation failed" "${test_info}"
+            validated=1
         elif [ -e ${test_name}.stdout ]
         then
             diff -q $RESULT_STDOUT ${test_name}.stdout || Die "Validation failed" "${test_info}"
+            validated=1
         fi
         if [ -e ${test_name}.h5dump ]
         then
             diff -q $RESULT_H5DUMP ${test_name}.h5dump || Die "Validation failed" "${test_info}"
+            validated=1
+        fi
+        if [ $validated = 0 ]
+        then
+            Die "No reference data available to validate test" "${test_info}"
         fi
         rm -f $RESULT_STDOUT $RESULT_H5DUMP
         Log_Normal "Successful validation" "${test_info}"
