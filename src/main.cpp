@@ -589,7 +589,7 @@ int main(int argc, char **argv)
         size_t payload_size = jas_str.length() + bytecode.size() + 1;
         printf("\n%s dataset header:\n%s\n", info.name.c_str(), jas.dump(4).c_str());
         if (compound_declarations.size())
-            printf("\nCompound data structures available to the UDF:\n%s\n", compound_declarations.c_str());
+            printf("\nData structures available to the UDF:\n%s\n", compound_declarations.c_str());
 
         /* Sanity check: the JSON and the bytecode must fit in the dataset */
         hsize_t grid_size = std::accumulate(std::begin(info.dimensions), std::end(info.dimensions), 1, std::multiplies<hsize_t>());

@@ -29,7 +29,11 @@ class PythonLib:
     def string(self, structure):
         # Strings are embedded in a structure with a single
         # 'value' member.
-        return self.ffi.string(structure.value).decode("utf-8")
+        if hasattr(structure, "value"):
+            return self.ffi.string(structure.value).decode("utf-8")
+        # The user may also provide a direct pointer to the
+        # string member.
+        return self.ffi.string(structure).decode("utf-8")
 
     def getData(self, name):
         name = self.ffi.new("char[]", name.encode("utf-8"))
