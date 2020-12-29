@@ -61,7 +61,7 @@ public:
     }
 
     // Create a textual declaration of a struct given a compound map
-    virtual std::string compoundToStruct(const DatasetInfo info) {
+    virtual std::string compoundToStruct(const DatasetInfo info, bool hardcoded_name) {
         return std::string("");
     }
 

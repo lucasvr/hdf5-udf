@@ -379,7 +379,27 @@ int main(int argc, char **argv)
                         info.name.c_str(), hdf5_file.c_str());
                     exit(1);
                 }
-                compound_declarations += backend->compoundToStruct(info);
+                if (compound_declarations.size())
+                    compound_declarations += "\n";
+                compound_declarations += backend->compoundToStruct(info, false);
+            }
+            else if (info.datatype.compare("varstring") == 0)
+            {
+                // Because HDF5 has both variable- and fixed-sized strings there
+                // are two possible ways to define a string element: (1) with
+                // 'char varname[size]' and (2) with 'char *varname'. Here we embed
+                // string variables into packed structures so that UDFs can easily
+                // iterate over them with for loops and basic pointer arithmetic.
+                info.members.push_back(info.getStringDeclaration());
+                if (info.members.size() == 0)
+                {
+                    fprintf(stderr, "Failed to parse dataset %s from file %s\n",
+                        info.name.c_str(), hdf5_file.c_str());
+                    exit(1);
+                }
+                if (compound_declarations.size())
+                    compound_declarations += "\n";
+                compound_declarations += backend->compoundToStruct(info, true);
             }
 
             input_datasets.push_back(info);

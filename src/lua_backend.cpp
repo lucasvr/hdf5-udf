@@ -381,7 +381,7 @@ std::vector<std::string> LuaBackend::udfDatasetNames(std::string udf_file)
 }
 
 // Create a textual declaration of a struct given a compound map
-std::string LuaBackend::compoundToStruct(const DatasetInfo info)
+std::string LuaBackend::compoundToStruct(const DatasetInfo info, bool hardcoded_name)
 {
     // Lua's FFI cdef() requires the use of #pragma pack(1) to align
     // structures at a byte boundary. Packing is needed so that UDFs
@@ -398,7 +398,7 @@ std::string LuaBackend::compoundToStruct(const DatasetInfo info)
             cstruct += "  char _pad" + std::to_string(pad++) +"["+ std::to_string(size) +"];\n";
         }
         current_offset = member.offset + member.size;
-        cstruct += "  " + member.type + " " + sanitizedName(member.name);
+        cstruct += "  " + member.type + " " + (hardcoded_name ? "value" : sanitizedName(member.name));
         if (member.is_char_array)
             cstruct += "[" + std::to_string(member.size) + "]";
         cstruct += ";\n";

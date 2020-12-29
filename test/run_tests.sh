@@ -148,6 +148,18 @@ tests=(
 for entry in "${tests[@]}"; do Run_Test "$entry"; done
 
 Log_Normal
+Log_Normal "********************"
+Log_Normal "*** String tests ***"
+Log_Normal "********************"
+Log_Normal
+tests=(
+    # HDF5 file         UDF file     Dynamic dataset
+    "example-string     test-string  Temperature:1000:double"
+    "example-varstring  test-string  Temperature:1000:double"
+)
+for entry in "${tests[@]}"; do Run_Test "$entry"; done
+
+Log_Normal
 Log_Normal "**********************"
 Log_Normal "*** Compound tests ***"
 Log_Normal "**********************"

@@ -365,7 +365,7 @@ std::vector<std::string> CppBackend::udfDatasetNames(std::string udf_file)
 }
 
 /* Create a textual declaration of a struct given a compound map */
-std::string CppBackend::compoundToStruct(const DatasetInfo info)
+std::string CppBackend::compoundToStruct(const DatasetInfo info, bool hardcoded_name)
 {
     // We use GCC's __attribute__((packed)) to ensure the structure
     // is byte-aligned. This is required so that we can iterate over
@@ -380,7 +380,7 @@ std::string CppBackend::compoundToStruct(const DatasetInfo info)
             cstruct += "  char _pad" + std::to_string(pad++) +"["+ std::to_string(size) +"];\n";
         }
         current_offset = member.offset + member.size;
-        cstruct += "  " + member.type + " " + sanitizedName(member.name);
+        cstruct += "  " + member.type + " " + (hardcoded_name ? "value" : sanitizedName(member.name));
         if (member.is_char_array)
             cstruct += "[" + std::to_string(member.size) + "]";
         cstruct += ";\n";

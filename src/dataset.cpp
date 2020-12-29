@@ -189,3 +189,19 @@ std::vector<CompoundMember> DatasetInfo::getCompoundMembers() const
     }
     return members;
 }
+
+CompoundMember DatasetInfo::getStringDeclaration() const
+{
+    bool is_varstring = H5Tis_variable_str(hdf5_datatype);
+    size_t size = H5Tget_size(hdf5_datatype);
+    std::string decl_datatype = is_varstring ? "char*" : "char";
+
+    CompoundMember member = {
+        .name = name,
+        .type = decl_datatype,
+        .offset = 0,
+        .size = size,
+        .is_char_array = is_varstring == false,
+    };
+    return member;
+}

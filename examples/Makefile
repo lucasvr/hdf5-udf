@@ -12,11 +12,13 @@ READ_OBJ   = $(patsubst %.cpp,%.o, $(READ_SRC))
 all: $(CREATE_BIN) $(READ_BIN)
 
 files: $(CREATE_BIN)
-	./$(CREATE_BIN) --out=example-simple_vector.h5
-	./$(CREATE_BIN) --out=example-sine_wave.h5
-	./$(CREATE_BIN) --out=example-socket.h5
-	./$(CREATE_BIN) --out=example-doom.h5
-	./$(CREATE_BIN) --out=example-add_datasets.h5 --count=2
+	./$(CREATE_BIN) --out=example-simple_vector.h5 --datatype=INT32
+	./$(CREATE_BIN) --out=example-sine_wave.h5 --datatype=INT32
+	./$(CREATE_BIN) --out=example-socket.h5 --datatype=INT32
+	./$(CREATE_BIN) --out=example-doom.h5 --datatype=INT32
+	./$(CREATE_BIN) --out=example-add_datasets.h5 --datatype=INT32 --count=2
+	./$(CREATE_BIN) --out=example-string.h5 --datatype=STRING --count=1
+	./$(CREATE_BIN) --out=example-varstring.h5 --datatype=VARSTRING --count=1
 	./$(CREATE_BIN) --out=example-compound-nostring_simple.h5 --compound=NOSTRING_SIMPLE --count=1
 	./$(CREATE_BIN) --out=example-compound-string_simple.h5 --compound=STRING_SIMPLE --count=1
 	./$(CREATE_BIN) --out=example-compound-varstring_simple.h5 --compound=VARSTRING_SIMPLE --count=1

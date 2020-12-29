@@ -35,6 +35,7 @@ public:
     const char *getCastDatatype() const;
     void printInfo(std::string dataset_type) const;
     std::vector<CompoundMember> getCompoundMembers() const;
+    CompoundMember getStringDeclaration() const;
 
     std::string name;                /* Dataset name */
     std::string datatype;            /* Datatype, given as string */

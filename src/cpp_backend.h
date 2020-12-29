@@ -38,7 +38,7 @@ public:
     std::vector<std::string> udfDatasetNames(std::string udf_file);
 
     // Create a textual declaration of a struct given a compound map
-    std::string compoundToStruct(const DatasetInfo info);
+    std::string compoundToStruct(const DatasetInfo info, bool hardcoded_name);
 
 private:
     // Compress a data buffer

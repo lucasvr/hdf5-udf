@@ -10,12 +10,17 @@
 #include <string.h>
 #include <hdf5.h>
 #include <string>
+#include <sstream>
+#include <fstream>
 #include <functional>
 
 int create_regular_dataset(hid_t file_id, int count);
 int create_compound_dataset_nostring(hid_t file_id, bool simple_layout, int count);
 int create_compound_dataset_string(hid_t file_id, bool simple_layout, int count);
 int create_compound_dataset_varstring(hid_t file_id, bool simple_layout, int count);
+int create_native_int32(hid_t file_id, int count);
+int create_native_string(hid_t file_id, int count);
+int create_native_varstring(hid_t file_id, int count);
 
 std::string getOptionValue(int argc, char **argv, const char *option, const char *default_value)
 {
@@ -50,17 +55,33 @@ int main(int argc, char **argv)
             "                    STRING_MIXED       (mixed layout, including a fixed-sized string member)\n"
             "                    VARSTRING_SIMPLE   (simple layout, including a variable-sized string member)\n"
             "                    VARSTRING_MIXED    (mixed layout, including a variable-sized string member)\n"
+            "  --datatype=TYPE   Create a dataset with a predefined native type\n"
+            "                    Valid options for TYPE are:\n"
+            "                    INT32              (an integer-based dataset)\n"
+            "                    STRING             (a fixed-sized string dataset)\n"
+            "                    VARSTRING          (a variable-sized string dataset)\n"
             "  --count=N         Create this many datasets in the output file (default: 0)\n"
             "  --out=FILE        Output file name (truncates FILE if it already exists)\n\n");
         return 1;
     }
 
     std::string compound = getOptionValue(argc, argv, "--compound", "");
+    std::string datatype = getOptionValue(argc, argv, "--datatype", "");
     int dataset_count = atoi(getOptionValue(argc, argv, "--count", "0").c_str());
     std::string hdf5_file = getOptionValue(argc, argv, "--out", "");
     if (hdf5_file.size() == 0)
     {
         fprintf(stderr, "Error: missing output file (--out=FILE)\n");
+        return 1;
+    }
+    if (compound.size() && datatype.size())
+    {
+        fprintf(stderr, "Error: --compound and --datatype are mutually exclusive\n");
+        return 1;
+    }
+    if (compound.size() == 0 && datatype.size() == 0)
+    {
+        fprintf(stderr, "Error: neither --compound nor --datatype were given\n");
         return 1;
     }
 
@@ -85,6 +106,16 @@ int main(int argc, char **argv)
         {NULL, false, NULL}
     };
 
+    struct {
+        const char *type;
+        int (*func)(hid_t, int);
+    } native_functions[] = {
+        {"INT32",      create_native_int32},
+        {"STRING",     create_native_string},
+        {"VARSTRING",  create_native_varstring},
+        {NULL, NULL}
+    };
+
     int ret = 0;
     for (int count=1; count<=dataset_count; ++count)
     {
@@ -103,8 +134,21 @@ int main(int argc, char **argv)
                 break;
             }
         }
-        else
-            ret = create_regular_dataset(file_id, count);
+        else if (datatype.size())
+        {
+            ret = -1;
+            for (int i=0; native_functions[i].type != NULL; ++i)
+            {
+                auto entry = &native_functions[i];
+                if (datatype.compare(entry->type) == 0)
+                    ret = entry->func(file_id, count);
+            }
+            if (ret == -1)
+            {
+                fprintf(stderr, "Invalid datatype '%s' requested\n", datatype.c_str());
+                break;
+            }
+        }
         if (ret != 0)
             break;
     }
@@ -113,40 +157,149 @@ int main(int argc, char **argv)
     return ret;
 }
 
-int create_regular_dataset(hid_t file_id, int count)
-{
-    const int dim0 = 100, dim1 = 50;
-    int data[dim0][dim1];
-    for (int i=0; i<dim0; ++i)
-        for (int j=0; j<dim1; ++j)
-            data[i][j] = count * 10 * i + j;
+// Files with native data types
+const int NATIVE_DIM0 = 100;
+const int NATIVE_DIM1 = 50;
 
+int __create_native_dataset(
+    hid_t file_id, hid_t space_id, hid_t type_id, hid_t mem_type, int count, void *data)
+{
     char name[64];
     snprintf(name, sizeof(name)-1, "Dataset%d", count);
-    hsize_t dims[2] = {dim0,dim1};
-    hid_t space_id = H5Screate_simple(2, dims, NULL);
-    if (space_id < 0)
-    {
-        fprintf(stderr, "Failed to create dataspace\n");
-        return 1;
-    }
-    hid_t dset_id = H5Dcreate(file_id, name, H5T_STD_I32LE, space_id,
-        H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    hid_t dset_id = H5Dcreate(file_id, name, type_id, space_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     if (dset_id < 0)
     {
         fprintf(stderr, "Failed to create dataset\n");
         return 1;
     }
-    herr_t ret = H5Dwrite(dset_id, H5T_NATIVE_INT,
-        H5S_ALL, H5S_ALL, H5P_DEFAULT, data[0]);
+    herr_t ret = H5Dwrite(dset_id, mem_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
     if (ret < 0)
     {
         fprintf(stderr, "Error writing data to file\n");
         return 1;
     }
     H5Dclose(dset_id);
-    H5Sclose(space_id);
+    H5Sclose(space_id); // close handle provided as argument to this function
     return 0;
+}
+
+int create_native_int32(hid_t file_id, int count)
+{
+    int32_t data[NATIVE_DIM0][NATIVE_DIM1];
+    for (int i=0; i<NATIVE_DIM0; ++i)
+        for (int j=0; j<NATIVE_DIM1; ++j)
+            data[i][j] = count * 10 * i + j;
+
+    hsize_t dims[2] = {NATIVE_DIM0, NATIVE_DIM1};
+    hid_t space_id = H5Screate_simple(2, dims, NULL);
+    if (space_id < 0)
+    {
+        fprintf(stderr, "Failed to create dataspace\n");
+        return 1;
+    }
+
+    return __create_native_dataset(
+        file_id, space_id, H5T_STD_I32LE, H5T_NATIVE_INT, count, (void *) data[0]);
+}
+
+int __create_string_dataset(
+    int dims,
+    int &current_dim,
+    std::function<void(int, const char *)> write_fn)
+{
+    // We use the LICENSE file as input to string-based datasets
+    std::ifstream textfile("../LICENSE");
+    if (! textfile.is_open())
+    {
+        fprintf(stderr, "Failed to open '../LICENSE'\n");
+        return 1;
+    }
+    std::string inputFileBuffer(
+		(std::istreambuf_iterator<char>(textfile)),
+        (std::istreambuf_iterator<char>()));
+
+    std::string word;
+    std::istringstream iss(inputFileBuffer);
+    while (iss >> word && current_dim < dims)
+    {
+        write_fn(current_dim, word.c_str());
+        current_dim++;
+    }
+
+    // Fill up the remaining dimensions with a static string, if needed
+    while (current_dim < dims)
+    {
+        write_fn(current_dim, "<dummy>");
+        current_dim++;
+    }
+
+    return 0;
+}
+
+int create_native_varstring(hid_t file_id, int count)
+{
+    // Prepare output data
+    int current_dim = 0;
+    char *data[NATIVE_DIM0];
+
+    auto _callback = [&](int dim, const char *word)
+    {
+        asprintf(&data[dim], "%s", word);
+    };
+
+    int ret = __create_string_dataset(NATIVE_DIM0, current_dim, _callback);
+    if (ret != 0)
+        return 1;
+
+    // Prepare HDF5 handles
+    hsize_t dims[1] = {NATIVE_DIM0};
+    hid_t space_id = H5Screate_simple(1, dims, NULL);
+    if (space_id < 0)
+    {
+        fprintf(stderr, "Failed to create dataspace\n");
+        return 1;
+    }
+
+    // Variable-length string type
+    hid_t stringtype_id = H5Tcopy(H5T_C_S1);
+    H5Tset_size(stringtype_id, H5T_VARIABLE);
+
+    return __create_native_dataset(
+        file_id, space_id, stringtype_id, stringtype_id, count, (void *) data);
+}
+
+int create_native_string(hid_t file_id, int count)
+{
+    // Prepare output data
+    const int len = 32;
+    int current_dim = 0;
+    char data[NATIVE_DIM0][len];
+    memset(data, 0, sizeof(data));
+
+    auto _callback = [&](int dim, const char *word)
+    {
+        snprintf(data[dim], len-1, "%s", word);
+    };
+
+    int ret = __create_string_dataset(NATIVE_DIM0, current_dim, _callback);
+    if (ret != 0)
+        return 1;
+
+    // Prepare HDF5 handles
+    hsize_t dims[1] = {NATIVE_DIM0};
+    hid_t space_id = H5Screate_simple(1, dims, NULL);
+    if (space_id < 0)
+    {
+        fprintf(stderr, "Failed to create dataspace\n");
+        return 1;
+    }
+
+    // Fixed-length string type
+    hid_t stringtype_id = H5Tcopy(H5T_C_S1);
+    H5Tset_size(stringtype_id, len);
+
+    return __create_native_dataset(
+        file_id, space_id, stringtype_id, stringtype_id, count, (void *) data[0]);
 }
 
 // Files with compound data types
