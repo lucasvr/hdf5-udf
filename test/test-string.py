@@ -6,7 +6,7 @@ def dynamic_dataset():
     udf_dims = lib.getDims("Temperature.py")
 
     for i in range(input_dims[0]):
-        print(lib.string(input_data[i]))
+        print(lib.string(input_data[i]), flush=True)
 
     for i in range(udf_dims[0]):
         udf_data[i] = i * 1.0
