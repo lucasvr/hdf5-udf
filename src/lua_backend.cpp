@@ -90,7 +90,7 @@ extern "C" const char *luaGetCast(const char *element)
         lua_pushlightuserdata(State, CAST_OFFSET(index));
         lua_gettable(State, LUA_REGISTRYINDEX);
         const char *cast = lua_tostring(State, -1);
-        if (! strcmp(cast, "void*"))
+        if (! strcmp(cast, "void*") || ! strcmp(cast, "char*"))
         {
             // Cast compound structure
             LuaBackend backend;

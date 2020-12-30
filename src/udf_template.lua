@@ -19,6 +19,16 @@ function init(filterpath)
         // compound_declarations_placeholder
     ]]
 
+    lib.string = function(name)
+        local type = tostring(ffi.typeof(name)):gsub("ctype<", ""):gsub("( ?)[&>?]", "")
+        if type:find("^struct") ~= nil then
+            return ffi.string(name.value)
+        elseif type:find("^char ") ~= nil then
+            return ffi.string(ffi.cast("char *", name))
+        end
+        return ffi.string(name)
+    end
+
     lib.getData = function(name)
         return ffi.cast(ffi.string(filterlib.luaGetCast(name)), filterlib.luaGetData(name))
     end
