@@ -49,6 +49,16 @@ function Read_Dataset() {
     h5dump -d "$dataset" -o "$RESULT_H5DUMP" -O "$input_file"
 }
 
+function CheckDiff() {
+    local generated="$1"
+    local reference="$2"
+    if ! numdiff -q -a 1.0000000000e-6 "$reference" "$generated"
+    then
+        # Files are different. Show differences with 'diff'
+        diff -up "$reference" "$generated"
+    fi
+}
+
 function Run_Test() {
     local entry="$1"
     local test_name="$(echo $entry | awk {'print $1'})"
@@ -82,11 +92,11 @@ function Run_Test() {
         Read_Dataset /${dataset_name} ${test_name}.h5 > $RESULT_STDOUT
         if [ -e ${test_name}.stdout.${backend} ]
         then
-            diff -up $RESULT_STDOUT ${test_name}.stdout.${backend} || Die "Validation failed" "${test_info}"
+            CheckDiff $RESULT_STDOUT ${test_name}.stdout.${backend} || Die "Validation failed" "${test_info}"
             validated=1
         elif [ -e ${test_name}.stdout ]
         then
-            diff -up $RESULT_STDOUT ${test_name}.stdout || Die "Validation failed" "${test_info}"
+            CheckDiff $RESULT_STDOUT ${test_name}.stdout || Die "Validation failed" "${test_info}"
             validated=1
         fi
         if [ -e ${test_name}.h5dump ]
