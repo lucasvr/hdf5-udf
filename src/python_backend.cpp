@@ -103,15 +103,20 @@ std::string PythonBackend::extension()
 std::string PythonBackend::compile(
     std::string udf_file,
     std::string template_file,
-    std::string compound_declarations)
+    std::string compound_declarations,
+    std::vector<DatasetInfo> &input_datasets)
 {
     AssembleData data = {
-        .udf_file = udf_file,
-        .template_file = template_file,
-        .compound_declarations = compound_declarations,
-        .callback_placeholder = "# user_callback_placeholder",
-        .compound_placeholder = "// compound_declarations_placeholder",
-        .extension = this->extension()
+        .udf_file                 = udf_file,
+        .template_file            = template_file,
+        .compound_placeholder     = "// compound_declarations_placeholder",
+        .compound_decl            = compound_declarations,
+        .methods_decl_placeholder = "",
+        .methods_decl             = "",
+        .methods_impl_placeholder = "",
+        .methods_impl             = "",
+        .callback_placeholder     = "# user_callback_placeholder",
+        .extension                = this->extension()
     };
     auto py_file = Backend::assembleUDF(data);
     if (py_file.size() == 0)

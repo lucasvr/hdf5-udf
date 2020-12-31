@@ -18,6 +18,21 @@
 #include "python_backend.h"
 #endif
 
+static std::string textReplace(
+    std::string input,
+    std::string placeholder,
+    std::string newstr)
+{
+    if (newstr.size())
+    {
+        auto start = input.find(placeholder);
+        if (start == std::string::npos)
+            return "";
+        return input.replace(start, placeholder.length(), newstr);
+    }
+    return input;
+}
+
 std::string Backend::assembleUDF(const AssembleData &data)
 {
     std::ifstream ifs(data.udf_file);
@@ -41,40 +56,34 @@ std::string Backend::assembleUDF(const AssembleData &data)
 		(std::istreambuf_iterator<char>(ifstr)),
         (std::istreambuf_iterator<char>()));
 
-    /* Check if the compound declaration placeholder present in the template file */
-    auto compound_start = udf.find(data.compound_placeholder);
-    if (compound_start == std::string::npos)
+    /* Populate placeholders */
+    udf = textReplace(udf, data.methods_decl_placeholder, data.methods_decl);
+    if (udf.size() == 0)
     {
-        fprintf(stderr, "Failed to find compound placeholder string in %s\n",
-            data.template_file.c_str());
+        fprintf(stderr, "Missing methods_decl placeholder in %s\n", data.template_file.c_str());
         return "";
     }
-
-    /* Replace compound placeholder with actual declaration string */
-    if (data.compound_declarations.size()) {
-        udf = udf.replace(
-            compound_start,
-            data.compound_placeholder.length(),
-            data.compound_declarations);
-    }
-
-    /* Check if the template string is present in the template file */
-    auto callback_start = udf.find(data.callback_placeholder);
-    if (callback_start == std::string::npos)
+    udf = textReplace(udf, data.methods_impl_placeholder, data.methods_impl);
+    if (udf.size() == 0)
     {
-        fprintf(stderr, "Failed to find callback placeholder string in %s\n",
-            data.template_file.c_str());
+        fprintf(stderr, "Missing methods_impl placeholder in %s\n", data.template_file.c_str());
         return "";
     }
-
-    /* Embed UDF string in the template */
-    auto completeCode = udf.replace(
-        callback_start,
-        data.callback_placeholder.length(),
-        inputFileBuffer);
+    udf = textReplace(udf, data.compound_placeholder, data.compound_decl);
+    if (udf.size() == 0)
+    {
+        fprintf(stderr, "Missing compound placeholder in %s\n", data.template_file.c_str());
+        return "";
+    }
+    udf = textReplace(udf, data.callback_placeholder, inputFileBuffer);
+    if (udf.size() == 0)
+    {
+        fprintf(stderr, "Missing callback placeholder in %s\n", data.template_file.c_str());
+        return "";
+    }
 
     /* Write the final code to disk */
-    auto out_file = writeToDisk(completeCode.data(), completeCode.size(), data.extension);
+    auto out_file = writeToDisk(udf.data(), udf.size(), data.extension);
     if (out_file.size() == 0)
     {
         fprintf(stderr, "Will not be able to compile the UDF code\n");

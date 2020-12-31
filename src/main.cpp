@@ -479,7 +479,8 @@ int main(int argc, char **argv)
 
     /* Compile the UDF source file */
     auto template_file = template_path(backend->extension(), argv[0]);
-    auto bytecode = backend->compile(udf_file, template_file, compound_declarations);
+    auto bytecode = backend->compile(
+        udf_file, template_file, compound_declarations, input_datasets);
     if (bytecode.size() == 0)
     {
         fprintf(stderr, "Failed to compile UDF file\n");

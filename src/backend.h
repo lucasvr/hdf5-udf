@@ -14,12 +14,19 @@
 #include "dataset.h"
 
 struct AssembleData {
-    std::string udf_file;
-    std::string template_file;
-    std::string compound_declarations;
-    std::string callback_placeholder;
-    std::string compound_placeholder;
-    std::string extension;
+    std::string udf_file;                 // UDF file
+    std::string template_file;            // backend-specific template file
+
+    std::string compound_placeholder;     // placeholder string in template file
+    std::string compound_decl;            // declaration of auto-generated C structures
+
+    std::string methods_decl_placeholder; // placeholder string in template file
+    std::string methods_decl;             // prototype of auxiliary methods
+    std::string methods_impl_placeholder; // placeholder string in template file
+    std::string methods_impl;             // actual implementation of those methods
+
+    std::string callback_placeholder;     // UDF placeholder string in template file
+    std::string extension;                // file name extension to use
 };
 
 class Backend {
@@ -38,7 +45,8 @@ public:
     virtual std::string compile(
         std::string udf_file,
         std::string template_file,
-        std::string compound_declarations) {
+        std::string compound_declarations,
+        std::vector<DatasetInfo> &input_datasets) {
         return "";
     }
 

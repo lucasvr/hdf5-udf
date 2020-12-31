@@ -24,15 +24,25 @@ class DummyBackend : public Backend {
 public:
     std::string name() { return ""; }
     std::string extension() { return ""; }
-    std::string compile(std::string udf_file, std::string template_file, std::string cdecl) { return ""; }
+
+    std::string compile(
+        std::string udf_file,
+        std::string template_file,
+        std::string cdecl,
+        std::vector<DatasetInfo> &input_datasets)
+    { return ""; }
+
     bool run(
         const std::string filterpath,
         const std::vector<DatasetInfo> input_datasets,
         const DatasetInfo output_dataset,
         const char *output_cast_datatype,
         const char *udf_blob,
-        size_t udf_blob_size) { return true; }
-    std::vector<std::string> udfDatasetNames(std::string udf_file) { return std::vector<std::string>(); }
+        size_t udf_blob_size)
+    { return true; }
+
+    std::vector<std::string> udfDatasetNames(std::string udf_file)
+    { return std::vector<std::string>(); }
 };
 
 bool Sandbox::init(std::string filterpath, const std::vector<std::string> &paths_allowed)

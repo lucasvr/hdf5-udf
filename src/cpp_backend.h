@@ -22,7 +22,8 @@ public:
     std::string compile(
         std::string udf_file,
         std::string template_file,
-        std::string compound_declarations);
+        std::string compound_declarations,
+        std::vector<DatasetInfo> &input_datasets);
 
     // Execute a user-defined-function
     bool run(

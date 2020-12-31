@@ -16,17 +16,18 @@ std::vector<const char *> hdf5_udf_names;
 std::vector<const char *> hdf5_udf_types;
 std::vector<std::vector<size_t>> hdf5_udf_dims;
 
+// compound_declarations_placeholder
+
 // This is the API that user-defined-functions use to retrieve
 // datasets they depend on.
 class UserDefinedLibrary
 {
 public:
-    template <class T>
-    T *getData(std::string name);
-    
+    template <class T> T *getData(std::string name);
     const char *getType(std::string name);
-    
     std::vector<size_t> getDims(std::string name);
+    const char *string(const char *element);
+    // methods_declaration_placeholder
 };
 
 template <class T>
@@ -55,10 +56,15 @@ std::vector<size_t> UserDefinedLibrary::getDims(std::string name)
     return dims;
 }
 
+const char *UserDefinedLibrary::string(const char *element)
+{
+    return element;
+}
+
+// methods_implementation_placeholder
+
 UserDefinedLibrary lib;
 
 // User-Defined Function
-
-// compound_declarations_placeholder
 
 // user_callback_placeholder

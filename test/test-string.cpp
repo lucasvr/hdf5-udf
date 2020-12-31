@@ -7,7 +7,7 @@ extern "C" void dynamic_dataset()
     auto udf_dims = lib.getDims("Temperature.cpp");
 
     for (size_t i=0; i<input_dims[0]; ++i)
-        printf("%s\n", input_string[i].value);
+        printf("%s\n", lib.string(input_string[i]));
 
     for (size_t i=0; i<udf_dims[0]; ++i)
         udf_data[i] = i * 1.0;

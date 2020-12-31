@@ -47,15 +47,33 @@ std::string CppBackend::extension()
 std::string CppBackend::compile(
     std::string udf_file,
     std::string template_file,
-    std::string compound_declarations)
+    std::string compound_declarations,
+    std::vector<DatasetInfo> &input_datasets)
 {
+    std::string methods_decl, methods_impl, spaces;
+    for (auto &info: input_datasets)
+    {
+        if (info.datatype.compare("varstring") == 0)
+        {
+            auto name = sanitizedName(info.name);
+            methods_decl += "const char *string(" + name + "_t &element);\n" + spaces;
+            spaces = "    ";
+            methods_impl += "const char *UserDefinedLibrary::string(" + name + "_t &element)\n{\n";
+            methods_impl += spaces + "return static_cast<const char *>(element.value);\n";
+            methods_impl += "}\n\n";
+        }
+    }
     AssembleData data = {
-        .udf_file = udf_file,
-        .template_file = template_file,
-        .compound_declarations = compound_declarations,
-        .callback_placeholder = "// user_callback_placeholder",
-        .compound_placeholder = "// compound_declarations_placeholder",
-        .extension = this->extension()
+        .udf_file                 = udf_file,
+        .template_file            = template_file,
+        .compound_placeholder     = "// compound_declarations_placeholder",
+        .compound_decl            = compound_declarations,
+        .methods_decl_placeholder = "// methods_declaration_placeholder",
+        .methods_decl             = methods_decl,
+        .methods_impl_placeholder = "// methods_implementation_placeholder",
+        .methods_impl             = methods_impl,
+        .callback_placeholder     = "// user_callback_placeholder",
+        .extension                = this->extension()
     };
     auto cpp_file = Backend::assembleUDF(data);
     if (cpp_file.size() == 0)
