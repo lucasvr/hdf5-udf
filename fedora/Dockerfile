@@ -1,7 +1,7 @@
 FROM fedora:32
 LABEL maintainer="lucasvr@gobolinux.org"
 
-ARG github_tag=v1.0
+ARG github_tag=v1.1
 ARG syscall_intercept_basename=syscall_intercept-0.1
 
 # Build dependencies (clang is needed to build syscall_intercept)
