@@ -5,7 +5,7 @@
 %define debug_package %{nil}
 
 Name:           hdf5-udf
-Version:        1.0
+Version:        1.1
 Release:        1%{?pre_dot}%{?dist}
 Summary:        Support for programmable datasets in HDF5 using Lua, Python, and C/C++ 
 
