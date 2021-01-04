@@ -271,20 +271,21 @@ bool PythonBackend::run(
 
     // The offset to the actual bytecode may change across Python versions.
     // Please look under $python_sources/Lib/importlib/_bootstrap_external.py
-    // for the implementation of _validate_bytecode_header() so you can identify
-    // the right offset for a version of Python not featured in the list below.
+    // for the implementation of _validate_*() so you can identify the right
+    // offset for a version of Python not featured in the list below.
     size_t bytecode_start;
     switch (PY_MINOR_VERSION)
     {
-        case 5:
+        case 1 .. 2:
+            bytecode_start = 8;
+            break;
+        case 3 .. 6:
             bytecode_start = 12;
             break;
-        case 8:
+        case 7 .. 8:
+        default:
             bytecode_start = 16;
             break;
-        default:
-            // Educated guess
-            bytecode_start = 16;
     }
     bytecode = &bytecode[bytecode_start];
     bytecode_size -= bytecode_start;
