@@ -29,7 +29,7 @@ std::string getOptionValue(int argc, char **argv, const char *option, const char
         char *start = strstr(argv[i], option);
         if (start == argv[i] && strlen(argv[i]) == strlen(option))
         {
-            // No-argument option (e.g., --compound). Return "1"
+            // No-argument option (e.g., --help). Return "1"
             return "1";
         }
         else if (start == argv[i])
@@ -74,11 +74,6 @@ int main(int argc, char **argv)
         fprintf(stderr, "Error: missing output file (--out=FILE)\n");
         return 1;
     }
-    if (compound.size() && datatype.size())
-    {
-        fprintf(stderr, "Error: --compound and --datatype are mutually exclusive\n");
-        return 1;
-    }
     if (compound.size() == 0 && datatype.size() == 0)
     {
         fprintf(stderr, "Error: neither --compound nor --datatype were given\n");
@@ -116,8 +111,8 @@ int main(int argc, char **argv)
         {NULL, NULL}
     };
 
-    int ret = 0;
-    for (int count=1; count<=dataset_count; ++count)
+    int ret = 0, count = 1;
+    while (true)
     {
         if (compound.size())
         {
@@ -133,8 +128,9 @@ int main(int argc, char **argv)
                 fprintf(stderr, "Invalid compound type '%s' requested\n", compound.c_str());
                 break;
             }
+            count++;
         }
-        else if (datatype.size())
+        if (datatype.size())
         {
             ret = -1;
             for (int i=0; native_functions[i].type != NULL; ++i)
@@ -148,8 +144,9 @@ int main(int argc, char **argv)
                 fprintf(stderr, "Invalid datatype '%s' requested\n", datatype.c_str());
                 break;
             }
+            count++;
         }
-        if (ret != 0)
+        if (ret != 0 || count >= dataset_count)
             break;
     }
 
