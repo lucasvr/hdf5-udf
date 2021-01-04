@@ -66,7 +66,8 @@ pieces of software to allow the embedding of bytecode and their execution:
 
 - `Lua`: requires the [LuaJIT](https://luajit.org/install.html) package
 - `Python`: requires the [CFFI](https://pypi.org/project/cffi) module
-- `C/C++`: requires the [GNU C++ compiler](https://gnu.org/software/gcc)
+- `C/C++`: requires the [GNU C++ compiler](https://gnu.org/software/gcc) or,
+   alternatively, the [Clang compiler](https://clang.llvm.org).
 
 It is possible to compile the code so that only a restricted number of system
 calls can be executed by the user-defined functions. We rely on two packages
@@ -88,6 +89,9 @@ destination directory other than `/usr/local`:
 $ make
 $ make install DESTDIR=/installation/path
 ```
+
+In order to use an alternative compiler, please set the `CXX` variable to the
+path to that executable (e.g., `CXX=clang++`).
 
 By default, `make` will attempt to build all backends and to compile the HDF5
 filter with support for system call filtering. It is possible to disable
