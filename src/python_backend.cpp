@@ -276,13 +276,13 @@ bool PythonBackend::run(
     size_t bytecode_start;
     switch (PY_MINOR_VERSION)
     {
-        case 1 .. 2:
+        case 1 ... 2:
             bytecode_start = 8;
             break;
-        case 3 .. 6:
+        case 3 ... 6:
             bytecode_start = 12;
             break;
-        case 7 .. 8:
+        case 7 ... 8:
         default:
             bytecode_start = 16;
             break;
