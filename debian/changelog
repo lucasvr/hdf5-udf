@@ -1,3 +1,9 @@
+hdf5-udf (1.1) unstable; urgency=low
+
+  * Introduce support for compounds and string data types.
+  * Add support for building UDFs with Clang (instead of GCC.)
+  * Assorted bug fixes.
+
 hdf5-udf (1.0) unstable; urgency=low
 
   * Initial release.
