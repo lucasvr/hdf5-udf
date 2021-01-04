@@ -131,10 +131,17 @@ on a given group by using the same syntax on the command line, such as
 `/group/name/dataset:resolution:datatype`. Note that the given group must already
 exist: `hdf5-udf` will not attempt to create them for you.
 
+# Support for strings and compounds
+
+It is possible to write UDFs that take input from compounds and from strings (both
+fixed- and variable-sized ones). `hdf5-udf` will print the name and layout of the
+generated structure that you can use to iterate over the input data members. Please
+refer to the [examples](https://github.com/lucasvr/hdf5-udf/tree/master/examples)
+directory for a guidance on how to access such datatypes from Python, C/C++ and Lua.
+
 ## Supported dataset types
 
-The following dataset types map to their corresponding little-endian
-definitions in HDF5:
+The following dataset types can be output by `hdf5-udf`:
 
 - `int8` (`H5T_STD_I8LE`)
 - `int16` (`H5T_STD_I16LE`)
