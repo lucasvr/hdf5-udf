@@ -163,9 +163,10 @@ Log_Normal "*** String tests ***"
 Log_Normal "********************"
 Log_Normal
 tests=(
-    # HDF5 file         UDF file     Dynamic dataset
-    "example-string     test-string  Temperature:1000:double"
-    "example-varstring  test-string  Temperature:1000:double"
+    # HDF5 file          UDF file         Dynamic dataset
+    "example-string      test-string      Temperature:1000:double"
+    "example-varstring   test-string      Temperature:1000:double"
+    "example-multistring test-multistring Temperature:1000:double"
 )
 for entry in "${tests[@]}"; do Run_Test "$entry"; done
 
@@ -182,6 +183,7 @@ tests=(
     "example-compound-varstring_mixed  test-compound-string      Temperature:1000:double"
     "example-compound-string_simple    test-compound-string      Temperature:1000:double"
     "example-compound-string_mixed     test-compound-string      Temperature:1000:double"
+    "example-compound-varstring_mixed_plus_string test-compound-plus-string Temperature:1000:double"
 )
 for entry in "${tests[@]}"; do Run_Test "$entry"; done
 

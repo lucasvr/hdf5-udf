@@ -146,7 +146,7 @@ int main(int argc, char **argv)
             }
             count++;
         }
-        if (ret != 0 || count >= dataset_count)
+        if (ret != 0 || count > dataset_count)
             break;
     }
 
