@@ -15,11 +15,14 @@ UDF can execute.
 
 We rely on **seccomp** to determine which system calls UDFs are allowed to
 invoke -- the UDF process is terminated if it tries to run a function that
-does not belong to the allow-list.
+does not belong to the allow-list. The following image shows the overall
+architecture of our seccomp-based sandboxing.
+
+![](images/hdf5-udf-seccomp.png)
 
 The basic system calls allowed have to do with dynamic memory allocation,
-such as `brk` and `mmap`. If network access through UDFs is desired, then 
-sockets-related system calls are also granted: `socket`, `setsockopt`, `ioctl`,
+such as `brk` and `mmap`. It is also possible to use a selected set of
+network-related system calls: `socket`, `setsockopt`, `ioctl`,
 `connect`, `select`, `poll`, `read`, `recv`, `recvfrom`, `write`, `send`,
 `sendto`, `sendmsg`, and `close`.
 
