@@ -14,6 +14,9 @@
 #include <numeric>
 #include <sstream>
 
+/* Default size of H5T_C_S1 strings in UDFs */
+#define DEFAULT_UDF_STRING_SIZE 32
+
 struct CompoundMember {
     std::string name;
     std::string type;
@@ -36,7 +39,7 @@ public:
     const char *getCastDatatype() const;
     void printInfo(std::string dataset_type) const;
     std::vector<CompoundMember> getCompoundMembers() const;
-    CompoundMember getStringDeclaration() const;
+    CompoundMember getStringDeclaration(bool is_varstring, size_t size) const;
 
     std::string name;                /* Dataset name */
     std::string datatype;            /* Datatype, given as string */

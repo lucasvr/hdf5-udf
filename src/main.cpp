@@ -249,9 +249,10 @@ int main(int argc, char **argv)
             "                                 datasets declared in that same file\n"
             "  --overwrite                    Overwrite existing virtual dataset(s)\n\n"
             "Formatting options for <virtual_dataset>:\n"
-            "  dataset_name:resolution:type   dataset_name: name of the virtual dataset\n"
+            "  name:resolution:type           name:       name of the virtual dataset\n"
             "                                 resolution: XRES, XRESxYRES, or XRESxYRESxZRES\n"
-            "                                 type: [u]int8, [u]int16, [u]int32, [u]int64, float, or double\n\n"
+            "                                 type:       [u]int8, [u]int16, [u]int32, [u]int64, float,\n"
+            "                                             double, or string\n\n"
             "Examples:\n"
             "%s sample.h5 simple_vector.lua Simple:500:float\n"
             "%s sample.h5 sine_wave.lua SineWave:100x10:int32\n"
@@ -383,20 +384,16 @@ int main(int argc, char **argv)
                     compound_declarations += "\n";
                 compound_declarations += backend->compoundToStruct(info, false);
             }
-            else if (info.datatype.compare("varstring") == 0)
+            else if (info.datatype.compare("string") == 0)
             {
                 // Because HDF5 has both variable- and fixed-sized strings there
                 // are two possible ways to define a string element: (1) with
                 // 'char varname[size]' and (2) with 'char *varname'. Here we embed
                 // string variables into packed structures so that UDFs can easily
                 // iterate over them with for loops and basic pointer arithmetic.
-                info.members.push_back(info.getStringDeclaration());
-                if (info.members.size() == 0)
-                {
-                    fprintf(stderr, "Failed to parse dataset %s from file %s\n",
-                        info.name.c_str(), hdf5_file.c_str());
-                    exit(1);
-                }
+                bool is_varstring = H5Tis_variable_str(info.hdf5_datatype);
+                size_t member_size = H5Tget_size(info.hdf5_datatype);
+                info.members.push_back(info.getStringDeclaration(is_varstring, member_size));
                 if (compound_declarations.size())
                     compound_declarations += "\n";
                 compound_declarations += backend->compoundToStruct(info, true);
@@ -440,6 +437,38 @@ int main(int argc, char **argv)
      */
     for (auto &info: virtual_datasets)
     {
+        if (info.datatype.compare("string") == 0)
+        {
+           /*
+            * Ideally, we'd like to  output string datatypes using variable size;
+            * that would make our life much easier. However, using variable string
+            * sizes means that H5Dwrite() needs to call strlen() on each member of
+            * the write data, and that fails badly because we're using the write
+            * data buffer to hold the UDF bytecode -- so that call to strlen() is
+            * likely to crash the application.
+            *
+            * For the time being we're using a predefined buffer size; it's perhaps
+            * better to ask the user to define it, although it will make UDFs a bit
+            * more bureaucratic to write.
+            */
+            if (H5Tset_size(info.hdf5_datatype, DEFAULT_UDF_STRING_SIZE) < 0)
+            {
+                fprintf(stderr, "Failed to set dataset size to variable\n");
+                exit(1);
+            }
+
+            /*
+             * Embed the string variable into a packed structure so that the
+             * UDFs can easily iterate over its members with for loops and
+             * basic pointer arithmetic.
+             */
+            info.members.push_back(
+                info.getStringDeclaration(false, DEFAULT_UDF_STRING_SIZE));
+            if (compound_declarations.size())
+                compound_declarations += "\n";
+            compound_declarations += backend->compoundToStruct(info, true);
+        }
+
         if (info.hdf5_datatype != -1) {
             info.printInfo("Virtual");
             continue;
@@ -478,9 +507,10 @@ int main(int argc, char **argv)
     }
 
     /* Compile the UDF source file */
+    std::vector<DatasetInfo> datasets(input_datasets);
+    datasets.insert(datasets.end(), virtual_datasets.begin(), virtual_datasets.end());
     auto template_file = template_path(backend->extension(), argv[0]);
-    auto bytecode = backend->compile(
-        udf_file, template_file, compound_declarations, input_datasets);
+    auto bytecode = backend->compile(udf_file, template_file, compound_declarations, datasets);
     if (bytecode.size() == 0)
     {
         fprintf(stderr, "Failed to compile UDF file\n");
@@ -602,7 +632,7 @@ int main(int argc, char **argv)
         }
 
         /* Prepare payload data */
-        char *payload = (char *) malloc(grid_size * H5Tget_size(info.hdf5_datatype));
+        char *payload = (char *) calloc(grid_size, H5Tget_size(info.hdf5_datatype));
         char *p = payload;
         memcpy(p, &jas_str[0], jas_str.length());
         p += jas_str.length();

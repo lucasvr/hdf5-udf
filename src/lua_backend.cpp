@@ -134,7 +134,7 @@ std::string LuaBackend::compile(
     std::string udf_file,
     std::string template_file,
     std::string compound_declarations,
-    std::vector<DatasetInfo> &input_datasets)
+    std::vector<DatasetInfo> &datasets)
 {
     AssembleData data = {
         .udf_file                 = udf_file,

@@ -279,6 +279,22 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
 
         DatasetInfo output_dataset(output_name, resolution, datatype);
         output_dataset.hdf5_datatype = output_dataset.getHdf5Datatype();
+
+        /*
+         * String datatype needs to have their size properly set so that
+         * getStorage() can return accurate information
+         */
+        if (datatype.compare("string") == 0)
+        {
+            if (H5Tset_size(output_dataset.hdf5_datatype, DEFAULT_UDF_STRING_SIZE) < 0)
+            {
+                fprintf(stderr, "Failed to set dataset size to variable\n");
+                if (handle_from_procfs)
+                    H5Fclose(file_id);
+                return 0;
+            }
+        }
+
         output_dataset.data = (void *) malloc(
             output_dataset.getStorageSize() * output_dataset.getGridSize());
         if (! output_dataset.data)

@@ -36,9 +36,10 @@ static std::vector<DatasetTypeInfo> numerical_types = {
 };
 
 // misc_types are looked up by HDF5 *class* rather than *datatype*
+// TODO: H5Tcopy() leak.
 static std::vector<DatasetTypeInfo> misc_types = {
-    {"compound",  "void*", H5T_COMPOUND, -1},
-    {"varstring", "char*", H5T_C_S1,     -1},
+    {"compound",  "void*", H5T_COMPOUND,      -1},
+    {"string",    "char*", H5Tcopy(H5T_C_S1), -1},
 };
 
 DatasetInfo::DatasetInfo() :
@@ -80,7 +81,9 @@ size_t DatasetInfo::getGridSize() const
 
 static bool sameDatatype(hid_t a, hid_t b)
 {
-    if (a == H5T_COMPOUND)
+    if (b == -1)
+        return false;
+    else if (a == H5T_COMPOUND)
         return H5Tget_class(b) == H5T_COMPOUND;
     else if (a == H5T_C_S1)
         return H5Tget_class(b) == H5T_STRING;
@@ -107,8 +110,11 @@ size_t DatasetInfo::getHdf5Datatype() const
             if (info.datatype.compare(datatype) == 0)
                 return info.hdf5_datatype_id;
         for (auto &info: misc_types)
-            if (sameDatatype(info.hdf5_datatype_id, hdf5_datatype))
+        {
+            if (info.datatype.compare(datatype) == 0 ||
+                sameDatatype(info.hdf5_datatype_id, hdf5_datatype))
                 return info.hdf5_datatype_id;
+        }
     }
     return -1;
 }
@@ -121,7 +127,11 @@ hid_t DatasetInfo::getStorageSize() const
                 return info.datatype_size;
         for (auto &info: misc_types)
             if (sameDatatype(info.hdf5_datatype_id, hdf5_datatype))
-                return info.datatype_size;
+            {
+                return datatype.compare("string") == 0 ?
+                    H5Tget_size(hdf5_datatype) :
+                    info.datatype_size;
+            }
     }
     return -1;
 }
@@ -195,15 +205,11 @@ std::vector<CompoundMember> DatasetInfo::getCompoundMembers() const
     return members;
 }
 
-CompoundMember DatasetInfo::getStringDeclaration() const
+CompoundMember DatasetInfo::getStringDeclaration(bool is_varstring, size_t size) const
 {
-    bool is_varstring = H5Tis_variable_str(hdf5_datatype);
-    size_t size = H5Tget_size(hdf5_datatype);
-    std::string decl_datatype = is_varstring ? "char*" : "char";
-
     CompoundMember member = {
         .name = name,
-        .type = decl_datatype,
+        .type = is_varstring ? "char*" : "char",
         .offset = 0,
         .size = size,
         .is_char_array = is_varstring == false,

@@ -48,12 +48,12 @@ std::string CppBackend::compile(
     std::string udf_file,
     std::string template_file,
     std::string compound_declarations,
-    std::vector<DatasetInfo> &input_datasets)
+    std::vector<DatasetInfo> &datasets)
 {
     std::string methods_decl, methods_impl, spaces;
-    for (auto &info: input_datasets)
+    for (auto &info: datasets)
     {
-        if (info.datatype.compare("varstring") == 0)
+        if (info.datatype.compare("string") == 0)
         {
             auto name = sanitizedName(info.name);
             methods_decl += "const char *string(" + name + "_t &element);\n" + spaces;
