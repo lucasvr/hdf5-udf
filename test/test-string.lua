@@ -5,11 +5,11 @@ function dynamic_dataset()
     local udf_data = lib.getData("Temperature.lua")
     local udf_dims = lib.getDims("Temperature.lua")
 
-    for i=0, input_dims[1]-1 do
+    for i=1, input_dims[1] do
         print(lib.string(input_data[i]))
     end
 
-    for i=0, udf_dims[1]-1 do
-        udf_data[i] = i * 1.0
+    for i=1, udf_dims[1] do
+        udf_data[i] = (i-1) * 1.0
     end
 end

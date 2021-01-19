@@ -5,7 +5,7 @@ function dynamic_dataset()
     local udf_data = lib.getData("Temperature.lua")
     local udf_dims = lib.getDims("Temperature.lua")
 
-    for i=0, udf_dims[1]-1 do
+    for i=1, udf_dims[1] do
         print(string.format(
             "serial: %d, temperature: %.6f, pressure: %.6f",
             tonumber(compound[i].serial_number),

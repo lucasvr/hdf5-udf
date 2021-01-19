@@ -83,10 +83,10 @@ function dynamic_dataset()
 
     local udf_data = lib.getData("RollingStone.lua")
     local udf_dims = lib.getDims("RollingStone.lua")
-    local i = 0
+    local i = 1
 
     for word in string.gmatch(lyrics, "[^%s]+") do
-        if i <= udf_dims[1]-1 then
+        if i <= udf_dims[1] then
             udf_data[i].value = word
         end
         i = i+1

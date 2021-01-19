@@ -5,7 +5,7 @@ function dynamic_dataset()
     local udf_data = lib.getData("VirtualDataset.lua")
     local udf_dims = lib.getDims("VirtualDataset.lua")
 
-    for i=0, udf_dims[1] * udf_dims[2] do
+    for i=1, udf_dims[1] * udf_dims[2] do
         udf_data[i] = ds1_data[i] + ds2_data[i]
     end
 end

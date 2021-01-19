@@ -2,8 +2,9 @@
 function dynamic_dataset()
     local udf_data = lib.getData("Simple.lua")
     local udf_dims = lib.getDims("Simple.lua")
+    print("udf_dims=" .. udf_dims[1])
     local N = udf_dims[1]
-    for i=0, N-1 do
-        udf_data[i] = i
+    for i=1, N do
+        udf_data[i] = i-1
     end
 end

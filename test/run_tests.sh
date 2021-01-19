@@ -90,16 +90,20 @@ function Run_Test() {
         validated=0
         Log_Normal "Reading UDF" "${test_info}"
         Read_Dataset /${dataset_name} ${test_name}.h5 > $RESULT_STDOUT
-        if [ -e ${test_name}.stdout.${backend} ]
+        if [ -e ${test_name}.stdout-${backend} ]
         then
-            CheckDiff $RESULT_STDOUT ${test_name}.stdout.${backend} || Die "Validation failed" "${test_info}"
+            CheckDiff $RESULT_STDOUT ${test_name}.stdout-${backend} || Die "Validation failed" "${test_info}"
             validated=1
         elif [ -e ${test_name}.stdout ]
         then
             CheckDiff $RESULT_STDOUT ${test_name}.stdout || Die "Validation failed" "${test_info}"
             validated=1
         fi
-        if [ -e ${test_name}.h5dump ]
+        if [ -e ${test_name}.h5dump-${backend} ]
+        then
+            diff -up $RESULT_H5DUMP ${test_name}.h5dump-${backend} || Die "Validation failed" "${test_info}"
+            validated=1
+        elif [ -e ${test_name}.h5dump ]
         then
             diff -up $RESULT_H5DUMP ${test_name}.h5dump || Die "Validation failed" "${test_info}"
             validated=1
@@ -165,8 +169,8 @@ Log_Normal
 tests=(
     # HDF5 file            UDF file             Dynamic dataset
     "example-string        test-string          Temperature:1000:double"
-    #"example-varstring     test-string          Temperature:1000:double"
-    #"example-multistring   test-multistring     Temperature:1000:double"
+    "example-varstring     test-string          Temperature:1000:double"
+    "example-multistring   test-multistring     Temperature:1000:double"
     "example-string2       test-string-output   RollingStone:405:string"
 )
 # Create a copy of example-string.h5, as the file gets removed after the
