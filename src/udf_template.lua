@@ -16,6 +16,7 @@ function init(filterpath)
         const char *luaGetType(const char *);
         const char *luaGetCast(const char *);
         const char *luaGetDims(const char *);
+        ssize_t     luaGetElementSize(const char *);
         // compound_declarations_placeholder
     ]]
 
@@ -30,7 +31,19 @@ function init(filterpath)
     end
 
     lib.getData = function(name)
-        return ffi.cast(ffi.string(filterlib.luaGetCast(name)), filterlib.luaGetData(name))
+        local cast = filterlib.luaGetCast(name)
+        local data = ffi.cast("char*", filterlib.luaGetData(name))
+
+        -- To allow 1-based indexing of HDF5 datasets we return a shifted data
+        -- container to the Lua application. In case of compounds or structures
+        -- the shift size is determined by ffi.sizeof().
+        local elementsize = filterlib.luaGetElementSize(name)
+        if elementsize == -1 then
+            local datatype = ffi.string(cast):gsub("*", "")
+            elementsize = ffi.sizeof(ffi.typeof(datatype))
+
+        end
+        return ffi.cast(ffi.string(cast), data - elementsize)
     end
 
     lib.getType = function(name)
@@ -41,7 +54,7 @@ function init(filterpath)
         local dims = ffi.string(filterlib.luaGetDims(name))
         local t = {}
         for dim in string.gmatch(dims, "([^x]+)") do
-            table.insert(t, dim)
+            table.insert(t, tonumber(dim))
         end
         return t
     end

@@ -7,8 +7,8 @@
 --
 -- Underneath, hdf5-udf converts the compound into a named
 -- class that can be used by getData<>() through the Foreign
--- Function Interface. Member names are made lowercase; spaces
--- and dashes are converted into the underscore ("_") character.
+-- Function Interface. Member names are made lowercase; spaces,
+-- dots and dashes are converted into the underscore ("_") character.
 -- Last, if present, the member names are truncated at the "("
 -- or "[" characters.
 -- 
@@ -41,7 +41,7 @@ function dynamic_dataset()
     local udf_data = lib.getData("Temperature")
     local udf_dims = lib.getDims("Temperature")
 
-    for i=0, udf_dims[1]-1 do
+    for i=1, udf_dims[1] do
         udf_data[i] = compound[i].temperature
     end
 end

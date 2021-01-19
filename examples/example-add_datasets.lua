@@ -17,13 +17,10 @@ function dynamic_dataset()
     local udf_data = lib.getData("VirtualDataset")
     local udf_dims = lib.getDims("VirtualDataset")
 
-    -- A gentle reminder that indexes in Lua begin with 1. This is why
-    -- udf_dims is indexed from 1 onwards.
+    -- A gentle reminder that indexes in Lua start at 1
     local N = udf_dims[1] * udf_dims[2]
 
-    for i=0, N-1 do
-        -- Arrays retrieved from FFI through lib.getData() are allocated and
-        -- managed by C code, thus indexing begins with 0 on such arrays.
+    for i=1, N do
         udf_data[i] = ds1_data[i] + ds2_data[i]
     end
 end

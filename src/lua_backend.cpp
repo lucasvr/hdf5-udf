@@ -37,6 +37,7 @@ static char compound_cast_name[256];
 #define DIMS_OFFSET(i)        (void *) (((char *) &State) + 200 + i)
 #define TYPE_OFFSET(i)        (void *) (((char *) &State) + 300 + i)
 #define CAST_OFFSET(i)        (void *) (((char *) &State) + 400 + i)
+#define SIZE_OFFSET(i)        (void *) (((char *) &State) + 500 + i)
 
 extern "C" int index_of(const char *element)
 {
@@ -66,6 +67,19 @@ extern "C" void *luaGetData(const char *element)
         return lua_touserdata(State, -1);
     }
     return NULL;
+}
+
+extern "C" ssize_t luaGetElementSize(const char *element)
+{
+    int index = index_of(element);
+    if (index >= 0)
+    {
+        /* Get datatype size */
+        lua_pushlightuserdata(State, SIZE_OFFSET(index));
+        lua_gettable(State, LUA_REGISTRYINDEX);
+        return (int) lua_tonumber(State, -1);
+    }
+    return 0;
 }
 
 extern "C" const char *luaGetType(const char *element)
@@ -244,7 +258,7 @@ bool LuaBackend::run(
     /* Populate vector of dataset names, sizes, and types */
     for (size_t i=0; i<dataset_info.size(); ++i)
     {
-        /* Grid */
+        /* Data */
         lua_pushlightuserdata(L, DATA_OFFSET(i));
         lua_pushlightuserdata(L, (void *) dataset_info[i].data);
         lua_settable(L, LUA_REGISTRYINDEX);
@@ -267,6 +281,11 @@ bool LuaBackend::run(
         /* Type, used for casting purposes */
         lua_pushlightuserdata(L, CAST_OFFSET(i));
         lua_pushstring(L, dataset_info[i].getCastDatatype());
+        lua_settable(L, LUA_REGISTRYINDEX);
+
+        /* Size */
+        lua_pushlightuserdata(L, SIZE_OFFSET(i));
+        lua_pushnumber(L, dataset_info[i].getStorageSize());
         lua_settable(L, LUA_REGISTRYINDEX);
     }
 
