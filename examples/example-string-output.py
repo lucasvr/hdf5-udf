@@ -1,17 +1,17 @@
---
--- Simple example: output a dataset made of variable strings
---
--- To embed it in an existing HDF5 file, run:
--- $ make files
--- $ hdf5-udf example-string.h5 example-string.py LikeARollingStone:405:string
---
+#
+# Simple example: output a dataset made of variable strings
+#
+# To embed it in an existing HDF5 file, run:
+# $ make files
+# $ hdf5-udf example-string.h5 example-string-output.py RollingStone:405:string
+#
 
-function dynamic_dataset()
+def dynamic_dataset():
 
-    -- This is the data we want to output from the UDF. Each one of the
-    -- 405 strings (group of characters) becomes a variable-sized string.
+    # This is the data we want to output from the UDF. Each one of the
+    # 405 strings (group of characters) becomes a variable-sized string.
 
-    lyrics = [[
+    lyrics = """
     Once upon a time, you dressed so fine
     Threw the bums a dime in your prime, didn't you?
     People'd call, say: Beware, doll! You're bound to fall!
@@ -79,16 +79,12 @@ function dynamic_dataset()
     With no direction home?
     Like a complete unknown?
     Like a rolling stone?
-    ]]
+    """
+    words = lyrics.split()
 
-    local udf_data = lib.getData("RollingStone")
-    local udf_dims = lib.getDims("RollingStone")
-    local i = 0
+    udf_data = lib.getData("RollingStone")
+    udf_dims = lib.getDims("RollingStone")
 
-    for word in string.gmatch(lyrics, "[^%s]+") do
-        if i <= udf_dims[1]-1 then
-            udf_data[i].value = word
-        end
-        i = i+1
-    end
-end
+    for i in range(udf_dims[0]):
+        if i < len(words):
+            udf_data[i].value = words[i].encode("utf-8")

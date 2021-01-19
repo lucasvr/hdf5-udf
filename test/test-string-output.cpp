@@ -3,7 +3,7 @@
  *
  * To embed it in an existing HDF5 file, run:
  * $ make files
- * $ hdf5-udf example-string.h5 example-string.py RollingStone:405:string
+ * $ hdf5-udf example-string.h5 test-string-output.cpp RollingStone.cpp:405:string
  */
 
 #include <stdio.h>
@@ -84,8 +84,8 @@ extern "C" void dynamic_dataset()
     Like a rolling stone?\
     ";
     
-    auto udf_data = lib.getData<rollingstone_t>("RollingStone");
-    auto udf_dims = lib.getDims("RollingStone");
+    auto udf_data = lib.getData<rollingstone_cpp_t>("RollingStone.cpp");
+    auto udf_dims = lib.getDims("RollingStone.cpp");
 
     char *dup = strdup(lyrics);
     char *tok = strtok(dup, " \t");

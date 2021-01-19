@@ -163,11 +163,15 @@ Log_Normal "*** String tests ***"
 Log_Normal "********************"
 Log_Normal
 tests=(
-    # HDF5 file          UDF file         Dynamic dataset
-    "example-string      test-string      Temperature:1000:double"
-    "example-varstring   test-string      Temperature:1000:double"
-    "example-multistring test-multistring Temperature:1000:double"
+    # HDF5 file            UDF file             Dynamic dataset
+    "example-string        test-string          Temperature:1000:double"
+    #"example-varstring     test-string          Temperature:1000:double"
+    #"example-multistring   test-multistring     Temperature:1000:double"
+    "example-string2       test-string-output   RollingStone:405:string"
 )
+# Create a copy of example-string.h5, as the file gets removed after the
+# first test finishes its execution. The copy is used for test-string-output.
+cp example-string.h5 example-string2.h5
 for entry in "${tests[@]}"; do Run_Test "$entry"; done
 
 Log_Normal
