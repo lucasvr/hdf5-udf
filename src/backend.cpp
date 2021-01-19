@@ -124,7 +124,7 @@ std::string Backend::sanitizedName(std::string name)
         }
 
     // Replace the following tokens by an underscore
-    const char *replace_at[] = {"-", " ", NULL};
+    const char *replace_at[] = {"-", " ", ".", NULL};
     for (int i=0; replace_at[i] != NULL; ++i)
         while (true)
         {
@@ -145,6 +145,7 @@ std::string Backend::sanitizedName(std::string name)
     // Put string to lowercase
     std::transform(name.begin(), name.end(), name.begin(),
         [](unsigned char c){ return std::tolower(c); });
+
 
     return name;
 }
