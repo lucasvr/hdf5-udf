@@ -34,8 +34,8 @@ public:
 
     bool run(
         const std::string filterpath,
-        const std::vector<DatasetInfo> input_datasets,
-        const DatasetInfo output_dataset,
+        const std::vector<DatasetInfo> &input_datasets,
+        const DatasetInfo &output_dataset,
         const char *output_cast_datatype,
         const char *udf_blob,
         size_t udf_blob_size)

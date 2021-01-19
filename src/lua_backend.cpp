@@ -195,8 +195,8 @@ std::string LuaBackend::compile(
 /* Execute the user-defined-function embedded in the given bytecode */
 bool LuaBackend::run(
     const std::string filterpath,
-    const std::vector<DatasetInfo> input_datasets,
-    const DatasetInfo output_dataset,
+    const std::vector<DatasetInfo> &input_datasets,
+    const DatasetInfo &output_dataset,
     const char *output_cast_datatype,
     const char *bytecode,
     size_t bytecode_size)
@@ -228,15 +228,18 @@ bool LuaBackend::run(
         return false;
 
     // Let output_dataset.data point to the shared memory segment
-    DatasetInfo output_dataset_copy = output_dataset;
+    DatasetInfo output_dataset_copy(output_dataset);
     output_dataset_copy.data = mm.mm;
 
-    DatasetInfo empty_entry;
+    // index_of() uses 'DatasetInfo.name.size() == 0' as stop condition,
+    // so we create a dummy entry, with an empty name, that gets pushed
+    // into the end of the dataset_info vector.
+    DatasetInfo empty_entry("", std::vector<hsize_t>(), "", -1);
     std::vector<DatasetInfo> dataset_info;
-    dataset_info.push_back(output_dataset_copy);
+    dataset_info.push_back(std::move(output_dataset_copy));
     dataset_info.insert(
         dataset_info.end(), input_datasets.begin(), input_datasets.end());
-    dataset_info.push_back(empty_entry);
+    dataset_info.push_back(std::move(empty_entry));
 
     /* Populate vector of dataset names, sizes, and types */
     for (size_t i=0; i<dataset_info.size(); ++i)
@@ -258,7 +261,7 @@ bool LuaBackend::run(
 
         /* Type */
         lua_pushlightuserdata(L, TYPE_OFFSET(i));
-        lua_pushstring(L, dataset_info[i].getDatatype());
+        lua_pushstring(L, dataset_info[i].getDatatypeName());
         lua_settable(L, LUA_REGISTRYINDEX);
 
         /* Type, used for casting purposes */
@@ -386,7 +389,7 @@ std::vector<std::string> LuaBackend::udfDatasetNames(std::string udf_file)
 }
 
 // Create a textual declaration of a struct given a compound map
-std::string LuaBackend::compoundToStruct(const DatasetInfo info, bool hardcoded_name)
+std::string LuaBackend::compoundToStruct(const DatasetInfo &info, bool hardcoded_name)
 {
     // Lua's FFI cdef() requires the use of #pragma pack(1) to align
     // structures at a byte boundary. Packing is needed so that UDFs

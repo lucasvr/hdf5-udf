@@ -187,8 +187,8 @@ std::string CppBackend::decompressBuffer(const char *data, size_t csize)
 /* Execute the user-defined-function embedded in the given buffer */
 bool CppBackend::run(
     const std::string filterpath,
-    const std::vector<DatasetInfo> input_datasets,
-    const DatasetInfo output_dataset,
+    const std::vector<DatasetInfo> &input_datasets,
+    const DatasetInfo &output_dataset,
     const char *output_cast_datatype,
     const char *sharedlib_data,
     size_t sharedlib_data_size)
@@ -252,10 +252,14 @@ bool CppBackend::run(
             return false;
 
         /* Let output_dataset.data point to the shared memory segment */
-        DatasetInfo output_dataset_copy = output_dataset;
+        DatasetInfo output_dataset_copy(output_dataset);
         output_dataset_copy.data = mm.mm;
 
-        /* Populate vector of dataset names, sizes, and types */
+        /*
+         * Populate vector of dataset names, sizes, and types. Note that we have
+         * to manually account for proper reference counting of hdf5_datatype by
+         * calling each member's reopenDatatype() method.
+         */
         std::vector<DatasetInfo> dataset_info;
         dataset_info.push_back(output_dataset_copy);
         dataset_info.insert(
@@ -263,9 +267,15 @@ bool CppBackend::run(
 
         for (size_t i=0; i<dataset_info.size(); ++i)
         {
+            /*
+             * reopen the datatype to prevent the destructor of the objects
+             * pushed into the vector from closing the handles borrowed from
+             * output_dataset and input_datasets.
+             */
+            dataset_info[i].reopenDatatype();
             hdf5_udf_data->push_back(dataset_info[i].data);
             hdf5_udf_names->push_back(dataset_info[i].name.c_str());
-            hdf5_udf_types->push_back(dataset_info[i].getDatatype());
+            hdf5_udf_types->push_back(dataset_info[i].getDatatypeName());
             hdf5_udf_dims->push_back(dataset_info[i].dimensions);
         }
 
@@ -383,7 +393,7 @@ std::vector<std::string> CppBackend::udfDatasetNames(std::string udf_file)
 }
 
 /* Create a textual declaration of a struct given a compound map */
-std::string CppBackend::compoundToStruct(const DatasetInfo info, bool hardcoded_name)
+std::string CppBackend::compoundToStruct(const DatasetInfo &info, bool hardcoded_name)
 {
     // We use GCC's __attribute__((packed)) to ensure the structure
     // is byte-aligned. This is required so that we can iterate over

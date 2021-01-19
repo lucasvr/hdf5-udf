@@ -50,7 +50,7 @@ extern "C" const char *pythonGetType(const char *element)
 {
     for (size_t i=0; i<dataset_info.size(); ++i)
         if (dataset_info[i].name.compare(element) == 0)
-            return dataset_info[i].getDatatype();
+            return dataset_info[i].getDatatypeName();
     fprintf(stderr, "%s: dataset %s not found\n", __func__, element);
     return NULL;
 }
@@ -213,8 +213,8 @@ static void teardown(std::vector<PyObject *> decref, void *libpython)
 /* Execute the user-defined-function embedded in the given buffer */
 bool PythonBackend::run(
     const std::string filterpath,
-    const std::vector<DatasetInfo> input_datasets,
-    const DatasetInfo output_dataset,
+    const std::vector<DatasetInfo> &input_datasets,
+    const DatasetInfo &output_dataset,
     const char *output_cast_datatype,
     const char *bytecode,
     size_t bytecode_size)
@@ -236,11 +236,11 @@ bool PythonBackend::run(
         return false;
 
     // Let output_dataset.data point to the shared memory segment
-    DatasetInfo output_dataset_copy = output_dataset;
+    DatasetInfo output_dataset_copy(output_dataset);
     output_dataset_copy.data = mm.mm;
 
     // Populate global vector of dataset names, sizes, and types
-    dataset_info.push_back(output_dataset_copy);
+    dataset_info.push_back(std::move(output_dataset_copy));
     dataset_info.insert(
         dataset_info.end(), input_datasets.begin(), input_datasets.end());
 
@@ -523,7 +523,7 @@ std::vector<std::string> PythonBackend::udfDatasetNames(std::string udf_file)
 }
 
 // Create a textual declaration of a struct given a compound map
-std::string PythonBackend::compoundToStruct(const DatasetInfo info, bool hardcoded_name)
+std::string PythonBackend::compoundToStruct(const DatasetInfo &info, bool hardcoded_name)
 {
     // Python's CFFI cdef() does not recognize packing attributes
     // such as __attribute__((pack)) or #pragma pack. Rather, it

@@ -104,12 +104,13 @@ bool DatasetOptionsParser::parseDataType(std::string text, DatasetInfo &out)
         return true;
     }
     out.datatype = text.substr(sep+1);
-    out.hdf5_datatype = out.getHdf5Datatype();
+    out.hdf5_datatype = getHdf5Datatype(out.datatype);
     if (out.hdf5_datatype < 0)
     {
         fprintf(stderr, "Datatype '%s' is not supported\n", out.datatype.c_str());
         return false;
     }
+    out.hdf5_datatype = H5Tcopy(out.hdf5_datatype);
     return true;
 }
 
@@ -296,7 +297,7 @@ int main(int argc, char **argv)
     std::vector<std::string> delete_list;
     for (int i=first_dataset_index; i<argc; ++i)
     {
-        DatasetInfo info;
+        DatasetInfo info("", std::vector<hsize_t>(), "", -1);
         DatasetOptionsParser parser;
         if (strcmp(argv[i], "--overwrite") == 0)
         {
@@ -318,7 +319,7 @@ int main(int argc, char **argv)
                 exit(1);
             }
         }
-        virtual_datasets.push_back(info);
+        virtual_datasets.push_back(std::move(info));
     }
 
     /* Identify virtual dataset name(s) and input dataset(s) that the UDF code depends on */
@@ -327,9 +328,6 @@ int main(int argc, char **argv)
     std::string compound_declarations = "";
     for (auto &name: dataset_names)
     {
-        DatasetInfo info;
-        info.name = name;
-
         /* If this dataset is scheduled for removal, then assume it's not an input dataset */
         bool is_valid_candidate = true;
         for (auto &deletename: delete_list)
@@ -350,60 +348,64 @@ int main(int argc, char **argv)
             }
 
             /* Retrieve dataset information */
-            hid_t dset_id = open_dataset(file_id, info.name, true);
+            hid_t dset_id = open_dataset(file_id, name, true);
             if (dset_id < 0)
             {
                 fprintf(stderr, "Error opening dataset %s from file %s\n",
-                    info.name.c_str(), hdf5_file.c_str());
+                    name.c_str(), hdf5_file.c_str());
                 exit(1);
             }
             hid_t space_id = H5Dget_space(dset_id);
-            int ndims = H5Sget_simple_extent_ndims(space_id);
-            info.dimensions.resize(ndims);
-            info.hdf5_datatype = H5Dget_type(dset_id);
-            H5Sget_simple_extent_dims(space_id, info.dimensions.data(), NULL);
+            hid_t hdf5_datatype = H5Dget_type(dset_id);
 
-            /* Check that the input dataset's datatype is supported by our implementation */
-            auto datatype_ptr = info.getDatatype();
-            if (datatype_ptr == NULL)
+            int ndims = H5Sget_simple_extent_ndims(space_id);
+            std::vector<hsize_t> dimensions(ndims);
+            H5Sget_simple_extent_dims(space_id, dimensions.data(), NULL);
+
+            auto datatype_name = getDatatypeName(hdf5_datatype);
+            if (datatype_name == NULL)
             {
-                fprintf(stderr, "Unsupported HDF5 datatype %#lx\n", info.hdf5_datatype);
+                fprintf(stderr, "Unsupported HDF5 datatype %#lx\n", hdf5_datatype);
                 exit(1);
             }
-            info.datatype = datatype_ptr;
-            if (info.datatype.compare("compound") == 0)
+
+            /* DatasetInfo entry we'll want to append */
+            DatasetInfo info(name, dimensions, datatype_name, hdf5_datatype);
+
+            /* Check that the input dataset's datatype is supported by our implementation */
+            if (strcmp(datatype_name, "compound") == 0)
             {
-                info.members = info.getCompoundMembers();
+                info.members = getCompoundMembers(hdf5_datatype);
                 if (info.members.size() == 0)
                 {
                     fprintf(stderr, "Failed to parse dataset %s from file %s\n",
-                        info.name.c_str(), hdf5_file.c_str());
+                        name.c_str(), hdf5_file.c_str());
                     exit(1);
                 }
                 if (compound_declarations.size())
                     compound_declarations += "\n";
                 compound_declarations += backend->compoundToStruct(info, false);
             }
-            else if (info.datatype.compare("string") == 0)
+            else if (strcmp(datatype_name, "string") == 0)
             {
                 // Because HDF5 has both variable- and fixed-sized strings there
                 // are two possible ways to define a string element: (1) with
                 // 'char varname[size]' and (2) with 'char *varname'. Here we embed
                 // string variables into packed structures so that UDFs can easily
                 // iterate over them with for loops and basic pointer arithmetic.
-                bool is_varstring = H5Tis_variable_str(info.hdf5_datatype);
-                size_t member_size = H5Tget_size(info.hdf5_datatype);
+                bool is_varstring = H5Tis_variable_str(hdf5_datatype);
+                size_t member_size = H5Tget_size(hdf5_datatype);
                 info.members.push_back(info.getStringDeclaration(is_varstring, member_size));
                 if (compound_declarations.size())
                     compound_declarations += "\n";
                 compound_declarations += backend->compoundToStruct(info, true);
             }
 
-            input_datasets.push_back(info);
+            info.printInfo("Input");
+            input_datasets.push_back(std::move(info));
             H5Sclose(space_id);
             H5Dclose(dset_id);
             H5Fclose(file_id);
-            info.printInfo("Input");
         }
         else
         {
@@ -417,8 +419,8 @@ int main(int argc, char **argv)
                 }
             if (! already_given_in_cmdline)
             {
-                info.name = name;
-                virtual_datasets.push_back(info);
+                DatasetInfo info(name, std::vector<hsize_t>(), "", -1);
+                virtual_datasets.push_back(std::move(info));
             }
         }
     }
@@ -453,7 +455,7 @@ int main(int argc, char **argv)
             */
             if (H5Tset_size(info.hdf5_datatype, DEFAULT_UDF_STRING_SIZE) < 0)
             {
-                fprintf(stderr, "Failed to set dataset size to variable\n");
+                fprintf(stderr, "Failed to set dataset %#lx to variable size\n", info.hdf5_datatype);
                 exit(1);
             }
 
@@ -500,7 +502,7 @@ int main(int argc, char **argv)
         }
 
         /* We're all set: copy attributes from the first input dataset */
-        info.hdf5_datatype = input_datasets[0].hdf5_datatype;
+        info.hdf5_datatype = H5Tcopy(input_datasets[0].hdf5_datatype);
         info.datatype = input_datasets[0].datatype;
         info.dimensions = input_datasets[0].dimensions;
         info.printInfo("Virtual");
@@ -599,7 +601,7 @@ int main(int argc, char **argv)
         /* Prepare data for JSON payload */
         std::vector<std::string> input_dataset_names, scratch_dataset_names;
         std::transform(input_datasets.begin(), input_datasets.end(), std::back_inserter(input_dataset_names),
-            [](DatasetInfo info) -> std::string { return info.name; });
+            [](DatasetInfo &info) -> std::string { return info.name; });
 
         for (auto &other: virtual_datasets)
             if (other.name.compare(info.name) != 0)

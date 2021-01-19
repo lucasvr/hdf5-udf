@@ -157,13 +157,10 @@ bool readHdf5Datasets(
         hsize_t n_elements = std::accumulate(
             std::begin(dims), std::end(dims), 1, std::multiplies<hsize_t>());
 
-        /*
-         * Retrieve datatype. Note that we use the full constructor
-         * so that the DatasetInfo's dimensions_str member is built.
-         */
-        DatasetInfo tmp(H5Dget_type(dset_id));
-        DatasetInfo info(dname, dims, tmp.getDatatype());
-        info.hdf5_datatype = tmp.hdf5_datatype;
+        /* Retrieve datatype */
+        hid_t hdf5_datatype = H5Dget_type(dset_id);
+        auto datatype_name = getDatatypeName(hdf5_datatype);
+        DatasetInfo info(dname, dims, datatype_name, hdf5_datatype);
 
         /* Allocate enough memory so we can read this dataset */
         void *rdata = (void *) malloc(n_elements * H5Tget_size(info.hdf5_datatype));
@@ -192,7 +189,7 @@ bool readHdf5Datasets(
             memset(rdata, 0, n_elements * H5Tget_size(info.hdf5_datatype));
 
         info.data = rdata;
-        out_info.push_back(info);
+        out_info.push_back(std::move(info));
         out_handles.push_back(handle);
         return true;
     };
@@ -277,8 +274,8 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
             return 0;
         }
 
-        DatasetInfo output_dataset(output_name, resolution, datatype);
-        output_dataset.hdf5_datatype = output_dataset.getHdf5Datatype();
+        auto datatype_h5id = getHdf5Datatype(datatype);
+        DatasetInfo output_dataset(output_name, resolution, datatype, datatype_h5id);
 
         /*
          * String datatype needs to have their size properly set so that
@@ -288,7 +285,8 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         {
             if (H5Tset_size(output_dataset.hdf5_datatype, DEFAULT_UDF_STRING_SIZE) < 0)
             {
-                fprintf(stderr, "Failed to set dataset size to variable\n");
+                fprintf(stderr, "Failed to set dataset %#lx to variable size\n",
+                    output_dataset.hdf5_datatype);
                 if (handle_from_procfs)
                     H5Fclose(file_id);
                 return 0;

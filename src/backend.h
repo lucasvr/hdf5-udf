@@ -53,8 +53,8 @@ public:
     // Execute a user-defined-function
     virtual bool run(
         const std::string filterpath,
-        const std::vector<DatasetInfo> input_datasets,
-        const DatasetInfo output_dataset,
+        const std::vector<DatasetInfo> &input_datasets,
+        const DatasetInfo &output_dataset,
         const char *output_cast_datatype,
         const char *udf_blob,
         size_t udf_blob_size)
@@ -69,7 +69,7 @@ public:
     }
 
     // Create a textual declaration of a struct given a compound map
-    virtual std::string compoundToStruct(const DatasetInfo info, bool hardcoded_name) {
+    virtual std::string compoundToStruct(const DatasetInfo &info, bool hardcoded_name) {
         return std::string("");
     }
 

@@ -28,12 +28,17 @@ struct CompoundMember {
 /* Dataset information */
 class DatasetInfo {
 public:
-    DatasetInfo();
-    DatasetInfo(hid_t in_hdf5_datatype);
-    DatasetInfo(std::string in_name, std::vector<hsize_t> in_dims, std::string in_datatype);
+    DatasetInfo(
+        std::string in_name, 
+        std::vector<hsize_t> in_dims,
+        std::string in_datatype,
+        hid_t in_hdf5_datatype);
+    DatasetInfo(const DatasetInfo &other);
+    ~DatasetInfo();
 
+    void reopenDatatype();
     size_t getGridSize() const;
-    const char *getDatatype() const;
+    const char *getDatatypeName() const;
     size_t getHdf5Datatype() const;
     hid_t getStorageSize() const;
     const char *getCastDatatype() const;
@@ -49,5 +54,13 @@ public:
     std::vector<CompoundMember> members; /* Compound member names and types */
     void *data;                      /* Allocated buffer to hold dataset data */
 };
+
+/* Helper functions */
+const char *getDatatypeName(hid_t hdf5_datatype);
+const char *getCastDatatype(hid_t hdf5_datatype);
+size_t getHdf5Datatype(std::string datatype);
+hid_t getStorageSize(hid_t hdf5_datatype);
+std::vector<CompoundMember> getCompoundMembers(hid_t hdf5_datatype);
+
 
 #endif /* __dataset_h */
