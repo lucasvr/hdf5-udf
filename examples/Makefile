@@ -1,6 +1,6 @@
 CXX        = g++
 LDFLAGS    = $(shell pkg-config --libs hdf5)
-CXXFLAGS   = $(shell pkg-config --cflags hdf5) -O3 -Wall
+CXXFLAGS   = $(shell pkg-config --cflags hdf5) -O3 -Wall -std=c++14
 
 CREATE_BIN = createh5
 CREATE_SRC = createh5.cpp

@@ -24,7 +24,7 @@ CXX            = g++
 OBJCOPY        = objcopy
 CXXFLAGS       = $(shell pkg-config --cflags luajit hdf5) \
                  $(shell python3-config --includes) \
-                 -fPIC -I. -Wall -O3 -g -ggdb
+                 -fPIC -I. -Wall -O3 -g -ggdb -std=c++14
 LDFLAGS        = $(shell pkg-config --libs luajit hdf5) \
                  $(PYTHON_LDFLAGS) \
                  -ldl -lm -Wl,--no-undefined
