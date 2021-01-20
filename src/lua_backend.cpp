@@ -69,7 +69,7 @@ extern "C" void *luaGetData(const char *element)
     return NULL;
 }
 
-extern "C" ssize_t luaGetElementSize(const char *element)
+extern "C" int luaGetElementSize(const char *element)
 {
     int index = index_of(element);
     if (index >= 0)
