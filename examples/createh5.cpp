@@ -345,10 +345,10 @@ int __create_compound_dataset(
     // https://support.hdfgroup.org/ftp/HDF5/examples/examples-by-api/hdf5-examples/1_8/C/H5T/h5ex_t_cmpd.c
 
     hid_t memtype_id = H5Tcreate(H5T_COMPOUND, sizeof(*data));
-    H5Tinsert(memtype_id, "Serial number", HOFFSET(typeof(*data), serial_no), H5T_NATIVE_INT);
+    H5Tinsert(memtype_id, "Serial number", HOFFSET(__typeof(*data), serial_no), H5T_NATIVE_INT);
     string_fn(memtype_id, "Location", -1);
-    H5Tinsert(memtype_id, "Temperature (F)", HOFFSET(typeof(*data), temperature), H5T_NATIVE_DOUBLE);
-    H5Tinsert(memtype_id, "Pressure (inHg)", HOFFSET(typeof(*data), pressure), H5T_NATIVE_DOUBLE);
+    H5Tinsert(memtype_id, "Temperature (F)", HOFFSET(__typeof(*data), temperature), H5T_NATIVE_DOUBLE);
+    H5Tinsert(memtype_id, "Pressure (inHg)", HOFFSET(__typeof(*data), pressure), H5T_NATIVE_DOUBLE);
 
     // If simple_layout==false, then we use a different disk layout to exercise HDF5-UDF's
     // ability to pad the compound structure. Note that the example at the URL above includes
