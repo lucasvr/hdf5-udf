@@ -149,7 +149,7 @@ tests=(
     "example-simple_vector  simple_vector  Simple:1500:float"
     "example-sine_wave      sine_wave      SineWave:100x10:int32"
 )
-#for entry in "${tests[@]}"; do Run_Test "$entry"; done
+for entry in "${tests[@]}"; do Run_Test "$entry"; done
 
 Log_Normal
 Log_Normal "*******************************"
@@ -160,7 +160,7 @@ tests=(
     # HDF5 file            UDF file             Dynamic dataset
     "example-add_datasets  test-multi-datasets  VirtualDataset"
 )
-#for entry in "${tests[@]}"; do Run_Test "$entry"; done
+for entry in "${tests[@]}"; do Run_Test "$entry"; done
 
 Log_Normal
 Log_Normal "********************"
@@ -177,7 +177,7 @@ tests=(
 # Create a copy of example-string.h5, as the file gets removed after the
 # first test finishes its execution. The copy is used for test-string-output.
 cp example-string.h5 example-string2.h5
-#for entry in "${tests[@]}"; do Run_Test "$entry"; done
+for entry in "${tests[@]}"; do Run_Test "$entry"; done
 
 Log_Normal
 Log_Normal "**********************"
@@ -185,14 +185,14 @@ Log_Normal "*** Compound tests ***"
 Log_Normal "**********************"
 Log_Normal
 tests=(
-    # HDF5 file                        UDF file                  Dynamic dataset
-    #"example-compound-nostring_simple  test-compound-nostring    Temperature:1000:double"
-    #"example-compound-nostring_mixed   test-compound-nostring    Temperature:1000:double"
-    #"example-compound-varstring_simple test-compound-string      Temperature:1000:double"
-    #"example-compound-varstring_mixed  test-compound-string      Temperature:1000:double"
-    #"example-compound-string_simple    test-compound-string      Temperature:1000:double"
-    #"example-compound-string_mixed     test-compound-string      Temperature:1000:double"
-    #"example-compound-varstring_mixed_plus_string test-compound-plus-string Temperature:1000:double"
+     HDF5 file                        UDF file                  Dynamic dataset
+    "example-compound-nostring_simple  test-compound-nostring    Temperature:1000:double"
+    "example-compound-nostring_mixed   test-compound-nostring    Temperature:1000:double"
+    "example-compound-varstring_simple test-compound-string      Temperature:1000:double"
+    "example-compound-varstring_mixed  test-compound-string      Temperature:1000:double"
+    "example-compound-string_simple    test-compound-string      Temperature:1000:double"
+    "example-compound-string_mixed     test-compound-string      Temperature:1000:double"
+    "example-compound-varstring_mixed_plus_string test-compound-plus-string Temperature:1000:double"
     "example-compound                  test-compound-output      Observations:{id:uint32,location:string,temperature:float}:1000"
 )
 for entry in "${tests[@]}"; do Run_Test "$entry"; done
