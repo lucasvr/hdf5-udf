@@ -1,0 +1,8 @@
+*.o
+*.so
+*.h5
+*.hdf5
+*.deb
+*.rpm
+*.tar.gz
+hdf5-udf
