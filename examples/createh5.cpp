@@ -74,11 +74,6 @@ int main(int argc, char **argv)
         fprintf(stderr, "Error: missing output file (--out=FILE)\n");
         return 1;
     }
-    if (compound.size() == 0 && datatype.size() == 0)
-    {
-        fprintf(stderr, "Error: neither --compound nor --datatype were given\n");
-        return 1;
-    }
 
     hid_t file_id = H5Fcreate(hdf5_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     if (file_id < 0)
