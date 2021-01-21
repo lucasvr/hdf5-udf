@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <algorithm>
 #include <fstream>
+#include <regex>
 
 #include "filter_id.h"
 #include "dataset.h"
@@ -36,18 +37,25 @@ public:
 private:
     bool parseName(std::string text, DatasetInfo &out);
     bool parseDimensions(std::string text, DatasetInfo &out);
-    bool parseDataType(std::string text, DatasetInfo &out);
+    bool parseDataType(std::string text, DatasetInfo &out, size_t size);
+    bool parseCompoundMembers(std::string text, DatasetInfo &out, size_t &size);
+    bool is_compound;
 };
 
 bool DatasetOptionsParser::parse(std::string text, DatasetInfo &out)
 {
     /* format 1: dataset_name
-     * format 2: dataset_name:dimensions:datatype */
+     * format 2: dataset_name:dimensions:datatype
+     * format 3: dataset_name:{member:type[,member:type...]}:dimensions */
+    size_t compound_size = 0;
+    is_compound = text.find_first_of("{") != std::string::npos;
     if (parseName(text, out) == false)
         return false;
     if (parseDimensions(text, out) == false)
         return false;
-    if (parseDataType(text, out) == false)
+    if (is_compound && parseCompoundMembers(text, out, compound_size) == false)
+        return false;
+    if (parseDataType(text, out, compound_size) == false)
         return false;
     return true;
 }
@@ -64,7 +72,8 @@ bool DatasetOptionsParser::parseName(std::string text, DatasetInfo &out)
 
 bool DatasetOptionsParser::parseDimensions(std::string text, DatasetInfo &out)
 {
-    auto sep = text.find_first_of(":");
+    /* On a compound, dimensions are the last declared element */
+    auto sep = is_compound ? text.find_last_of(":") : text.find_first_of(":");
     if (sep == std::string::npos)
     {
         /* No dimensions declared in the input string (not an error) */
@@ -79,38 +88,110 @@ bool DatasetOptionsParser::parseDimensions(std::string text, DatasetInfo &out)
         return false;
     }
     auto x = res.substr(0, res.find_first_of(":"));
-    out.dimensions.push_back(std::stoi(x));
-    if (num_dims == 2)
+    try
     {
-        auto y = res.substr(res.find_first_of("x")+1, res.find_first_of(":"));
-        out.dimensions.push_back(std::stoi(y));
+        out.dimensions.push_back(std::stoi(x));
+        if (num_dims == 2)
+        {
+            auto y = res.substr(res.find_first_of("x")+1, res.find_first_of(":"));
+            out.dimensions.push_back(std::stoi(y));
+        }
+        else if (num_dims == 3)
+        {
+            auto y = res.substr(res.find_first_of("x")+1, res.find_last_of("x"));
+            auto z = res.substr(res.find_last_of("x")+1, res.find_first_of(":"));
+            out.dimensions.push_back(std::stoi(y));
+            out.dimensions.push_back(std::stoi(z));
+        }
     }
-    else if (num_dims == 3)
+    catch (std::invalid_argument &e)
     {
-        auto y = res.substr(res.find_first_of("x")+1, res.find_last_of("x"));
-        auto z = res.substr(res.find_last_of("x")+1, res.find_first_of(":"));
-        out.dimensions.push_back(std::stoi(y));
-        out.dimensions.push_back(std::stoi(z));
+        fprintf(stderr, "Failed to extract dimensions from '%s'\n", text.c_str());
+        return false;
     }
     return true;
 }
 
-bool DatasetOptionsParser::parseDataType(std::string text, DatasetInfo &out)
+bool DatasetOptionsParser::parseDataType(std::string text, DatasetInfo &out, size_t size)
 {
-    auto sep = text.find_last_of(":");
-    if (sep == std::string::npos)
+    if (is_compound)
     {
-        /* No datatype declared in the input string (not an error) */
-        return true;
+        out.datatype = "compound";
+        out.hdf5_datatype = H5Tcreate(H5T_COMPOUND, size);
+        for (auto &member: out.members)
+        {
+            auto type = getHdf5Datatype(member.usertype);
+            if (type == static_cast<size_t>(H5T_C_S1))
+            {
+                type = H5Tcopy(H5T_C_S1);
+                H5Tset_size(type, DEFAULT_UDF_STRING_SIZE);
+            }
+
+            H5Tinsert(out.hdf5_datatype, member.name.c_str(), member.offset, type);
+
+            if (H5Tget_class(type) == H5T_C_S1)
+                H5Tclose(type);
+        }
     }
-    out.datatype = text.substr(sep+1);
-    out.hdf5_datatype = getHdf5Datatype(out.datatype);
-    if (out.hdf5_datatype < 0)
+    else
     {
-        fprintf(stderr, "Datatype '%s' is not supported\n", out.datatype.c_str());
+        auto sep = text.find_last_of(":");
+        if (sep == std::string::npos)
+        {
+            /* No datatype declared in the input string (not an error) */
+            return true;
+        }
+        out.datatype = text.substr(sep+1);
+        out.hdf5_datatype = getHdf5Datatype(out.datatype);
+        if (out.hdf5_datatype < 0)
+        {
+            fprintf(stderr, "Datatype '%s' is not supported\n", out.datatype.c_str());
+            return false;
+        }
+        out.hdf5_datatype = H5Tcopy(out.hdf5_datatype);
+    }
+    return true;
+}
+
+bool DatasetOptionsParser::parseCompoundMembers(std::string text, DatasetInfo &out, size_t &size)
+{
+    /* Format: dataset_name{member:type[,member:type...]}:dimensions */
+    auto start = text.find_first_of("{"), end = text.find_last_of("}");
+    if (start == std::string::npos || end == std::string::npos)
+    {
+        fprintf(stderr, "Invalid syntax to describe a compound dataset\n");
         return false;
     }
-    out.hdf5_datatype = H5Tcopy(out.hdf5_datatype);
+    auto memberlist = text.substr(start+1, end-start-1);
+    std::regex re("([A-Za-z0-9_]+:[A-Za-z0-9_]+)");
+    std::smatch matches;
+
+    size = 0;
+    while (std::regex_search(memberlist, matches, re))
+    {
+        auto sep = matches.str(0).find_first_of(":");
+        auto name = matches.str(0).substr(0, sep);
+        auto type = matches.str(0).substr(sep+1);
+        std::string cast(getCastDatatype(getHdf5Datatype(type)));
+
+        auto ptr = cast.find("*");
+        if (ptr != std::string::npos)
+            cast.erase(ptr);
+
+        CompoundMember member;
+        member.name = name;
+        member.type = cast;
+        member.usertype = type;
+        member.offset = size;
+        member.size = type.compare("string") == 0 ?
+            DEFAULT_UDF_STRING_SIZE :
+            getStorageSize(getHdf5Datatype(type));
+        member.is_char_array = type.compare("string") == 0;
+        out.members.push_back(member);
+
+        memberlist = matches.suffix().str();
+        size += member.size;
+    }
     return true;
 }
 
@@ -247,18 +328,21 @@ int main(int argc, char **argv)
             "  virtual_dataset                Virtual dataset(s) to create. See syntax below.\n"
             "                                 If omitted, dataset names are picked from udf_file\n"
             "                                 and their resolutions/types are set to match the input\n"
-            "                                 datasets declared in that same file\n"
+            "                                 datasets declared on that same file\n"
             "  --overwrite                    Overwrite existing virtual dataset(s)\n\n"
             "Formatting options for <virtual_dataset>:\n"
             "  name:resolution:type           name:       name of the virtual dataset\n"
             "                                 resolution: XRES, XRESxYRES, or XRESxYRESxZRES\n"
             "                                 type:       [u]int8, [u]int16, [u]int32, [u]int64, float,\n"
             "                                             double, or string\n\n"
+            "Formatting options for outputting compound datasets:\n"
+            "  name:{member:type[,member:type...]}:resolution\n\n"
             "Examples:\n"
             "%s sample.h5 simple_vector.lua Simple:500:float\n"
             "%s sample.h5 sine_wave.lua SineWave:100x10:int32\n"
-            "%s sample.h5 virtual.py /Group/Name/VirtualDataset:100x100:uint8\n",
-            argv[0], argv[0], argv[0], argv[0]);
+            "%s sample.h5 virtual.py /Group/Name/VirtualDataset:100x100:uint8\n"
+            "%s sample.h5 compound.cpp 'Observations:{id:uint8,location:string,temperature:float}:1000'\n\n",
+            argv[0], argv[0], argv[0], argv[0], argv[0]);
         exit(1);
     }
 
@@ -460,7 +544,7 @@ int main(int argc, char **argv)
             }
 
             /*
-             * Embed the string variable into a packed structure so that the
+             * Embed the output variable in a packed structure so that the
              * UDFs can easily iterate over its members with for loops and
              * basic pointer arithmetic.
              */
@@ -469,6 +553,17 @@ int main(int argc, char **argv)
             if (compound_declarations.size())
                 compound_declarations += "\n";
             compound_declarations += backend->compoundToStruct(info, true);
+        }
+        else if (info.datatype.compare("compound") == 0)
+        {
+            /*
+             * Embed the output variable in a packed structure so that the
+             * UDFs can easily iterate over its members with for loops and
+             * basic pointer arithmetic.
+             */
+            if (compound_declarations.size())
+                compound_declarations += "\n";
+            compound_declarations += backend->compoundToStruct(info, false);
         }
 
         if (info.hdf5_datatype != -1) {

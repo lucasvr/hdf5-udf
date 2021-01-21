@@ -261,7 +261,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         if (file_id == -1)
             return 0;
 
-        /* Allocate input and output grids */
+        /* Allocate room for input data */
         std::vector<DatasetHandle *> input_handles;
         std::vector<DatasetInfo> input_info;
         auto ok = readHdf5Datasets(
@@ -274,18 +274,40 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
             return 0;
         }
 
-        auto datatype_h5id = getHdf5Datatype(datatype);
-        DatasetInfo output_dataset(output_name, resolution, datatype, datatype_h5id);
-
         /*
-         * String datatype needs to have their size properly set so that
-         * getStorage() can return accurate information
+         * Allocate room for output data. String and compound datatypes need to
+         * have their size properly set so that getStorage() can return accurate
+         * information.
          */
-        if (datatype.compare("string") == 0)
+        ssize_t output_dataset_size = 0;
+        auto datatype_h5id = getHdf5Datatype(datatype);
+        if (datatype_h5id == H5T_COMPOUND)
         {
-            if (H5Tset_size(output_dataset.hdf5_datatype, DEFAULT_UDF_STRING_SIZE) < 0)
+            hid_t output_id = H5Dopen(file_id, output_name.c_str(), H5P_DEFAULT);
+            hid_t output_datatype = H5Dget_type(output_id);
+            output_dataset_size = H5Tget_size(output_datatype);
+            datatype_h5id = output_datatype;
+
+            /* output_datatype is closed after the handle is borrowed from DatasetInfo */
+            H5Dclose(output_id);
+        }
+        else if (datatype_h5id == static_cast<size_t>(H5T_C_S1))
+        {
+            output_dataset_size = DEFAULT_UDF_STRING_SIZE;
+        }
+
+        DatasetInfo output_dataset(output_name, resolution, datatype, datatype_h5id);
+        if (H5Tget_class(datatype_h5id) == H5T_COMPOUND)
+        {
+            /* Now that the handle has been borrowed we can close it */
+            H5Tclose(datatype_h5id);
+        }
+
+        if (output_dataset_size)
+        {
+            if (H5Tset_size(output_dataset.hdf5_datatype, output_dataset_size) < 0)
             {
-                fprintf(stderr, "Failed to set dataset %#lx to variable size\n",
+                fprintf(stderr, "Failed to set dataset %#lx size\n",
                     output_dataset.hdf5_datatype);
                 if (handle_from_procfs)
                     H5Fclose(file_id);

@@ -18,8 +18,9 @@
 #define DEFAULT_UDF_STRING_SIZE 32
 
 struct CompoundMember {
-    std::string name;
-    std::string type;
+    std::string name;      // ex: identifier
+    std::string type;      // ex: uint8_t
+    std::string usertype;  // ex: uint8
     size_t offset;
     size_t size;
     bool is_char_array;

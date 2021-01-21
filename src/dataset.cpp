@@ -53,6 +53,16 @@ static bool sameDatatype(hid_t a, hid_t b)
     return H5Tequal(a, b);
 }
 
+static bool isNativeDatatype(hid_t hdf5_datatype)
+{
+    if (hdf5_datatype == H5T_COMPOUND ||
+        hdf5_datatype == H5T_STRING ||
+        H5Tget_class(hdf5_datatype) == H5T_COMPOUND ||
+        H5Tget_class(hdf5_datatype) == H5T_STRING)
+        return false;
+    return true;
+}
+
 const char *getDatatypeName(hid_t hdf5_datatype)
 {
     if (hdf5_datatype != -1)
@@ -105,9 +115,9 @@ hid_t getStorageSize(hid_t hdf5_datatype)
         for (auto &info: misc_types)
             if (sameDatatype(info.hdf5_datatype_id, hdf5_datatype))
             {
-                return info.hdf5_datatype_id == H5T_C_S1 ?
-                    H5Tget_size(hdf5_datatype) :
-                    info.datatype_size;
+                return isNativeDatatype(info.hdf5_datatype_id) ?
+                    info.datatype_size :
+                    H5Tget_size(hdf5_datatype);
             }
     }
     return -1;

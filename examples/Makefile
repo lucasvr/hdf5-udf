@@ -12,6 +12,7 @@ READ_OBJ   = $(patsubst %.cpp,%.o, $(READ_SRC))
 all: $(CREATE_BIN) $(READ_BIN)
 
 files: $(CREATE_BIN)
+	./$(CREATE_BIN) --out=example-compound.h5
 	./$(CREATE_BIN) --out=example-simple_vector.h5 --datatype=INT32
 	./$(CREATE_BIN) --out=example-sine_wave.h5 --datatype=INT32
 	./$(CREATE_BIN) --out=example-socket.h5 --datatype=INT32
