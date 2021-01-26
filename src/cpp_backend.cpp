@@ -53,7 +53,7 @@ std::string CppBackend::compile(
     std::string methods_decl, methods_impl, spaces;
     for (auto &info: datasets)
     {
-        if (info.datatype.compare("string") == 0)
+        if (info.datatype.compare(0, 6, "string") == 0)
         {
             auto name = sanitizedName(info.name);
             methods_decl += "const char *string(" + name + "_t &element);\n" + spaces;
@@ -61,6 +61,15 @@ std::string CppBackend::compile(
             methods_impl += "const char *UserDefinedLibrary::string(" + name + "_t &element)\n{\n";
             methods_impl += spaces + "return static_cast<const char *>(element.value);\n";
             methods_impl += "}\n\n";
+
+            methods_decl += "void setString(" + name + "_t &element, const char *format, ...);\n" + spaces;
+            methods_impl += "void UserDefinedLibrary::setString(" + name + "_t &element, const char *format, ...)\n{\n";
+            methods_impl += spaces + "va_list argptr;\n";
+            methods_impl += spaces + "va_start(argptr, format);\n";
+            methods_impl += spaces + "vsnprintf((char *) element.value, sizeof(element.value), format, argptr);\n";
+            methods_impl += spaces + "va_end(argptr);\n";
+            methods_impl += "}\n\n";
+
         }
     }
     AssembleData data = {
@@ -120,7 +129,7 @@ std::string CppBackend::compile(
         if (exit_status != 0)
         {
             fprintf(stderr, "Failed to compile the UDF\n");
-            unlink(cpp_file.c_str());
+            //unlink(cpp_file.c_str());
             return "";
         }
 

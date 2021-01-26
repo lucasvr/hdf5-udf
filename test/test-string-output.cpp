@@ -90,8 +90,12 @@ extern "C" void dynamic_dataset()
     char *tok = strtok(dup, " \t");
     for (int i=0; i<udf_dims[0] && tok != NULL; ++i)
     {
-        char *str = udf_data[i].value;
-        snprintf(str, sizeof(udf_data[i].value), "%s", tok);
+        // Here we can either write directly to udf_data[i].value
+        // or use the lib.setString() API. The latter is preferred
+        // as it prevents writes outside the boundaries of the buffer
+        // while at the same time keeping the udf_data[i] string
+        // structure opaque to the application.
+        lib.setString(udf_data[i], "%s", tok);
         tok = strtok(NULL, " \t");
     }
 }

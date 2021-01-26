@@ -30,6 +30,31 @@
 
 using json = nlohmann::json;
 
+/* Helper functions */
+int getUserStringSize(std::string user_type)
+{
+    /*
+     * UDF strings can be defined as 'string' or as 'string(N)'.
+     * In the first case the string size is determined by the
+     * constant DEFAULT_UDF_STRING_SIZE.
+     */
+    auto start = user_type.find("(");
+    auto end = user_type.find(")");
+    if (start == std::string::npos && end == std::string::npos)
+        return DEFAULT_UDF_STRING_SIZE;
+    else if (start != std::string::npos && end != std::string::npos)
+    {
+        auto ssize = user_type.substr(start+1, end-start-1);
+        return std::stoi(ssize);
+    }
+    else
+    {
+        fprintf(stderr, "Invalid string syntax: %s\n", user_type.c_str());
+        return -1;
+    }
+}
+
+
 /* Virtual dataset parser */
 class DatasetOptionsParser {
 public:
@@ -124,7 +149,15 @@ bool DatasetOptionsParser::parseDataType(std::string text, DatasetInfo &out, siz
             if (type == static_cast<size_t>(H5T_C_S1))
             {
                 type = H5Tcopy(H5T_C_S1);
-                H5Tset_size(type, DEFAULT_UDF_STRING_SIZE);
+                auto size = getUserStringSize(member.usertype);
+                if (size < 0)
+                {
+                    fprintf(stderr, "Invalid syntax describing string element in compound\n");
+                    H5Tclose(out.hdf5_datatype);
+                    H5Tclose(type);
+                    return false;
+                }
+                H5Tset_size(type, size);
             }
 
             H5Tinsert(out.hdf5_datatype, member.name.c_str(), member.offset, type);
@@ -163,7 +196,7 @@ bool DatasetOptionsParser::parseCompoundMembers(std::string text, DatasetInfo &o
         return false;
     }
     auto memberlist = text.substr(start+1, end-start-1);
-    std::regex re("([A-Za-z0-9_]+:[A-Za-z0-9_]+)");
+    std::regex re("([A-Za-z0-9_]+:[A-Za-z0-9_()]+)");
     std::smatch matches;
 
     size = 0;
@@ -178,17 +211,25 @@ bool DatasetOptionsParser::parseCompoundMembers(std::string text, DatasetInfo &o
         if (ptr != std::string::npos)
             cast.erase(ptr);
 
+        bool is_string = type.compare(0, 6, "string") == 0;
+
         CompoundMember member;
         member.name = name;
         member.type = cast;
         member.usertype = type;
         member.offset = size;
-        member.size = type.compare("string") == 0 ?
-            DEFAULT_UDF_STRING_SIZE :
+        member.size = is_string ?
+            getUserStringSize(type) :
             getStorageSize(getHdf5Datatype(type));
-        member.is_char_array = type.compare("string") == 0;
-        out.members.push_back(member);
+        member.is_char_array = is_string;
 
+        if (is_string && member.size < 0)
+        {
+            fprintf(stderr, "Invalid syntax in compound dataset description\n");
+            return false;
+        }
+
+        out.members.push_back(member);
         memberlist = matches.suffix().str();
         size += member.size;
     }
@@ -334,15 +375,17 @@ int main(int argc, char **argv)
             "  name:resolution:type           name:       name of the virtual dataset\n"
             "                                 resolution: XRES, XRESxYRES, or XRESxYRESxZRES\n"
             "                                 type:       [u]int8, [u]int16, [u]int32, [u]int64, float,\n"
-            "                                             double, or string\n\n"
+            "                                             double, string, or string(NN)\n"
+            "                                 If unset, strings have a fixed size of 32 characters.\n\n"
             "Formatting options for outputting compound datasets:\n"
             "  name:{member:type[,member:type...]}:resolution\n\n"
             "Examples:\n"
             "%s sample.h5 simple_vector.lua Simple:500:float\n"
             "%s sample.h5 sine_wave.lua SineWave:100x10:int32\n"
+            "%s sample.h5 string_generator.lua 'Words:1000:string(80)'\n"
             "%s sample.h5 virtual.py /Group/Name/VirtualDataset:100x100:uint8\n"
             "%s sample.h5 compound.cpp 'Observations:{id:uint8,location:string,temperature:float}:1000'\n\n",
-            argv[0], argv[0], argv[0], argv[0], argv[0]);
+            argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
         exit(1);
     }
 
@@ -523,7 +566,8 @@ int main(int argc, char **argv)
      */
     for (auto &info: virtual_datasets)
     {
-        if (info.datatype.compare("string") == 0)
+        // XXX: path tested
+        if (info.datatype.compare(0, 6, "string") == 0)
         {
            /*
             * Ideally, we'd like to  output string datatypes using variable size;
@@ -532,12 +576,14 @@ int main(int argc, char **argv)
             * the write data, and that fails badly because we're using the write
             * data buffer to hold the UDF bytecode -- so that call to strlen() is
             * likely to crash the application.
-            *
-            * For the time being we're using a predefined buffer size; it's perhaps
-            * better to ask the user to define it, although it will make UDFs a bit
-            * more bureaucratic to write.
             */
-            if (H5Tset_size(info.hdf5_datatype, DEFAULT_UDF_STRING_SIZE) < 0)
+            int string_size = getUserStringSize(info.datatype);
+            if (string_size < 0)
+            {
+                fprintf(stderr, "Failed to parse string size in '%s'\n", info.datatype.c_str());
+                exit(1);
+            }
+            if (H5Tset_size(info.hdf5_datatype, string_size) < 0)
             {
                 fprintf(stderr, "Failed to set dataset %#lx to variable size\n", info.hdf5_datatype);
                 exit(1);
@@ -549,7 +595,7 @@ int main(int argc, char **argv)
              * basic pointer arithmetic.
              */
             info.members.push_back(
-                info.getStringDeclaration(false, DEFAULT_UDF_STRING_SIZE));
+                info.getStringDeclaration(false, string_size));
             if (compound_declarations.size())
                 compound_declarations += "\n";
             compound_declarations += backend->compoundToStruct(info, true);
@@ -702,11 +748,17 @@ int main(int argc, char **argv)
             if (other.name.compare(info.name) != 0)
                 scratch_dataset_names.push_back(other.name);
 
+        /* Remove the output string size (if given) from the datatype */
+        auto payload_datatype = info.datatype;
+        auto sep = payload_datatype.find("(");
+        if (sep != std::string::npos)
+            payload_datatype = payload_datatype.substr(0, sep);
+
         /* JSON Payload */
         json jas;
         jas["output_dataset"] = info.name;
         jas["output_resolution"] = info.dimensions;
-        jas["output_datatype"] = info.datatype;
+        jas["output_datatype"] = payload_datatype;
         jas["input_datasets"] = input_dataset_names;
         jas["scratch_datasets"] = scratch_dataset_names;
         jas["bytecode_size"] = bytecode.length();

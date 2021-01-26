@@ -35,6 +35,14 @@ class PythonLib:
         # string member.
         return self.ffi.string(structure).decode("utf-8")
 
+    def setString(self, structure, s):
+        if hasattr(structure, "value"):
+            n = len(s) if len(s) <= len(structure.value) else len(structure.value)
+            structure.value[0:n] = s[0:n]
+        else:
+            n = len(s) if len(s) <= len(structure) else len(structure)
+            structure[0:n] = s[0:n]
+
     def getData(self, name):
         name = self.ffi.new("char[]", name.encode("utf-8"))
         cast = self.filterlib.pythonGetCast(name)

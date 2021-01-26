@@ -30,6 +30,23 @@ function init(filterpath)
         return ffi.string(name)
     end
 
+    lib.setString = function(name, s)
+        local t = tostring(ffi.typeof(name)):gsub("ctype<", ""):gsub("( ?)[&>?]", "")
+        if t:find("^struct") ~= nil then
+            local n = #s
+            if n > ffi.sizeof(name.value) then
+                n = ffi.sizeof(name.value)
+            end
+            ffi.copy(name.value, s, n)
+        else
+            local n = #s
+            if n > ffi.sizeof(name) then
+                n = ffi.sizeof(name)
+            end
+            ffi.copy(name, s, n)
+        end
+    end
+
     lib.getData = function(name)
         local cast = filterlib.luaGetCast(name)
         local data = ffi.cast("char*", filterlib.luaGetData(name))

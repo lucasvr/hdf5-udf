@@ -87,4 +87,4 @@ def dynamic_dataset():
 
     for i in range(udf_dims[0]):
         if i < len(words):
-            udf_data[i].value = words[i].encode("utf-8")
+            lib.setString(udf_data[i], words[i].encode("utf-8"))

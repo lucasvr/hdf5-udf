@@ -87,7 +87,12 @@ function dynamic_dataset()
 
     for word in string.gmatch(lyrics, "[^%s]+") do
         if i <= udf_dims[1] then
-            udf_data[i].value = word
+            -- Here we can either write directly to udf_data[i].value
+            -- or use the lib.setString() API. The latter is preferred
+            -- as it prevents writes outside the boundaries of the buffer
+            -- while at the same time keeping the udf_data[i] string
+            -- structure opaque to the application.
+            lib.setString(udf_data[i], word)
         end
         i = i+1
     end

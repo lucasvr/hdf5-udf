@@ -99,8 +99,13 @@ size_t getHdf5Datatype(std::string datatype)
             if (info.datatype.compare(datatype) == 0)
                 return info.hdf5_datatype_id;
         for (auto &info: misc_types)
-            if (info.datatype.compare(datatype) == 0)
+        {
+            // Note that we compare against the length of info.datatype.
+            // This is so we can account for user-defined string length
+            // datatypes (e.g., 'string(80)').
+            if (datatype.compare(0, info.datatype.size(), info.datatype) == 0)
                 return info.hdf5_datatype_id;
+        }
     }
     return -1;
 }

@@ -87,4 +87,9 @@ def dynamic_dataset():
 
     for i in range(udf_dims[0]):
         if i < len(words):
-            udf_data[i].value = words[i].encode("utf-8")
+            # Here we can either write directly to udf_data[i].value
+            # or use the lib.setString() API. The latter is preferred
+            # as it prevents writes outside the boundaries of the buffer
+            # while at the same time keeping the udf_data[i] string
+            # structure opaque to the application.
+            lib.setString(udf_data[i], words[i].encode("utf-8"))
