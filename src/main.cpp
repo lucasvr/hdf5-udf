@@ -731,14 +731,6 @@ int main(int argc, char **argv)
             exit(1);
         }
 
-        /* Create virtual dataset */
-        hid_t dset_id = H5Dcreate(file_id, info.name.c_str(), info.hdf5_datatype, space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
-        if (dset_id < 0)
-        {
-            fprintf(stderr, "Failed to create dataset\n");
-            exit(1);
-        }
-
         /* Prepare data for JSON payload */
         std::vector<std::string> input_dataset_names, scratch_dataset_names;
         std::transform(input_datasets.begin(), input_datasets.end(), std::back_inserter(input_dataset_names),
@@ -787,6 +779,14 @@ int main(int argc, char **argv)
         p += jas_str.length();
         *p = '\0';
         memcpy(&p[1], &bytecode[0], bytecode.size());
+
+        /* Create virtual dataset */
+        hid_t dset_id = H5Dcreate(file_id, info.name.c_str(), info.hdf5_datatype, space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
+        if (dset_id < 0)
+        {
+            fprintf(stderr, "Failed to create dataset\n");
+            exit(1);
+        }
 
         /* Write the data to the dataset */
         status = H5Dwrite(dset_id, info.hdf5_datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, payload);
