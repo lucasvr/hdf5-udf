@@ -281,7 +281,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
          */
         ssize_t output_dataset_size = 0;
         auto datatype_h5id = getHdf5Datatype(datatype);
-        if (datatype_h5id == H5T_COMPOUND)
+        if (datatype_h5id == H5T_COMPOUND || datatype_h5id == static_cast<size_t>(H5T_C_S1))
         {
             hid_t output_id = H5Dopen(file_id, output_name.c_str(), H5P_DEFAULT);
             hid_t output_datatype = H5Dget_type(output_id);
@@ -291,13 +291,10 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
             /* output_datatype is closed after the handle is borrowed from DatasetInfo */
             H5Dclose(output_id);
         }
-        else if (datatype_h5id == static_cast<size_t>(H5T_C_S1))
-        {
-            output_dataset_size = DEFAULT_UDF_STRING_SIZE;
-        }
 
         DatasetInfo output_dataset(output_name, resolution, datatype, datatype_h5id);
-        if (H5Tget_class(datatype_h5id) == H5T_COMPOUND)
+        if (H5Tget_class(datatype_h5id) == H5T_COMPOUND ||
+            H5Tget_class(datatype_h5id) == H5T_STRING)
         {
             /* Now that the handle has been borrowed we can close it */
             H5Tclose(datatype_h5id);
