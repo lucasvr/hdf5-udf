@@ -74,6 +74,7 @@ function Run_Test() {
 
     for backend in "cpp" "py" "lua"
     do
+    Log_Normal "checking ${file_name}.${backend}"
         [ ! -e "${file_name}.${backend}" ] && continue
 
         # Adjust variable and dataset names so they're named after the backend being tested
@@ -173,10 +174,12 @@ tests=(
     "example-varstring     test-string          Temperature:1000:double"
     "example-multistring   test-multistring     Temperature:1000:double"
     "example-string2       test-string-output   RollingStone:405:string"
+    "example-string3       test-stringN-output  RollingStone:1005:string(5)"
 )
 # Create a copy of example-string.h5, as the file gets removed after the
 # first test finishes its execution. The copy is used for test-string-output.
 cp example-string.h5 example-string2.h5
+cp example-string.h5 example-string3.h5
 for entry in "${tests[@]}"; do Run_Test "$entry"; done
 
 Log_Normal
