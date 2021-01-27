@@ -22,7 +22,10 @@ functions to interface with HDF5 datasets:
 - `lib.getDims("DatasetName")`: number of dimensions in DatasetName
    and their sizes
 - `lib.getType("DatasetName")`: dataset type of DatasetName. See
-   below for a list of supported dataset types.
+   below for a list of supported dataset types
+- `lib.string(member)`: get the value of a string datatype
+- `lib.setString(member, value)`: write the given value to a string datatype.
+   This API does boundary checks to prevent buffer overflows
 
 The user-provided function must be named `dynamic_dataset`. That
 function takes no input and produces no output; data exchange is
@@ -59,7 +62,7 @@ function dynamic_dataset()
     local b_data = lib.getData("B")
     local c_data = lib.getData("C")
     local n = lib.getDims("C")[1] * lib.getDims("C")[2]
-    for i=0, n-1 do
+    for i=1, n do
         c_data[i] = a_data[i] + b_data[i]
     end
 end
@@ -100,8 +103,8 @@ function dynamic_dataset()
     local c_data = lib.getData("C")
     local x = lib.getDims("A")[1]
     local y = lib.getDims("A")[2]
-    for i=0, x-1 do
-        for j=0, y-1 do
+    for i=1, x do
+        for j=1, y do
             b_data[i*y+j] = a_data[i*y+j] * 2
             c_data[i*y+j] = a_data[i*y+j] * 3
         end
@@ -121,6 +124,59 @@ Also, make sure to read the template files for
 [C/C++](https://github.com/lucasvr/hdf5-udf/blob/master/src/udf_template.cpp)
 to learn more about the APIs behind the `lib` interface.
 
+# Configuration and execution
+
+If the program has been installed to a directory other than `/usr/local`, then
+make sure to configure the HDF5 filter search path accordingly:
+
+```
+$ export HDF5_PLUGIN_PATH=/installation/path/hdf5/lib/plugin
+```
+
+The main program takes as input a few required arguments: the HDF5 file, the
+user-defined script, and the output dataset name/resolution/data type. If
+we were to create a `float` dataset named "temperature" with 1000x800 cells
+(and whose script is named "udf.py") then the following command would do
+it (while appending the result to "myfile.h5"):
+
+```
+$ hdf5-udf myfile.h5 udf.py temperature:1000x800:float
+```
+
+It is also possible to let the main program infer the output dataset information
+based on the UDF script -- as long as the script takes input from at least one
+existing dataset. In that case, if the dataset name/resolution/data type is
+omitted from the command line, the main program:
+
+1. Identifies calls to `lib.getData()` in the UDF script and checks if the dataset
+   name given as argument to that function exists in the HDF5 file. If it doesn't,
+   then that name is used for the output dataset.
+2. Identifies the resolution and data types of existing datasets taken as input.
+   If all input datasets have the same resolution and data type, then the output
+   dataset is produced with the same characteristics.
+
+In such cases, invoking the program is as simple as:
+
+```
+$ hdf5-udf myfile.h5 udf.py
+```
+
+It is also possible to have more than one dataset produced by a single script.
+In that case, information regarding each output variable can be provided in the
+command line as extra arguments to the main program. Alternatively, their names,
+resolution and data types can be guessed from the UDF script as mentioned before.
+
+# Supported datatypes
+
+The following dataset types can be output by `hdf5-udf`:
+
+- `int8`, `uint8` (`H5T_STD_I8LE`, `H5T_STD_U8LE`)
+- `int16`, `uint16` (`H5T_STD_I16LE`, `H5T_STD_U16LE`)
+- `int32`, `uint32` (`H5T_STD_I32LE`, `H5T_STD_U32LE`)
+- `int64`, `uint64` (`H5T_STD_I64LE`, `H5T_STD_U64LE`)
+- `float`, `double` (`H5T_IEEE_F32LE`, `H5T_IEEE_F64LE`)
+- `string` (`H5T_C_S1`)
+- `compound` (`H5T_COMPOUND`)
 
 # Support for HDF5 groups
 
@@ -139,60 +195,16 @@ generated structure that you can use to iterate over the input data members. Ple
 refer to the [examples](https://github.com/lucasvr/hdf5-udf/tree/master/examples)
 directory for a guidance on how to access such datatypes from Python, C/C++ and Lua.
 
-## Supported dataset types
+Also, one can write UDFs that output such datatypes. Strings have a default fixed
+size of 32 characters; that value can be changed by the user using the `(N)` modifier.
+For instance, to output strings with at most 8 characters one can declare a dataset
+like `dataset_name:resolution:string(8)`.
 
-The following dataset types can be output by `hdf5-udf`:
-
-- `int8` (`H5T_STD_I8LE`)
-- `int16` (`H5T_STD_I16LE`)
-- `int32` (`H5T_STD_I32LE`)
-- `int64` (`H5T_STD_I64LE`)
-- `uint8` (`H5T_STD_U8LE`)
-- `uint16` (`H5T_STD_U16LE`)
-- `uint32` (`H5T_STD_U32LE`)
-- `uint64` (`H5T_STD_U64LE`)
-- `float` (`H5T_IEEE_F32LE`)
-- `double` (`H5T_IEEE_F64LE`)
-
-# Configuration and execution
-
-If the program has been installed to a directory other than `/usr/local`, then
-make sure to configure the HDF5 filter search path accordingly:
-
-```
-$ export HDF5_PLUGIN_PATH=/installation/path/hdf5/lib/plugin
-```
-
-The main program takes as input a few required arguments: the HDF5 file, the
-user-defined Lua script, and the output dataset name/resolution/data type. If
-we were to create a `float` dataset named "temperature" with 1000x800 cells
-(and whose Lua script is named "udf.lua") then the following command would do
-it (while appending the result to "myfile.h5"):
-
-```
-$ hdf5-udf myfile.h5 udf.lua temperature:1000x800:float
-```
-
-It is also possible to let the main program infer the output dataset information
-based on the Lua script -- as long as the script takes input from at least one
-existing dataset. In that case, if the dataset name/resolution/data type is
-omitted from the command line, the main program:
-
-1. Identifies calls to `lib.getData()` in the Lua script and checks if the dataset
-   name given as argument to that function exists in the HDF5 file. If it doesn't,
-   then that name is used for the output dataset.
-2. Identifies the resolution and data types of existing datasets taken as input.
-   If all input datasets have the same resolution and data type, then the output
-   dataset is produced with the same characteristics.
-
-In such cases, invoking the program is as simple as:
-
-```
-$ hdf5-udf myfile.h5 udf.lua
-```
-
-Last, but not least, it is possible to have more than one dataset produced by
-a single user-defined function. In that case, information regarding each output
-variable can be provided in the command line as extra arguments to the main
-program. Alternatively, their names, resolution and data types can be guessed
-from the Lua script as mentioned above.
+The syntax for outputting compounds is slightly different, as members may have
+distinct datatypes: `dataset_name:{member:type[,member:type...]}:resolution`.
+A sample compound named "placemark" with a single "location" member can be entered
+as `placemark:{location:string}:1000` to `hdf5-udf`. Multiple members must be
+separated by a comma within the curly braces delimiters. Note that it is possible
+to use the `(N)` modifier with string members that belong to a compound too. In the
+previous example, one could write `placemark:{location:string(48)}:1000` to limit
+location strings to 48 characters.
