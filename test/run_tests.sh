@@ -174,7 +174,7 @@ tests=(
     "example-varstring     test-string          Temperature:1000:double"
     "example-multistring   test-multistring     Temperature:1000:double"
     "example-string2       test-string-output   RollingStone:405:string"
-    "example-string3       test-stringN-output  RollingStone:1005:string(5)"
+    "example-string3       test-stringN-output  RollingStone:1205:string(5)"
 )
 # Create a copy of example-string.h5, as the file gets removed after the
 # first test finishes its execution. The copy is used for test-string-output.
