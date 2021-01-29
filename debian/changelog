@@ -1,3 +1,11 @@
+hdf5-udf (1.2) unstable; urgency=low
+
+  * Introduce support for **outputting** compounds and string data types.
+  * Use 1-based indexing on the Lua API
+  * Allow reading from CSV files
+
+ -- Lucas C. Villa Real <lucasvr@br.ibm.com>  Fri, 29 Jan 2021 00:51:21 -0300
+
 hdf5-udf (1.1) unstable; urgency=low
 
   * Introduce support for compounds and string data types.
