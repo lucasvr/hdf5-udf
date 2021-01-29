@@ -93,19 +93,35 @@ static int syscall_intercept_hook(
 // Entry point, called from Sandbox::init()
 bool sandbox_init_syscall_intercept(std::vector<std::string> paths_allowed)
 {
+    // Allow reading from CSV files in the current directory,
+    // as long as they are not symlinks to other objects in
+    // the filesystem. This rule is to be made configurable
+    // in the next major release of HDF5-UDF.
+    paths_allowed.push_back("*.csv");
+
+    auto is_symlink = [&](const char *path)
+    {
+        struct stat statbuf;
+        return lstat(path, &statbuf) == 0 && S_ISLNK(statbuf.st_mode);
+    };
+
     // Resolve wildcards in paths_allowed[]
     for (auto &path: paths_allowed)
     {
         // Update list of files the program is allowed to open
         if (path.find("*") == std::string::npos)
-            files_allowed.push_back(path);
+        {
+            if (! is_symlink(path.c_str()))
+                files_allowed.push_back(path);
+        }
         else
         {
             glob_t globbuf;
             if (glob(path.c_str(), GLOB_NOSORT, NULL, &globbuf) != 0)
                 continue;
             for (size_t n=0; n < globbuf.gl_pathc; ++n)
-                files_allowed.push_back(globbuf.gl_pathv[n]);
+                if (! is_symlink(globbuf.gl_pathv[n]))
+                    files_allowed.push_back(globbuf.gl_pathv[n]);
             globfree(&globbuf);
         }
     }
