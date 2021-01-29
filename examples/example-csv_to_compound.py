@@ -15,15 +15,6 @@
 # each of them. Please adjust these values according to the input
 # data you provide to the UDF.
 #
-# ---------
-# IMPORTANT
-# ---------
-#
-# This UDF uses file I/O, which is disallowed by the sandbox.
-# For the time being, in order to run this test you will have
-# to build the software without support for sandboxing (i.e.,
-# running `make OPT_SANDBOX=0`).
-#
 
 
 def dynamic_dataset():
