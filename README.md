@@ -203,7 +203,9 @@ like `dataset_name:resolution:string(8)`.
 The syntax for outputting compounds is slightly different, as members may have
 distinct datatypes: `dataset_name:{member:type[,member:type...]}:resolution`.
 A sample compound named "placemark" with a single "location" member can be entered
-as `placemark:{location:string}:1000` to `hdf5-udf`. Multiple members must be
+as `placemark:{location:string}:1000` to `hdf5-udf`.
+
+Multiple compound members must be
 separated by a comma within the curly braces delimiters. Note that it is possible
 to use the `(N)` modifier with string members that belong to a compound too. In the
 previous example, one could write `placemark:{location:string(48)}:1000` to limit
