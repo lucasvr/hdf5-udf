@@ -129,7 +129,7 @@ std::string CppBackend::compile(
         if (exit_status != 0)
         {
             fprintf(stderr, "Failed to compile the UDF\n");
-            //unlink(cpp_file.c_str());
+            unlink(cpp_file.c_str());
             return "";
         }
 
