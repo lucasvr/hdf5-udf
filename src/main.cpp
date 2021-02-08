@@ -23,7 +23,7 @@
 #include <fstream>
 #include <regex>
 
-#include "filter_id.h"
+#include "io_filter.h"
 #include "dataset.h"
 #include "backend.h"
 #include "json.hpp"

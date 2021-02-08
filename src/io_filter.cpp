@@ -18,7 +18,7 @@
 #include <unistd.h>
 #include <iostream>
 
-#include "filter_id.h"
+#include "io_filter.h"
 #include "dataset.h"
 #include "backend.h"
 #include "debug.h"

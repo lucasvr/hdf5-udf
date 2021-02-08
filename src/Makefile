@@ -66,7 +66,7 @@ endif
 ##############
 
 FILTER_TARGET  = libhdf5-udf.so
-FILTER_SOURCES = $(COMMON_SOURCES) hdf5-udf.cpp
+FILTER_SOURCES = $(COMMON_SOURCES) io_filter.cpp
 FILTER_OBJS    = $(patsubst %.cpp,%.o, $(FILTER_SOURCES))
 FILTER_LDFLAGS = -shared
 
