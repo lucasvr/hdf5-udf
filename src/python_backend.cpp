@@ -208,6 +208,7 @@ static void teardown(std::vector<PyObject *> decref, void *libpython)
     Py_Finalize();
     if (libpython)
         dlclose(libpython);
+    dataset_info.clear();
 }
 
 /* Execute the user-defined-function embedded in the given buffer */
