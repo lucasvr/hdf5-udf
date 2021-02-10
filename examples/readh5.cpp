@@ -68,6 +68,9 @@ int main(int argc, char **argv)
         fprintf(stderr, "We're only ready to deal with INT/UINT8 data types, sorry!\n");
         return 1;
     }
+    H5Sclose(space_id);
+    H5Tclose(type_id);
+    H5Dclose(dataset_id);
 
     // Read palette, if provided. We assume it's an uint8_t
     uint8_t *pal = NULL;
@@ -87,13 +90,15 @@ int main(int argc, char **argv)
         pal = new uint8_t[pal_dims];
         memset(pal, 0, pal_dims);
         H5Dread(palette_id, H5T_NATIVE_UINT8, H5S_ALL, H5S_ALL, H5P_DEFAULT, pal);
+        H5Sclose(pal_space_id);
+        H5Dclose(palette_id);
     }
+    H5Fclose(file_id);
 
-    // Tux and Doom datasets needs to be stretched a little bit so they look prettier
-    // on the console. They also look better when rendered as special characters instead
+    // Image-based datasets needs to be stretched a little bit so they look prettier on
+    // the console. They also look better when rendered as special characters instead
     // of a collection of 0s and 1s.
     bool is_tux = hdf5_dataset.compare("Tux") == 0;
-    bool is_doom = hdf5_dataset.compare("Framebuffer") == 0;
 
     char line[8192];
     char *cur = line, *end = line + sizeof(line);
@@ -113,7 +118,7 @@ int main(int argc, char **argv)
             int *rdata_int = (int *) rdata;
             cur += snprintf(cur, end-cur, "%lc%lc", rdata_int[i] == 1 ? ' ' : shade, rdata_int[i] == 1 ? ' ' : shade);
         }
-        else if (is_doom)
+        else if (hdf5_palette.size())
         {
             pal_t *pal_ptr = (pal_t *) pal;
             uint8_t data = rdata[i];
