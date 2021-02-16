@@ -360,7 +360,7 @@ std::string template_path(std::string backend_extension, std::string argv0)
 
 int main(int argc, char **argv)
 {
-    if(argc < 3)
+    if (argc < 3)
     {
         fprintf(stdout,
             "Syntax: %s <hdf5_file> <udf_file> [--overwrite] [virtual_dataset..]\n\n"
@@ -748,9 +748,12 @@ int main(int argc, char **argv)
             payload_datatype = payload_datatype.substr(0, sep);
 
         /* Sign datasets and UDF */
-        KeyChecks kc;
-        if (kc.sign_file(udf_file) == -1)
+        UserSignature user;
+        if (!user.signFile(udf_file))
+        {
             fprintf(stderr, "Error: could not sign udf\n");
+            exit(1);
+        }
 
         /* JSON Payload */
         json jas;

@@ -241,8 +241,9 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         auto output_name = jas["output_dataset"].get<std::string>();
         auto backend_name = jas["backend"].get<std::string>();
 
-        KeyChecks kc;
-        if(kc.validate_key() == -1){
+        UserSignature user;
+        if (!user.validateKey())
+        {
             fprintf(stderr, "Error validating user profile\n");
             return 0;
         }

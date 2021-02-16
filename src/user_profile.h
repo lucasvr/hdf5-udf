@@ -3,31 +3,60 @@
  *
  * File: user_profile.h
  *
- * Interfaces for user/UDF privileges and key checks.
+ * Routines to check and assure who is writing the UDF
+ * and give correct access rights to the user
  */
 #ifndef __user_profile_h
 #define __user_profile_h
 
-class KeyChecks {
-    const std::string DIR_PATH = std::string(getenv("HOME")) + "/.config/hdf5-udf/";
+#include <dirent.h>
+#include <iostream>
+#include <fstream>
+
+class UserSignature {
+    std::string DIR_PATH;       // Default configuration files directory path
 
     public:
+    // Override constructor to assign value to DIR_PATH
+    UserSignature()
+    {
+        if (getenv("HOME")) 
+            DIR_PATH = std::string(getenv("HOME")) + "/.config/hdf5-udf/";
+        else
+            DIR_PATH = "/tmp/hdf5-udf/";
+    }
+
+    ~UserSignature() {}
+
     // Check if libsodium is properly set
-    int initialize();
+    bool initialize();
 
     // Validate key files
-    int validate_key();
+    bool validateKey();
     
     // Sign files and create directories structure
-    int sign_file(std::string udf_file);
-};
+    bool signFile(std::string udf_file);
 
-class Directories{
-    const std::string DIR_PATH = std::string(getenv("HOME")) + "/.config/hdf5-udf/";
-
-    public:
-    void create_dir_struct(unsigned char* pk, unsigned char* sk, 
+    // Create desired directory structure and key files if not exists 
+    bool createDirectoryTree(unsigned char* pk, unsigned char* sk, 
     unsigned char* signed_message, unsigned long long signed_message_len);
-};
 
+    private:
+    // Create public key file if not exists 
+    bool createPublicKey(unsigned char* pk);
+
+    // Create secret key file if not exists 
+    bool createSecretKey(unsigned char* sk);
+
+    // Create signed udf file if not exists or overwrite the existing one
+    bool createSignature(unsigned char* signed_message, unsigned long long signed_message_len);
+
+    // Sign udf file
+    bool signUdf(unsigned char* sk, struct stat statbuf, char* udf,
+    unsigned char* signed_message, unsigned long long signed_message_len);
+
+    // Read UDF file to char*
+    bool UdfToChar(char* udf, FILE *fp, const char* udf_file, struct stat statbuf);
+
+};
 #endif
