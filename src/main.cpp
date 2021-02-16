@@ -12,6 +12,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,12 +21,12 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <algorithm>
-#include <fstream>
 #include <regex>
 
 #include "io_filter.h"
 #include "dataset.h"
 #include "backend.h"
+#include "user_profile.h"
 #include "json.hpp"
 
 using json = nlohmann::json;
@@ -359,7 +360,7 @@ std::string template_path(std::string backend_extension, std::string argv0)
 
 int main(int argc, char **argv)
 {
-    if(argc < 3)
+    if (argc < 3)
     {
         fprintf(stdout,
             "Syntax: %s <hdf5_file> <udf_file> [--overwrite] [virtual_dataset..]\n\n"
@@ -745,6 +746,14 @@ int main(int argc, char **argv)
         auto sep = payload_datatype.find("(");
         if (sep != std::string::npos)
             payload_datatype = payload_datatype.substr(0, sep);
+
+        /* Sign datasets and UDF */
+        UserSignature user;
+        if (!user.signFile(udf_file))
+        {
+            fprintf(stderr, "Error: could not sign udf\n");
+            exit(1);
+        }
 
         /* JSON Payload */
         json jas;
