@@ -148,7 +148,9 @@ bool UserSignature::signFile(string udf_file)
                 delete[] signed_message;
                 return false;
             }
-            return createSignature(signed_message, signed_message_len);
+            bool ret = createSignature(signed_message, signed_message_len);
+            delete[] signed_message;
+            return ret;
         }
         return false;
     }
@@ -173,13 +175,15 @@ bool UserSignature::signFile(string udf_file)
     {
         signed_message = new unsigned char[crypto_sign_BYTES + statbuf.st_size];
         if (crypto_sign(signed_message, &signed_message_len,
-        reinterpret_cast<const unsigned char *>(udf), statbuf.st_size, sk) != 0)
+            reinterpret_cast<const unsigned char *>(udf), statbuf.st_size, sk) != 0)
         {
             fprintf(stderr, "Could not sign message\n");
             delete[] signed_message;
             return false;
         }
-        return createDirectoryTree(pk, sk, signed_message, signed_message_len);
+        bool ret = createDirectoryTree(pk, sk, signed_message, signed_message_len);
+        delete[] signed_message;
+        return ret;
     }
     return false;
 }
@@ -222,7 +226,6 @@ bool UserSignature::createDirectoryTree(unsigned char* pk, unsigned char* sk,
         else
             returnvalue = false;
     }
-    delete[] signed_message;
     return returnvalue;
 }
 
