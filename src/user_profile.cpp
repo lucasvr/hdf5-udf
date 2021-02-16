@@ -75,8 +75,7 @@ bool UserSignature::validateKey()
             signed_message = new unsigned char[signed_size];
             signed_file.seekg(0, ios::beg);
             signed_file.read((char*) signed_message, signed_size);
-            unsigned char* unsigned_message;
-            unsigned_message = new unsigned char[static_cast<size_t>(signed_size)];
+            unsigned char* unsigned_message = new unsigned char[static_cast<size_t>(signed_size)];
             unsigned long long unsigned_message_len;
 
             if (crypto_sign_open(unsigned_message, &unsigned_message_len,
@@ -91,6 +90,7 @@ bool UserSignature::validateKey()
             {
                 delete[] pub_key;
                 delete[] signed_message;
+                delete[] unsigned_message;
                 break;
             }
         }
