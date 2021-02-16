@@ -27,7 +27,7 @@ CXXFLAGS       = $(shell pkg-config --cflags luajit hdf5) \
                  -fPIC -I. -Wall -O3 -g -ggdb -std=c++14
 LDFLAGS        = $(shell pkg-config --libs luajit hdf5) \
                  $(PYTHON_LDFLAGS) \
-                 -ldl -lm -Wl,--no-undefined
+                 -ldl -lm -Wl,--no-undefined -lsodium
 
 ALL_HEADERS    = $(wildcard *.h)
 COMMON_SOURCES = backend.cpp dataset.cpp
@@ -66,18 +66,18 @@ endif
 ##############
 
 FILTER_TARGET  = libhdf5-udf.so
-FILTER_SOURCES = $(COMMON_SOURCES) io_filter.cpp
+FILTER_SOURCES = $(COMMON_SOURCES) io_filter.cpp user_profile.cpp
 FILTER_OBJS    = $(patsubst %.cpp,%.o, $(FILTER_SOURCES))
-FILTER_LDFLAGS = -shared
+FILTER_LDFLAGS = -shared -lsodium
 
 ###########
 # hdf5-udf
 ###########
 
 BIN_TARGET     = hdf5-udf
-BIN_SOURCES    = $(COMMON_SOURCES) main.cpp
+BIN_SOURCES    = $(COMMON_SOURCES) main.cpp user_profile.cpp
 BIN_OBJS       = $(patsubst %.cpp,%.o, $(BIN_SOURCES))
-BIN_CXXFLAGS   = -Wall
+BIN_CXXFLAGS   = -Wall -lsodium
 
 ################
 # general rules

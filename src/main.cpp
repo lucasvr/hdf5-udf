@@ -12,6 +12,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,12 +21,12 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <algorithm>
-#include <fstream>
 #include <regex>
 
 #include "io_filter.h"
 #include "dataset.h"
 #include "backend.h"
+#include "user_profile.h"
 #include "json.hpp"
 
 using json = nlohmann::json;
@@ -745,6 +746,11 @@ int main(int argc, char **argv)
         auto sep = payload_datatype.find("(");
         if (sep != std::string::npos)
             payload_datatype = payload_datatype.substr(0, sep);
+
+        /* Sign datasets and UDF */
+        KeyChecks kc;
+        if (kc.sign_file(udf_file) == -1)
+            fprintf(stderr, "Error: could not sign udf\n");
 
         /* JSON Payload */
         json jas;
