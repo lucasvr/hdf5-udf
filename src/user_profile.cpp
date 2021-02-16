@@ -71,28 +71,27 @@ bool UserSignature::validateKey()
 
         if (signed_file.is_open())
         {
+            bool stop = false;
             signed_size = signed_file.tellg();
             signed_message = new unsigned char[signed_size];
             signed_file.seekg(0, ios::beg);
             signed_file.read((char*) signed_message, signed_size);
-            unsigned char* unsigned_message = new unsigned char[static_cast<size_t>(signed_size)];
+            unsigned char* unsigned_message;
+            unsigned_message = new unsigned char[static_cast<size_t>(signed_size)];
             unsigned long long unsigned_message_len;
 
             if (crypto_sign_open(unsigned_message, &unsigned_message_len,
                 signed_message, (int) signed_size, pub_key) != 0)
             {
                 printf("Keys do not match, will try with another public key\n");
-                delete[] pub_key;
-                delete[] signed_message;
-                delete[] unsigned_message;
             }
             else
-            {
-                delete[] pub_key;
-                delete[] signed_message;
-                delete[] unsigned_message;
+                stop = true;
+            delete[] pub_key;
+            delete[] signed_message;
+            delete[] unsigned_message;
+            if (stop)
                 break;
-            }
         }
         else
         {
@@ -136,11 +135,21 @@ bool UserSignature::signFile(string udf_file)
             fprintf(stderr, "Error extracting public key\n");
             return false;
         }
+        
         char *udf = (char *) calloc(buf.st_size, sizeof(char));
         FILE *fp = fopen(udf_file.c_str(), "r");
-        if (UdfToChar(udf, fp, udf_file.c_str(), buf))
-            if (signUdf(sk, buf, udf, signed_message, signed_message_len))     
-                return createSignature(signed_message, signed_message_len);
+        if (udfFromFile(udf, fp, udf_file.c_str(), buf))
+        {
+            signed_message = new unsigned char[crypto_sign_BYTES + buf.st_size];
+            if (crypto_sign(signed_message, &signed_message_len,
+            reinterpret_cast<const unsigned char *>(udf), buf.st_size, sk) != 0)
+            {
+                fprintf(stderr, "Could not sign message\n");
+                delete[] signed_message;
+                return false;
+            }
+            return createSignature(signed_message, signed_message_len);
+        }
         return false;
     }
     else
@@ -160,9 +169,18 @@ bool UserSignature::signFile(string udf_file)
     }
     char *udf = (char *) calloc(statbuf.st_size, sizeof(char));
     FILE *fp = fopen(udf_file.c_str(), "r");
-    if (UdfToChar(udf, fp, udf_file.c_str(), statbuf))
-        if (signUdf(sk, buf, udf, signed_message, signed_message_len))
-            return createDirectoryTree(pk, sk, signed_message, signed_message_len);
+    if (udfFromFile(udf, fp, udf_file.c_str(), statbuf))
+    {
+        signed_message = new unsigned char[crypto_sign_BYTES + statbuf.st_size];
+        if (crypto_sign(signed_message, &signed_message_len,
+        reinterpret_cast<const unsigned char *>(udf), statbuf.st_size, sk) != 0)
+        {
+            fprintf(stderr, "Could not sign message\n");
+            delete[] signed_message;
+            return false;
+        }
+        return createDirectoryTree(pk, sk, signed_message, signed_message_len);
+    }
     return false;
 }
 
@@ -171,49 +189,41 @@ bool UserSignature::createDirectoryTree(unsigned char* pk, unsigned char* sk,
 {
     DIR *pDir;
     pDir = opendir((DIR_PATH).c_str());
+    bool returnvalue = true;
     if (pDir == NULL)
     {
         // Creating a directory
         if (mkdir((DIR_PATH).c_str(), 0777) == -1)
         {
             cerr << "Error: " << strerror(errno) << endl;
-            delete[] signed_message;
-            return false;
+            returnvalue = false;
         }
         if (mkdir((DIR_PATH+"/default").c_str(), 0755) == -1)
         {
             cerr << "Error: " << strerror(errno) << endl;
-            delete[] signed_message;
-            return false;
+            returnvalue = false;
         }
         if (mkdir((DIR_PATH+"/allow").c_str(), 0755) == -1)
         {
             cerr << "Error: " << strerror(errno) << endl;
-            delete[] signed_message;
-            return false;
+            returnvalue = false;
         }
         if (mkdir((DIR_PATH+"/deny").c_str(), 0755) == -1)
         {
             cerr << "Error: " << strerror(errno) << endl;
-            delete[] signed_message;
-            return false;
+            returnvalue = false;
         }
     }
     closedir(pDir);
-
-    if (createPublicKey(pk))
+    if (returnvalue)
     {
-        if (createSecretKey(sk))
-        {
-            if (createSignature(signed_message, signed_message_len))
-            {
-                delete[] signed_message;
-                return true;
-            }
-        }
+        if (createPublicKey(pk) && createSecretKey(sk) && createSignature(signed_message, signed_message_len))
+            returnvalue = true;
+        else
+            returnvalue = false;
     }
     delete[] signed_message;
-    return false;
+    return returnvalue;
 }
 
 bool UserSignature::createPublicKey(unsigned char* pk)
@@ -227,7 +237,7 @@ bool UserSignature::createPublicKey(unsigned char* pk)
     }
     else
     {
-        printf("Public key %s already exists!\n", full_path.c_str());
+        fprintf(stderr, "Public key %s already exists\n", full_path.c_str());
         return false;
     }
     return true;
@@ -244,7 +254,7 @@ bool UserSignature::createSecretKey(unsigned char* sk)
     }
     else
     {
-        printf("Secret key %s already exists!\n", full_path.c_str());
+        fprintf(stderr, "Secret key %s already exists\n", full_path.c_str());
         return false;
     }
     return true;
@@ -267,7 +277,7 @@ bool UserSignature::createSignature(unsigned char* signed_message, unsigned long
     return true;
 }
 
-bool UserSignature::UdfToChar(char* udf, FILE *fp, const char* udf_file, struct stat statbuf)
+bool UserSignature::udfFromFile(char* udf, FILE *fp, const char* udf_file, struct stat statbuf)
 {
     if (!fp)
     {
@@ -276,19 +286,5 @@ bool UserSignature::UdfToChar(char* udf, FILE *fp, const char* udf_file, struct 
     }
     fread(udf, sizeof(char), statbuf.st_size, fp);
     fclose(fp);
-    return true;
-}
-
-bool UserSignature::signUdf(unsigned char* sk, struct stat statbuf, char* udf,
-    unsigned char* signed_message, unsigned long long signed_message_len)
-{
-    signed_message = new unsigned char[crypto_sign_BYTES + statbuf.st_size];
-    if (crypto_sign(signed_message, &signed_message_len,
-        reinterpret_cast<const unsigned char *>(udf), statbuf.st_size, sk) != 0)
-    {
-        fprintf(stderr, "Could not sign message\n");
-        delete[] signed_message;
-        return false;
-    }
     return true;
 }

@@ -51,12 +51,8 @@ class UserSignature {
     // Create signed udf file if not exists or overwrite the existing one
     bool createSignature(unsigned char* signed_message, unsigned long long signed_message_len);
 
-    // Sign udf file
-    bool signUdf(unsigned char* sk, struct stat statbuf, char* udf,
-    unsigned char* signed_message, unsigned long long signed_message_len);
-
     // Read UDF file to char*
-    bool UdfToChar(char* udf, FILE *fp, const char* udf_file, struct stat statbuf);
+    bool udfFromFile(char* udf, FILE *fp, const char* udf_file, struct stat statbuf);
 
 };
 #endif
