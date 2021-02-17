@@ -48,7 +48,7 @@ std::string CppBackend::compile(
     std::string udf_file,
     std::string template_file,
     std::string compound_declarations,
-    std::string &sourcecode,
+    std::string &source_code,
     std::vector<DatasetInfo> &datasets)
 {
     std::string methods_decl, methods_impl, spaces;
@@ -143,10 +143,10 @@ std::string CppBackend::compile(
             bytecode.assign(buffer.begin(), buffer.end());
             unlink(output.c_str());
         }
-        
+
         // Read source file
         std::ifstream ifs(cpp_file.c_str());
-        sourcecode = std::string((std::istreambuf_iterator<char>(ifs)), 
+        source_code = std::string((std::istreambuf_iterator<char>(ifs)),
             (std::istreambuf_iterator<char>()));
         
         unlink(cpp_file.c_str());

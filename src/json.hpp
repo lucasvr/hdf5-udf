@@ -13726,6 +13726,7 @@ class serializer
     void dump(const BasicJsonType& val, const bool pretty_print,
               const bool ensure_ascii,
               const unsigned int indent_step,
+              const ssize_t max_size = -1,
               const unsigned int current_indent = 0)
     {
         switch (val.m_type)
@@ -13757,7 +13758,7 @@ class serializer
                         o->write_character('\"');
                         dump_escaped(i->first, ensure_ascii);
                         o->write_characters("\": ", 3);
-                        dump(i->second, true, ensure_ascii, indent_step, new_indent);
+                        dump(i->second, true, ensure_ascii, indent_step, max_size, new_indent);
                         o->write_characters(",\n", 2);
                     }
 
@@ -13768,7 +13769,7 @@ class serializer
                     o->write_character('\"');
                     dump_escaped(i->first, ensure_ascii);
                     o->write_characters("\": ", 3);
-                    dump(i->second, true, ensure_ascii, indent_step, new_indent);
+                    dump(i->second, true, ensure_ascii, indent_step, max_size, new_indent);
 
                     o->write_character('\n');
                     o->write_characters(indent_string.c_str(), current_indent);
@@ -13785,7 +13786,7 @@ class serializer
                         o->write_character('\"');
                         dump_escaped(i->first, ensure_ascii);
                         o->write_characters("\":", 2);
-                        dump(i->second, false, ensure_ascii, indent_step, current_indent);
+                        dump(i->second, false, ensure_ascii, indent_step, max_size, current_indent);
                         o->write_character(',');
                     }
 
@@ -13795,7 +13796,7 @@ class serializer
                     o->write_character('\"');
                     dump_escaped(i->first, ensure_ascii);
                     o->write_characters("\":", 2);
-                    dump(i->second, false, ensure_ascii, indent_step, current_indent);
+                    dump(i->second, false, ensure_ascii, indent_step, max_size, current_indent);
 
                     o->write_character('}');
                 }
@@ -13827,14 +13828,14 @@ class serializer
                             i != val.m_value.array->cend() - 1; ++i)
                     {
                         o->write_characters(indent_string.c_str(), new_indent);
-                        dump(*i, true, ensure_ascii, indent_step, new_indent);
+                        dump(*i, true, ensure_ascii, indent_step, max_size, new_indent);
                         o->write_characters(",\n", 2);
                     }
 
                     // last element
                     assert(not val.m_value.array->empty());
                     o->write_characters(indent_string.c_str(), new_indent);
-                    dump(val.m_value.array->back(), true, ensure_ascii, indent_step, new_indent);
+                    dump(val.m_value.array->back(), true, ensure_ascii, indent_step, max_size, new_indent);
 
                     o->write_character('\n');
                     o->write_characters(indent_string.c_str(), current_indent);
@@ -13848,13 +13849,13 @@ class serializer
                     for (auto i = val.m_value.array->cbegin();
                             i != val.m_value.array->cend() - 1; ++i)
                     {
-                        dump(*i, false, ensure_ascii, indent_step, current_indent);
+                        dump(*i, false, ensure_ascii, indent_step, max_size, current_indent);
                         o->write_character(',');
                     }
 
                     // last element
                     assert(not val.m_value.array->empty());
-                    dump(val.m_value.array->back(), false, ensure_ascii, indent_step, current_indent);
+                    dump(val.m_value.array->back(), false, ensure_ascii, indent_step, max_size, current_indent);
 
                     o->write_character(']');
                 }
@@ -13864,9 +13865,17 @@ class serializer
 
             case value_t::string:
             {
-                o->write_character('\"');
-                dump_escaped(*val.m_value.string, ensure_ascii);
-                o->write_character('\"');
+                if (max_size > 0 && (ssize_t) val.m_value.string->size() > max_size)
+                {
+                    const std::string msg("<omitted>");
+                    o->write_characters(msg.c_str(), msg.size());
+                }
+                else
+                {
+                    o->write_character('\"');
+                    dump_escaped(*val.m_value.string, ensure_ascii);
+                    o->write_character('\"');
+                }
                 return;
             }
 
@@ -16376,6 +16385,7 @@ class basic_json
     string_t dump(const int indent = -1,
                   const char indent_char = ' ',
                   const bool ensure_ascii = false,
+                  const ssize_t max_size = -1,
                   const error_handler_t error_handler = error_handler_t::strict) const
     {
         string_t result;
@@ -16383,11 +16393,11 @@ class basic_json
 
         if (indent >= 0)
         {
-            s.dump(*this, true, ensure_ascii, static_cast<unsigned int>(indent));
+            s.dump(*this, true, ensure_ascii, static_cast<unsigned int>(indent), max_size);
         }
         else
         {
-            s.dump(*this, false, ensure_ascii, 0);
+            s.dump(*this, false, ensure_ascii, 0, max_size);
         }
 
         return result;

@@ -650,11 +650,11 @@ int main(int argc, char **argv)
     }
 
     /* Compile the UDF source file */
-    std::string sourcecode;
+    std::string source_code;
     std::vector<DatasetInfo> datasets(input_datasets);
     datasets.insert(datasets.end(), virtual_datasets.begin(), virtual_datasets.end());
     auto template_file = template_path(backend->extension(), argv[0]);
-    auto bytecode = backend->compile(udf_file, template_file, compound_declarations, sourcecode, datasets);
+    auto bytecode = backend->compile(udf_file, template_file, compound_declarations, source_code, datasets);
     if (bytecode.size() == 0)
     {
         fprintf(stderr, "Failed to compile UDF file\n");
@@ -756,12 +756,12 @@ int main(int argc, char **argv)
         jas["scratch_datasets"] = scratch_dataset_names;
         jas["bytecode_size"] = bytecode.length();
         jas["backend"] = backend->name();
-        jas["sourcecode"] = sourcecode;
+        jas["source_code"] = source_code;
         jas["api_version"] = 2;
 
         std::string jas_str = jas.dump();
         size_t payload_size = jas_str.length() + bytecode.size() + 1;
-        printf("\n%s dataset header:\n%s\n", info.name.c_str(), jas.dump(4).c_str());
+        printf("\n%s dataset header:\n%s\n", info.name.c_str(), jas.dump(4, ' ', false, 40).c_str());
         if (compound_declarations.size())
             printf("\nData structures available to the UDF:\n%s\n", compound_declarations.c_str());
 

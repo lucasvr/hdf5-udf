@@ -29,6 +29,7 @@ public:
         std::string udf_file,
         std::string template_file,
         std::string cdecl,
+        std::string &source_code,
         std::vector<DatasetInfo> &input_datasets)
     { return ""; }
 

@@ -238,7 +238,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         auto resolution = jas["output_resolution"].get<std::vector<hsize_t>>();
         auto output_name = jas["output_dataset"].get<std::string>();
         auto backend_name = jas["backend"].get<std::string>();
-        auto sourcecode = jas["sourcecode"].get<std::string>();
+        auto source_code = jas["source_code"].get<std::string>();
 
         auto backend = getBackendByName(backend_name);
         if (! backend)

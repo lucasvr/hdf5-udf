@@ -47,7 +47,7 @@ public:
         std::string udf_file,
         std::string template_file,
         std::string compound_declarations,
-        std::string &sourcecode,
+        std::string &source_code,
         std::vector<DatasetInfo> &datasets) {
         return "";
     }

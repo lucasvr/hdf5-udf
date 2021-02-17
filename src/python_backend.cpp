@@ -104,7 +104,7 @@ std::string PythonBackend::compile(
     std::string udf_file,
     std::string template_file,
     std::string compound_declarations,
-    std::string &sourcecode,
+    std::string &source_code,
     std::vector<DatasetInfo> &datasets)
 {
     AssembleData data = {
@@ -194,7 +194,7 @@ std::string PythonBackend::compile(
 
         // Read source file
         std::ifstream ifs(py_file.c_str());
-        sourcecode = std::string((std::istreambuf_iterator<char>(ifs)), 
+        source_code = std::string((std::istreambuf_iterator<char>(ifs)),
             (std::istreambuf_iterator<char>()));
 
         unlink(py_file.c_str());
