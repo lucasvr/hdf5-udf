@@ -9,7 +9,6 @@
 #include <H5PLextern.h>
 #include <hdf5.h>
 #include <stdlib.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -239,6 +238,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         auto resolution = jas["output_resolution"].get<std::vector<hsize_t>>();
         auto output_name = jas["output_dataset"].get<std::string>();
         auto backend_name = jas["backend"].get<std::string>();
+        auto sourcecode = jas["sourcecode"].get<std::string>();
 
         auto backend = getBackendByName(backend_name);
         if (! backend)

@@ -104,6 +104,7 @@ std::string PythonBackend::compile(
     std::string udf_file,
     std::string template_file,
     std::string compound_declarations,
+    std::string &sourcecode,
     std::vector<DatasetInfo> &datasets)
 {
     AssembleData data = {
@@ -190,7 +191,12 @@ std::string PythonBackend::compile(
         std::ifstream data(pyc_file, std::ifstream::binary);
         std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(data), {});
         bytecode.assign(buffer.begin(), buffer.end());
-        
+
+        // Read source file
+        std::ifstream ifs(py_file.c_str());
+        sourcecode = std::string((std::istreambuf_iterator<char>(ifs)), 
+            (std::istreambuf_iterator<char>()));
+
         unlink(py_file.c_str());
         unlink(pyc_file.c_str());
         rmdir(pycache.str().c_str());

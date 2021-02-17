@@ -650,10 +650,11 @@ int main(int argc, char **argv)
     }
 
     /* Compile the UDF source file */
+    std::string sourcecode;
     std::vector<DatasetInfo> datasets(input_datasets);
     datasets.insert(datasets.end(), virtual_datasets.begin(), virtual_datasets.end());
     auto template_file = template_path(backend->extension(), argv[0]);
-    auto bytecode = backend->compile(udf_file, template_file, compound_declarations, datasets);
+    auto bytecode = backend->compile(udf_file, template_file, compound_declarations, sourcecode, datasets);
     if (bytecode.size() == 0)
     {
         fprintf(stderr, "Failed to compile UDF file\n");
@@ -755,6 +756,7 @@ int main(int argc, char **argv)
         jas["scratch_datasets"] = scratch_dataset_names;
         jas["bytecode_size"] = bytecode.length();
         jas["backend"] = backend->name();
+        jas["sourcecode"] = sourcecode;
         jas["api_version"] = 2;
 
         std::string jas_str = jas.dump();

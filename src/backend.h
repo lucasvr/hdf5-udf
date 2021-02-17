@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <vector>
 #include <string>
+#include <fstream>
 #include "dataset.h"
 
 struct AssembleData {
@@ -46,10 +47,11 @@ public:
         std::string udf_file,
         std::string template_file,
         std::string compound_declarations,
+        std::string &sourcecode,
         std::vector<DatasetInfo> &datasets) {
         return "";
     }
-
+    
     // Execute a user-defined-function
     virtual bool run(
         const std::string filterpath,
