@@ -51,15 +51,7 @@ public:
         std::vector<DatasetInfo> &datasets) {
         return "";
     }
-
-    // Return source code as a string
-    // virtual std::string source(std::string udf_file) {
-    //     std::ifstream ifs(udf_file.c_str());
-    //     std::string sourcecode((std::istreambuf_iterator<char>(ifs)), 
-    //         (std::istreambuf_iterator<char>()));
-    //     return sourcecode;
-    // }
-
+    
     // Execute a user-defined-function
     virtual bool run(
         const std::string filterpath,
