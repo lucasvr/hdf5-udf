@@ -748,10 +748,11 @@ int main(int argc, char **argv)
             payload_datatype = payload_datatype.substr(0, sep);
 
         /* Sign datasets and UDF */
-        UserSignature user;
-        if (!user.signFile(udf_file))
+        SignatureHandler signature;
+        auto blob = signature.signPayload((const uint8_t *) &bytecode[0], bytecode.length());
+        if (blob == NULL)
         {
-            fprintf(stderr, "Error: could not sign udf\n");
+            fprintf(stderr, "Failed to sign UDF\n");
             exit(1);
         }
 
@@ -762,12 +763,13 @@ int main(int argc, char **argv)
         jas["output_datatype"] = payload_datatype;
         jas["input_datasets"] = input_dataset_names;
         jas["scratch_datasets"] = scratch_dataset_names;
-        jas["bytecode_size"] = bytecode.length();
+        jas["bytecode_size"] = blob->size;
+        jas["signature"] = "signature information goes here";
         jas["backend"] = backend->name();
         jas["api_version"] = 2;
 
         std::string jas_str = jas.dump();
-        size_t payload_size = jas_str.length() + bytecode.size() + 1;
+        size_t payload_size = jas_str.length() + blob->size + 1;
         printf("\n%s dataset header:\n%s\n", info.name.c_str(), jas.dump(4).c_str());
         if (compound_declarations.size())
             printf("\nData structures available to the UDF:\n%s\n", compound_declarations.c_str());
@@ -787,7 +789,7 @@ int main(int argc, char **argv)
         memcpy(p, &jas_str[0], jas_str.length());
         p += jas_str.length();
         *p = '\0';
-        memcpy(&p[1], &bytecode[0], bytecode.size());
+        memcpy(&p[1], blob->data, blob->size);
 
         /* Create virtual dataset */
         hid_t dset_id = H5Dcreate(file_id, info.name.c_str(), info.hdf5_datatype, space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
@@ -811,6 +813,7 @@ int main(int argc, char **argv)
         status = H5Sclose(space_id);
         status = H5Fclose(file_id);
         free(payload);
+        delete blob;
     }
     
     return 0;

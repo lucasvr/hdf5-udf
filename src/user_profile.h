@@ -3,8 +3,7 @@
  *
  * File: user_profile.h
  *
- * Routines to check and assure who is writing the UDF
- * and give correct access rights to the user
+ * Routines to check and assure who produced a UDF.
  */
 #ifndef __user_profile_h
 #define __user_profile_h
@@ -12,47 +11,64 @@
 #include <dirent.h>
 #include <iostream>
 #include <fstream>
+#include <string>
 
-class UserSignature {
-    std::string DIR_PATH;       // Default configuration files directory path
-
-    public:
-    // Override constructor to assign value to DIR_PATH
-    UserSignature()
+// Structure Blob holds a buffer either encrypted with the user's own
+// private key or decrypted with one of the public keys imported into
+// the system -- it depends on the functions that use this structure.
+// Metadata associated with that key are also maintained here.
+struct Blob {
+    Blob(uint8_t *_data, unsigned long long _size, std::string _path) :
+        data(_data),
+        size(_size),
+        path(_path)
     {
-        if (getenv("HOME")) 
-            DIR_PATH = std::string(getenv("HOME")) + "/.config/hdf5-udf/";
-        else
-            DIR_PATH = "/tmp/hdf5-udf/";
     }
 
-    ~UserSignature() {}
+    ~Blob()
+    {
+        delete[] data;
+    }
 
-    // Check if libsodium is properly set
-    bool initialize();
+    uint8_t *data;
+    unsigned long long size;
+    std::string path;
+};
 
-    // Validate key files
-    bool validateKey();
-    
-    // Sign files and create directories structure
-    bool signFile(std::string udf_file);
+class SignatureHandler {
+public:
+    SignatureHandler()
+    {
+        const char *home = getenv("HOME");
+        if (home)
+            configdir = std::string(home) + "/.config/hdf5-udf/";
+        else
+            configdir = "/tmp/hdf5-udf/";
+    }
 
-    // Create desired directory structure and key files if not exists 
-    bool createDirectoryTree(unsigned char* pk, unsigned char* sk, 
-    unsigned char* signed_message, unsigned long long signed_message_len);
+    ~SignatureHandler() {}
 
-    private:
-    // Create public key file if not exists 
-    bool createPublicKey(unsigned char* pk);
+    // Given a payload, attempt to extract it using public keys already
+    // imported into the system.
+    Blob *extractPayload(const uint8_t *in, unsigned long long size_in);
 
-    // Create secret key file if not exists 
-    bool createSecretKey(unsigned char* sk);
+    // Given a payload (such as a UDF), attempt to sign it using the
+    // user's own private key. Directory structures are created as
+    // needed. If absent, the private key and its corresponding public
+    // key are also created under @configdir.
+    Blob *signPayload(const uint8_t *in, unsigned long long size_in);
 
-    // Create signed udf file if not exists or overwrite the existing one
-    bool createSignature(unsigned char* signed_message, unsigned long long signed_message_len);
+private:
+    // Create directory structure at @configdir
+    bool createDirectoryTree();
 
-    // Read UDF file to char*
-    bool udfFromFile(char* udf, FILE *fp, const char* udf_file, struct stat statbuf);
+    // Save public key to disk
+    bool savePublicKey(uint8_t *public_key, std::string path);
 
+    // Save secret key to disk
+    bool savePrivateKey(uint8_t *secret_key, std::string path);
+
+    // Default configuration path
+    std::string configdir;
 };
 #endif
