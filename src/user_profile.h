@@ -18,10 +18,10 @@
 // the system -- it depends on the functions that use this structure.
 // Metadata associated with that key are also maintained here.
 struct Blob {
-    Blob(uint8_t *_data, unsigned long long _size, std::string _path) :
+    Blob(uint8_t *_data, unsigned long long _size, std::string _public_key_base64="") :
         data(_data),
         size(_size),
-        path(_path)
+        public_key_base64(_public_key_base64)
     {
     }
 
@@ -32,7 +32,7 @@ struct Blob {
 
     uint8_t *data;
     unsigned long long size;
-    std::string path;
+    std::string public_key_base64;
 };
 
 class SignatureHandler {
@@ -50,7 +50,10 @@ public:
 
     // Given a payload, attempt to extract it using public keys already
     // imported into the system.
-    Blob *extractPayload(const uint8_t *in, unsigned long long size_in);
+    Blob *extractPayload(
+        const uint8_t *in,
+        unsigned long long size_in,
+        std::string public_key_base64);
 
     // Given a payload (such as a UDF), attempt to sign it using the
     // user's own private key. Directory structures are created as
@@ -63,7 +66,7 @@ private:
     bool createDirectoryTree();
 
     // Save public key to disk
-    bool savePublicKey(uint8_t *public_key, std::string path);
+    bool savePublicKey(uint8_t *public_key, std::string path, bool overwrite=false);
 
     // Save secret key to disk
     bool savePrivateKey(uint8_t *secret_key, std::string path);

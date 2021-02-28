@@ -764,9 +764,11 @@ int main(int argc, char **argv)
         jas["input_datasets"] = input_dataset_names;
         jas["scratch_datasets"] = scratch_dataset_names;
         jas["bytecode_size"] = blob->size;
-        jas["signature"] = "signature information goes here";
         jas["backend"] = backend->name();
         jas["api_version"] = 2;
+        jas["signature"] = {
+            {"public_key", blob->public_key_base64 }
+        };
 
         std::string jas_str = jas.dump();
         size_t payload_size = jas_str.length() + blob->size + 1;

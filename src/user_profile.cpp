@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 #include "user_profile.h"
+#include "base64.h"
 
 using namespace std;
 
@@ -43,7 +44,10 @@ const char *globStrError(int errnum)
         return "unknown error";
 }
 
-Blob *SignatureHandler::extractPayload(const uint8_t *in, unsigned long long size_in)
+Blob *SignatureHandler::extractPayload(
+    const uint8_t *in,
+    unsigned long long size_in,
+    std::string public_key_base64)
 {
     if (sodium_init() == -1)
     {
@@ -57,6 +61,42 @@ Blob *SignatureHandler::extractPayload(const uint8_t *in, unsigned long long siz
     glob_t globbuf;
     string public_keys = configdir + "{*.pub,*/*.pub}";
     int ret = glob(public_keys.c_str(), GLOB_BRACE, globError, &globbuf);
+    if (ret == GLOB_NOMATCH)
+    {
+        // Import public key into the 'deny' repository.
+        // Any system calls attempted to be executed by UDFs
+        // signed by this key will be rejected by HDF5-UDF.
+        std::string public_key;
+        macaron::Base64 base64;
+        auto errmsg = base64.Decode(public_key_base64, public_key);
+        if (errmsg.size() > 0)
+        {
+            fprintf(stderr, "Base64: %s\n", errmsg.c_str());
+            return NULL;
+        }
+
+        // Guarantee a unique file name for the new file
+        std::string public_path = configdir + "deny/XXXXXX.pub";
+        int fd = mkstemps(&public_path[0], 4);
+        if (fd < 0)
+        {
+            fprintf(stderr, "Failed to create file at %s/deny: %s\n",
+                configdir.c_str(), strerror(errno));
+            return NULL;
+        }
+        close(fd);
+
+        createDirectoryTree();
+        savePublicKey((uint8_t *) public_key.c_str(), public_path, true);
+
+        // Re-run glob() and fall-through so the test below can check for
+        // any error conditions
+        ret = glob(public_keys.c_str(), GLOB_BRACE, globError, &globbuf);
+    }
+
+    // Catch errors other than GLOB_NOMATCH from our original call to glob()
+    // as well as errors coming from our re-execution of glob() in the 'if'
+    // branch above.
     if (ret != 0)
     {
         fprintf(stderr, "Error scanning %s: %s\n", public_keys.c_str(), globStrError(ret));
@@ -91,7 +131,7 @@ Blob *SignatureHandler::extractPayload(const uint8_t *in, unsigned long long siz
         }
         delete[] pub_key;
         globfree(&globbuf);
-        return new Blob(data, size, path);
+        return new Blob(data, size);
     }
 
     globfree(&globbuf);
@@ -159,8 +199,6 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
         createDirectoryTree();
         savePrivateKey(secret_key, private_path);
         savePublicKey(public_key, public_path);
-
-        path = private_path;
     }
     else if (ret != 0)
     {
@@ -178,7 +216,9 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
         return NULL;
     }
 
-    return new Blob(signed_message, signed_message_len, path);
+    macaron::Base64 base64;
+    auto public_key_base64 = base64.Encode(public_key, crypto_sign_PUBLICKEYBYTES);
+    return new Blob(signed_message, signed_message_len, public_key_base64);
 }
 
 bool SignatureHandler::createDirectoryTree()
@@ -201,10 +241,10 @@ bool SignatureHandler::createDirectoryTree()
     return true;
 }
 
-bool SignatureHandler::savePublicKey(uint8_t *public_key, std::string path)
+bool SignatureHandler::savePublicKey(uint8_t *public_key, std::string path, bool overwrite)
 {
-    ifstream file(path);
-    if (! file.is_open())
+    struct stat statbuf;
+    if (overwrite || stat(path.c_str(), &statbuf) != 0)
     {
         ofstream file(path);
         file.write((char *) public_key, crypto_sign_PUBLICKEYBYTES);
