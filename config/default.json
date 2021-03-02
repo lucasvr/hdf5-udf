@@ -1,0 +1,52 @@
+{
+    "#": "Run the UDF in a sandbox?",
+    "sandbox": true,
+
+    "syscalls": [
+        {"#": "Memory management"},
+        {"brk": true},
+        {"futex": true},
+        {"mprotect": true},
+
+        {"#": "Process management"},
+        {"exit_group": true},
+
+        {"#": "Terminal-related"},
+        {"ioctl": {"arg": 1, "op": "equals", "value": "TCGETS"}},
+        {"ioctl": {"arg": 1, "op": "equals", "value": "TIOCGWINSZ"}},
+
+        {"#": "System information"},
+        {"uname": true},
+
+        {"#": "Sockets-related system calls"},
+        {"socket": true},
+        {"setsockopt": true},
+        {"connect": true},
+        {"select": true},
+        {"poll": true},
+        {"read": true},
+        {"recv": true},
+        {"recvfrom": true},
+        {"write": true},
+        {"send": true},
+        {"sendto": true},
+        {"sendmsg": true},
+        {"close": true},
+        {"ioctl": {"arg": 1, "op": "equals", "value": "FIONREAD"}},
+
+        {"#": "File descriptor"},
+        {"open": {"arg": 1, "op": "is_set", "value": "O_RDONLY"}},
+        {"openat": {"arg": 2, "op": "is_set", "value": "O_RDONLY"}},
+        {"fcntl": true},
+        {"fcntl64": true},
+        {"stat": true},
+        {"lstat": true},
+        {"fstat": true},
+        {"fstat64": true},
+        {"mmap": true},
+        {"mmap2": true},
+        {"munmap": true},
+        {"lseek": true},
+        {"_llseek": true}
+    ]
+}

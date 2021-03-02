@@ -14,11 +14,16 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pwd.h>
+#include <map>
 #include <string>
 #include <vector>
+#include <filesystem>
+
 #include "user_profile.h"
+#include "sysdefs.h"
 #include "base64.h"
 
+namespace fs = std::filesystem;
 using namespace std;
 
 int globError(const char *epath, int eerrno)
@@ -106,10 +111,11 @@ Blob *SignatureHandler::extractPayload(
     for (size_t i=0; i<globbuf.gl_pathc; ++i)
     {
         // Read public key
-        ifstream file(globbuf.gl_pathv[i], ios::in|ios::binary|ios::ate);
+        auto path = globbuf.gl_pathv[i];
+        ifstream file(path, ios::in|ios::binary|ios::ate);
         if (! file.is_open())
         {
-            fprintf(stderr, "Error opening %s: %s\n", globbuf.gl_pathv[i], strerror(errno));
+            fprintf(stderr, "Error opening %s: %s\n", path, strerror(errno));
             continue;
         }
         auto file_size = file.tellg();
@@ -120,7 +126,6 @@ Blob *SignatureHandler::extractPayload(
         // Attempt to decrypt the input data with the public key read
         auto data = new uint8_t[size_in];
         auto size = size_in;
-        auto path = globbuf.gl_pathv[i];
         if (crypto_sign_open(data, &size, in, size_in, pub_key) != 0)
         {
             const char *extra = i == globbuf.gl_pathc-1 ? "" : ", will try another key";
@@ -129,9 +134,16 @@ Blob *SignatureHandler::extractPayload(
             delete[] data;
             continue;
         }
+
+        // Create a new Blob object and set its public_key_path member.
+        // This way, the caller can identify the associated configuration
+        // file holding the seccomp rules for this UDF.
+        auto blob = new Blob(data, size);
+        blob->public_key_path = path;
+
         delete[] pub_key;
         globfree(&globbuf);
-        return new Blob(data, size);
+        return blob;
     }
 
     globfree(&globbuf);
@@ -219,6 +231,99 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
     macaron::Base64 base64;
     auto public_key_base64 = base64.Encode(public_key, crypto_sign_PUBLICKEYBYTES);
     return new Blob(signed_message, signed_message_len, public_key_base64);
+}
+
+bool SignatureHandler::getProfileRules(std::string public_key_path, json &rules)
+{
+    std::string public_key_dir = fs::path(public_key_path).parent_path();
+    if (fs::equivalent(public_key_dir, configdir))
+    {
+        // Special case: public key comes from the very same user (and machine)
+        // who's running the UDF. Cook a JSON that allows this UDF to run with
+        // no restrictions.
+        rules["sandbox"] = false;
+        return true;
+    }
+
+    std::string base = fs::path(public_key_dir).filename();
+    std::string rulefile = public_key_dir + "/" + base + ".json";
+    ifstream file(rulefile);
+    if (! file.is_open())
+    {
+        // No matching rule file exists. Cook a JSON that denies this UDF from
+        // running any system calls.
+        fprintf(stderr, "**** special case: no rules -> deny\n");
+        rules["sandbox"] = true;
+        return true;
+    }
+
+    // Deserialize JSON from input stream
+    file >> rules;
+
+    return validateProfileRules(rulefile, rules);
+}
+
+#define Fail(fmt...) do { \
+    fprintf(stderr, "%s, %s: ", rulefile.c_str(), name.c_str()); \
+    fprintf(stderr, fmt); \
+    fprintf(stderr, "\n"); \
+    return false; \
+} while (0)
+
+bool SignatureHandler::validateProfileRules(std::string rulefile, const json &rules)
+{
+    if (! rules.contains("sandbox"))
+    {
+        fprintf(stderr, "%s: missing mandatory 'sandbox' element\n", rulefile.c_str());
+        return false;
+    }
+    else if (! rules.contains("syscalls"))
+    {
+        // syscalls array is optional
+        return true;
+    }
+    else if (! rules["syscalls"].is_array())
+    {
+        fprintf(stderr, "%s: 'syscalls' element must be an array\n", rulefile.c_str());
+        return false;
+    }
+
+    for (auto &[k, v]: rules["syscalls"].items())
+        for (auto &[name, rule]: v.items())
+        {
+            if (name.compare("#") == 0 || rule.is_boolean())
+                continue;
+            else if (! rule.is_object())
+                Fail("rules must be given as boolean or JSON object");
+
+            // Check that required rule elements are present
+            const char *needed[] = {"arg", "op", "value", NULL};
+            for (int i=0; needed[i]; ++i)
+                if (! rule.contains(needed[i]))
+                    Fail("missing rule element '%s'", needed[i]);
+
+            // Check that the data types are correct
+            if (! rule["arg"].is_number())
+                Fail("rule element 'arg' must be a number");
+            else if (! rule["op"].is_string())
+                Fail("rule element 'op' must be a string");
+            else if (! (rule["value"].is_string() || rule["value"].is_number()))
+                Fail("rule element 'value' must be a string or number");
+
+            // Check that opcode is valid
+            auto rule_op = rule["op"].get<std::string>();
+            if (rule_op.compare("equals") && rule_op.compare("is_set"))
+                Fail("invalid value for opcode: '%s'", rule_op.c_str());
+
+            // Check that any given mnemonics are supported
+            if (rule["value"].is_string())
+            {
+                auto value = rule["value"].get<std::string>();
+                if (sysdefs.find(value) == sysdefs.end())
+                    Fail("unrecognized mnemonic '%s'", value.c_str());
+            }
+        }
+    return true;
 }
 
 bool SignatureHandler::createDirectoryTree()

@@ -12,6 +12,9 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include "json.hpp"
+
+using json = nlohmann::json;
 
 // Structure Blob holds a buffer either encrypted with the user's own
 // private key or decrypted with one of the public keys imported into
@@ -21,18 +24,16 @@ struct Blob {
     Blob(uint8_t *_data, unsigned long long _size, std::string _public_key_base64="") :
         data(_data),
         size(_size),
-        public_key_base64(_public_key_base64)
-    {
-    }
+        public_key_base64(_public_key_base64) { }
 
-    ~Blob()
-    {
+    ~Blob() {
         delete[] data;
     }
 
     uint8_t *data;
     unsigned long long size;
     std::string public_key_base64;
+    std::string public_key_path;
 };
 
 class SignatureHandler {
@@ -49,7 +50,8 @@ public:
     ~SignatureHandler() {}
 
     // Given a payload, attempt to extract it using public keys already
-    // imported into the system.
+    // imported into the system. On success, returns a Blob object with
+    // its 'data', 'size', and 'public_key_path' members set.
     Blob *extractPayload(
         const uint8_t *in,
         unsigned long long size_in,
@@ -61,6 +63,10 @@ public:
     // key are also created under @configdir.
     Blob *signPayload(const uint8_t *in, unsigned long long size_in);
 
+    // Given the path to a public key stored in the config directory,
+    // retrieve the corresponding seccomp profile rules as a JSON object.
+    bool getProfileRules(std::string public_key_path, json &rules);
+
 private:
     // Create directory structure at @configdir
     bool createDirectoryTree();
@@ -70,6 +76,9 @@ private:
 
     // Save secret key to disk
     bool savePrivateKey(uint8_t *secret_key, std::string path);
+
+    // Validate JSON file previously serialized by getProfileRules().
+    bool validateProfileRules(std::string rulefile, const json &rules);
 
     // Default configuration path
     std::string configdir;

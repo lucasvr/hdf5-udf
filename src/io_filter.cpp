@@ -241,6 +241,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         auto output_name = jas["output_dataset"].get<std::string>();
         auto backend_name = jas["backend"].get<std::string>();
 
+        json rules;
         Blob *blob = NULL;
         char *bytecode = (char *)(((char *) *buf) + *buf_size - bytecode_size);
         if (jas.contains("signature"))
@@ -249,13 +250,21 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
             if (jas["signature"].contains("public_key"))
                 public_key_base64 = jas["signature"]["public_key"].get<std::string>();
 
-            blob = SignatureHandler().extractPayload(
-                (const uint8_t *) bytecode,
-                (unsigned long long) bytecode_size,
-                public_key_base64);
+            // Extract UDF
+            auto sighandler = SignatureHandler();
+            blob = sighandler.extractPayload(
+                (const uint8_t *) bytecode, (unsigned long long) bytecode_size, public_key_base64);
             if (blob == NULL)
             {
                 fprintf(stderr, "Could not extract payload from signed UDF\n");
+                return 0;
+            }
+
+            // Get seccomp rules associated with this public key
+            if (sighandler.getProfileRules(blob->public_key_path, rules) == false)
+            {
+                fprintf(stderr, "Could not find valid profile rules under the config directory\n");
+                delete blob;
                 return 0;
             }
 
