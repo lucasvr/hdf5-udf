@@ -52,13 +52,16 @@ endif
 ######################
 
 ifeq ($(strip $(OPT_SANDBOX)),1)
-CXXFLAGS       += -DENABLE_SANDBOX
-COMMON_SOURCES +=  sandbox.cpp
+CXXFLAGS       += $(shell pkg-config --cflags libseccomp) \
+                  -DENABLE_SANDBOX
+LDFLAGS        += $(shell pkg-config --libs libseccomp)
+COMMON_SOURCES += sandbox.cpp
 
 SANDBOX_TARGET  = libhdf5-udf-sandbox.so
 SANDBOX_SOURCES = sandbox_library.cpp
 SANDBOX_OBJS    = $(patsubst %.cpp,%.o, $(SANDBOX_SOURCES))
-SANDBOX_LDFLAGS = -shared -fPIC -lsyscall_intercept -lseccomp
+SANDBOX_LDFLAGS = $(shell pkg-config --cflags libsyscall_intercept)
+SANDBOX_LDFLAGS = -shared -fPIC $(shell pkg-config --libs libsyscall_intercept)
 endif
 
 ##############
@@ -68,7 +71,7 @@ endif
 FILTER_TARGET  = libhdf5-udf.so
 FILTER_SOURCES = $(COMMON_SOURCES) io_filter.cpp user_profile.cpp
 FILTER_OBJS    = $(patsubst %.cpp,%.o, $(FILTER_SOURCES))
-FILTER_LDFLAGS = -shared -lsodium
+FILTER_LDFLAGS = -shared
 
 ###########
 # hdf5-udf
@@ -77,7 +80,7 @@ FILTER_LDFLAGS = -shared -lsodium
 BIN_TARGET     = hdf5-udf
 BIN_SOURCES    = $(COMMON_SOURCES) main.cpp user_profile.cpp
 BIN_OBJS       = $(patsubst %.cpp,%.o, $(BIN_SOURCES))
-BIN_CXXFLAGS   = -Wall -lsodium
+BIN_CXXFLAGS   = -Wall
 
 ################
 # general rules
@@ -86,7 +89,7 @@ BIN_CXXFLAGS   = -Wall -lsodium
 all: $(SANDBOX_TARGET) $(FILTER_TARGET) $(BIN_TARGET) $(SANDBOX_TARGET)
 
 $(SANDBOX_TARGET): $(SANDBOX_OBJS)
-	$(CXX) $^ -C -o $@ $(SANDBOX_LDFLAGS)
+	$(CXX) $^ -C -o $@ $(SANDBOX_LDFLAGS) $(LDFLAGS)
 
 $(FILTER_TARGET): $(FILTER_OBJS) $(SANDBOX_TARGET)
 	$(CXX) $(FILTER_OBJS) -C -o $@ $(FILTER_LDFLAGS) $(LDFLAGS)
@@ -98,7 +101,7 @@ $(FILTER_TARGET): $(FILTER_OBJS) $(SANDBOX_TARGET)
 	fi
 
 $(BIN_TARGET): $(BIN_OBJS)
-	$(CXX) $^ -o $@ $(LDFLAGS)
+	$(CXX) $^ -o $@ $(BIN_LDFLAGS) $(LDFLAGS)
 
 $(SANDBOX_OBJS) $(BIN_OBJS) $(FILTER_OBJS): $(ALL_HEADERS)
 
