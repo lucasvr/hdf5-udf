@@ -213,7 +213,8 @@ bool LuaBackend::run(
     const DatasetInfo &output_dataset,
     const char *output_cast_datatype,
     const char *bytecode,
-    size_t bytecode_size)
+    size_t bytecode_size,
+    const json &rules)
 {
     lua_State *L = luaL_newstate();
     State = L;
@@ -311,8 +312,11 @@ bool LuaBackend::run(
     {
         bool ready = true;
 #ifdef ENABLE_SANDBOX
-        Sandbox sandbox;
-        ready = sandbox.init(filterpath, std::vector<std::string>());
+        if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
+        {
+            Sandbox sandbox;
+            ready = sandbox.init(filterpath, std::vector<std::string>(), rules);
+        }
 #endif
         if (ready)
         {

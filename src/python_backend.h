@@ -34,7 +34,8 @@ public:
         const DatasetInfo &output_dataset,
         const char *output_cast_datatype,
         const char *udf_blob,
-        size_t udf_blob_size);
+        size_t udf_blob_size,
+        const json &rules);
 
     // Scan the UDF file for references to HDF5 dataset names.
     // We use this to store the UDF dependencies in the JSON payload.
@@ -46,7 +47,11 @@ public:
 private:
     std::vector<std::string> pathsAllowed();
     void printPyObject(PyObject *obj);
-    bool executeUDF(PyObject *loadlib, PyObject *udf, std::string filterpath);
+    bool executeUDF(
+        PyObject *loadlib,
+        PyObject *udf,
+        std::string filterpath,
+        const json &rules);
 };
 
 #endif /* __python_backend_h */

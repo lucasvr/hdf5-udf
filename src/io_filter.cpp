@@ -367,7 +367,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         Benchmark benchmark;
         auto dtype = output_dataset.getCastDatatype();
         if (! backend->run(
-            filterpath, input_info, output_dataset, dtype, bytecode, bytecode_size))
+            filterpath, input_info, output_dataset, dtype, bytecode, bytecode_size, rules))
         {
             nbytes = 0;
         } 

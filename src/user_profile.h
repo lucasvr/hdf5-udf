@@ -78,7 +78,7 @@ private:
     bool savePrivateKey(uint8_t *secret_key, std::string path);
 
     // Validate JSON file previously serialized by getProfileRules().
-    bool validateProfileRules(std::string rulefile, const json &rules);
+    bool validateProfileRules(std::string rulefile, json &rules);
 
     // Default configuration path
     std::string configdir;

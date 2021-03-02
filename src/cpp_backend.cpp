@@ -200,7 +200,8 @@ bool CppBackend::run(
     const DatasetInfo &output_dataset,
     const char *output_cast_datatype,
     const char *sharedlib_data,
-    size_t sharedlib_data_size)
+    size_t sharedlib_data_size,
+    const json &rules)
 {
     /* Decompress the shared library */
     std::string decompressed_shlib = decompressBuffer(sharedlib_data, sharedlib_data_size);
@@ -291,8 +292,11 @@ bool CppBackend::run(
         /* Prepare the sandbox if needed and run the UDF */
         bool ready = true;
 #ifdef ENABLE_SANDBOX
-        Sandbox sandbox;
-        ready = sandbox.init(filterpath, std::vector<std::string>());
+        if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
+        {
+            Sandbox sandbox;
+            ready = sandbox.init(filterpath, std::vector<std::string>(), rules);
+        }
 #endif
         if (ready)
         {

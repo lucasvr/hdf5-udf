@@ -15,12 +15,18 @@
 #include <vector>
 #include <string>
 #include "sharedlib_manager.h"
+#include "json.hpp"
+
+using json = nlohmann::json;
 
 class Sandbox {
 public:
     Sandbox() {}
     ~Sandbox() {}
-    bool init(std::string filterpath, const std::vector<std::string> &paths_allowed);
+    bool init(
+        std::string filterpath,
+        const std::vector<std::string> &paths_allowed,
+        const json &rules);
 
 private:
     std::string extractSymbol(std::string elf, std::string symbol_name);

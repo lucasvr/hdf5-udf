@@ -14,6 +14,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pwd.h>
+#ifdef ENABLE_SANDBOX
+#include <seccomp.h>
+#endif
 #include <map>
 #include <string>
 #include <vector>
@@ -270,7 +273,7 @@ bool SignatureHandler::getProfileRules(std::string public_key_path, json &rules)
     return false; \
 } while (0)
 
-bool SignatureHandler::validateProfileRules(std::string rulefile, const json &rules)
+bool SignatureHandler::validateProfileRules(std::string rulefile, json &rules)
 {
     if (! rules.contains("sandbox"))
     {
@@ -291,7 +294,16 @@ bool SignatureHandler::validateProfileRules(std::string rulefile, const json &ru
     for (auto &[k, v]: rules["syscalls"].items())
         for (auto &[name, rule]: v.items())
         {
-            if (name.compare("#") == 0 || rule.is_boolean())
+            if (name.size() && name[0] == '#')
+                continue;
+
+#ifdef ENABLE_SANDBOX
+            // Validate syscall name
+            if (seccomp_syscall_resolve_name(name.c_str()) == __NR_SCMP_ERROR)
+                Fail("failed to resolve syscall name '%s'", name.c_str());
+#endif
+
+            if (rule.is_boolean())
                 continue;
             else if (! rule.is_object())
                 Fail("rules must be given as boolean or JSON object");
@@ -319,8 +331,12 @@ bool SignatureHandler::validateProfileRules(std::string rulefile, const json &ru
             if (rule["value"].is_string())
             {
                 auto value = rule["value"].get<std::string>();
-                if (sysdefs.find(value) == sysdefs.end())
+                auto it = sysdefs.find(value);
+                if (it == sysdefs.end())
                     Fail("unrecognized mnemonic '%s'", value.c_str());
+
+                // Overwrite original string-based data with its integer value
+                rule["value"] = it->second;
             }
         }
     return true;
