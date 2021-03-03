@@ -70,11 +70,13 @@ pieces of software to allow the embedding of bytecode and their execution:
    alternatively, the [Clang compiler](https://clang.llvm.org).
 
 It is possible to compile the code so that only a restricted number of system
-calls can be executed by the user-defined functions. We rely on two packages
+calls can be executed by the user-defined functions. We rely on three packages
 to limit what the UDF process can do:
 
 - The [libseccomp](https://github.com/seccomp/libseccomp) library
 - The [syscall_intercept](https://github.com/pmem/syscall_intercept) library
+- The [libsodium](https://libsodium.gitbook.io) package, used for UDF signing
+  and mapping of foreign public keys to `seccomp` rules
 
 Please follow your distribution instructions to install these packages.
 Also, make sure that you install both regular and development packages.
