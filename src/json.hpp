@@ -13722,6 +13722,7 @@ class serializer
     @param[in] pretty_print    whether the output shall be pretty-printed
     @param[in] indent_step     the indent level
     @param[in] current_indent  the current indent level (only used internally)
+    @param[in] parent_type     data type of current object's parent (only used internally)
     */
     void dump(const BasicJsonType& val, const bool pretty_print,
               const bool ensure_ascii,
@@ -13739,7 +13740,7 @@ class serializer
                     return;
                 }
 
-                if (pretty_print && parent_type != value_t::array)
+                if (pretty_print && parent_type != value_t::array && parent_type != value_t::object)
                 {
                     o->write_characters("{\n", 2);
 
@@ -13789,8 +13790,11 @@ class serializer
                             o->write_characters("\": ", 3);
                         else
                             o->write_characters("\":", 2);
-                        dump(i->second, false, ensure_ascii, indent_step, current_indent, val.m_type);
-                        o->write_character(',');
+                        dump(i->second, pretty_print, ensure_ascii, indent_step, current_indent, val.m_type);
+                        if (pretty_print)
+                            o->write_characters(", ", 2);
+                        else
+                            o->write_character(',');
                     }
 
                     // last element
@@ -13802,7 +13806,7 @@ class serializer
                         o->write_characters("\": ", 3);
                     else
                         o->write_characters("\":", 2);
-                    dump(i->second, false, ensure_ascii, indent_step, current_indent, val.m_type);
+                    dump(i->second, pretty_print, ensure_ascii, indent_step, current_indent, val.m_type);
 
                     o->write_character('}');
                 }
