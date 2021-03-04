@@ -35,6 +35,8 @@ struct AssembleData {
 
 class Backend {
 public:
+    virtual ~Backend() {}
+
     // Backend name (e.g., "LuaJIT")
     virtual std::string name() {
         return "";
