@@ -8,7 +8,7 @@ before_install:
 - echo "deb https://lucasvr.gobolinux.org/debian/repo/ /" | sudo tee -a /etc/apt/sources.list
 - wget -q -O - https://lucasvr.gobolinux.org/debian/repo/KEY.gpg | sudo apt-key add -
 - sudo apt-get -qq update
-- sudo apt install -y libsyscall-intercept0 libsyscall-intercept-dev luajit libluajit-5.1-dev libseccomp-dev libsodium-dev libhdf5-dev hdf5-tools python3-pip numdiff libc++
+- sudo apt install -y libsyscall-intercept0 libsyscall-intercept-dev luajit libluajit-5.1-dev libseccomp-dev libsodium-dev libhdf5-dev hdf5-tools python3-pip numdiff
 - sudo pip3 install cffi
 
 script:

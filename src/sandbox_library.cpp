@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <vector>
 #include <string>
+#include "sysdefs.h"
 #include "json.hpp"
 
 #ifndef SYS_SECCOMP
@@ -182,39 +183,54 @@ bool sandbox_init_seccomp(const json &rules)
 
     // Iterate over the rules to configure Seccomp.
     // Note that the rules have been already validated by the time this function is called.
-    for (auto &[k, v]: rules["syscalls"].items())
-        for (auto &[name, rule]: v.items())
+    if (rules.contains("syscalls"))
+    {
+        for (auto &element: rules["syscalls"].items())
         {
-            if ((name.size() && name[0] == '#'))
-                continue;
+            for (auto &syscall_element: element.value().items())
+            {
+                auto name = syscall_element.key();
+                auto rule = syscall_element.value();
+                if ((name.size() && name[0] == '#'))
+                    continue;
 
-            // Simple case: rule is a boolean
-            auto syscall_nr = seccomp_syscall_resolve_name(name.c_str());
-            if (rule.is_boolean())
-            {
-                ALLOW(syscall_nr, 0);
-                continue;
-            }
+                // Simple case: rule is a boolean
+                auto syscall_nr = seccomp_syscall_resolve_name(name.c_str());
+                if (rule.is_boolean())
+                {
+                    ALLOW(syscall_nr, 0);
+                    continue;
+                }
 
-            // Rule has specific filters. At this point, any string-based rules
-            // have been already converted into a number by the rule validation
-            // code at SignatureHandler::validateProfileRules().
-            auto rule_arg = rule["arg"].get<unsigned int>();
-            auto rule_op = rule["op"].get<std::string>();
-            auto rule_value = rule["value"].get<unsigned long>();
-            printf("-> %s: arg_%d %s %lu\n", name.c_str(), rule_arg, rule_op.c_str(), rule_value);
-            if (rule_op.compare("equals"))
-            {
-                // We currently support specifying a single argument only
-                ALLOW(syscall_nr, 1, SCMP_CMP64(rule_arg, SCMP_CMP_EQ, rule_value));
-                continue;
-            }
-            else if (rule_op.compare("is_set"))
-            {
-                ALLOW(syscall_nr, 1, SCMP_CMP64(rule_arg, SCMP_CMP_MASKED_EQ, rule_value, rule_value));
-                continue;
+                // Rule has specific filters. At this point, any string-based rules
+                // have been already converted into a number by the rule validation
+                // code at SignatureHandler::validateProfileRules().
+                auto rule_arg = rule["arg"].get<unsigned int>();
+                auto rule_op = rule["op"].get<std::string>();
+
+                unsigned long rule_value;
+                if (rule["value"].is_string())
+                {
+                    auto value = rule["value"].get<std::string>();
+                    rule_value = sysdefs.find(value)->second;
+                }
+                else
+                    rule_value = rule["value"].get<unsigned long>();
+
+                if (rule_op.compare("equals"))
+                {
+                    // We currently support specifying a single argument only
+                    ALLOW(syscall_nr, 1, SCMP_CMP64(rule_arg, SCMP_CMP_EQ, rule_value));
+                    continue;
+                }
+                else if (rule_op.compare("is_set"))
+                {
+                    ALLOW(syscall_nr, 1, SCMP_CMP64(rule_arg, SCMP_CMP_MASKED_EQ, rule_value, rule_value));
+                    continue;
+                }
             }
         }
+    }
 
     // Load seccomp rules
     int ret = seccomp_load(ctx);

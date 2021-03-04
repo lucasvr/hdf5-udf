@@ -11,6 +11,7 @@
 #include <sodium.h>
 #include <hdf5.h>
 #include <glob.h>
+#include <libgen.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pwd.h>
@@ -20,14 +21,41 @@
 #include <map>
 #include <string>
 #include <vector>
-#include <filesystem>
+#include <iomanip>
 
 #include "user_profile.h"
 #include "sysdefs.h"
 #include "base64.h"
 
-namespace fs = std::filesystem;
 using namespace std;
+
+bool filesystem_path_exists(std::string path)
+{
+    struct stat statbuf;
+    return stat(path.c_str(), &statbuf) < 0 && errno == ENOENT ? false : true;
+}
+
+bool filesystem_paths_equal(std::string a, std::string b)
+{
+    struct stat info_a, info_b;
+    if (stat(a.c_str(), &info_a) < 0 || stat(b.c_str(), &info_b) < 0)
+        return false;
+    return info_a.st_dev == info_b.st_dev && info_a.st_ino == info_b.st_ino;
+}
+
+std::string filesystem_parentdir(std::string path)
+{
+    char tmp[path.size()+1];
+    sprintf(tmp, "%s", path.c_str());
+    return dirname(tmp);
+}
+
+std::string filesystem_basename(std::string path)
+{
+    char tmp[path.size()+1];
+    sprintf(tmp, "%s", path.c_str());
+    return basename(tmp);
+}
 
 int globError(const char *epath, int eerrno)
 {
@@ -71,6 +99,12 @@ Blob *SignatureHandler::extractPayload(
     int ret = glob(public_keys.c_str(), GLOB_BRACE, globError, &globbuf);
     if (ret == GLOB_NOMATCH)
     {
+        if (! createDirectoryTree())
+        {
+            fprintf(stderr, "Unable to import public key into local repository\n");
+            return NULL;
+        }
+
         // Import public key into the 'deny' repository.
         // Any system calls attempted to be executed by UDFs
         // signed by this key will be rejected by HDF5-UDF.
@@ -94,7 +128,6 @@ Blob *SignatureHandler::extractPayload(
         }
         close(fd);
 
-        createDirectoryTree();
         savePublicKey((uint8_t *) public_key.c_str(), public_path, true);
 
         // Re-run glob() and fall-through so the test below can check for
@@ -207,11 +240,16 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
             return NULL;
         }
 
+        if (! createDirectoryTree())
+        {
+            fprintf(stderr, "Unable to store generated public and secret keys on disk\n");
+            return NULL;
+        }
+
         // Save both keys to disk
         auto pw = getpwuid(getuid());
         std::string private_path = configdir + (pw ? pw->pw_name : "my") + ".priv";
         std::string public_path = configdir + (pw ? pw->pw_name : "my") + ".pub";
-        createDirectoryTree();
         savePrivateKey(secret_key, private_path);
         savePublicKey(public_key, public_path);
     }
@@ -238,8 +276,8 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
 
 bool SignatureHandler::getProfileRules(std::string public_key_path, json &rules)
 {
-    std::string public_key_dir = fs::path(public_key_path).parent_path();
-    if (fs::equivalent(public_key_dir, configdir))
+    std::string public_key_dir = filesystem_parentdir(public_key_path);
+    if (filesystem_paths_equal(public_key_dir, configdir))
     {
         // Special case: public key comes from the very same user (and machine)
         // who's running the UDF. Cook a JSON that allows this UDF to run with
@@ -248,16 +286,18 @@ bool SignatureHandler::getProfileRules(std::string public_key_path, json &rules)
         return true;
     }
 
-    std::string base = fs::path(public_key_dir).filename();
+    // This function is expected to be called from the I/O filter succeeding
+    // a call to extractPayload(). Since that function performs the extraction
+    // of the public key and stores it under the 'deny' profile (iff that key
+    // was not previously associated with another profile), we really don't
+    // expect the next operation to fail.
+    std::string base = filesystem_basename(public_key_dir);
     std::string rulefile = public_key_dir + "/" + base + ".json";
     ifstream file(rulefile);
     if (! file.is_open())
     {
-        // No matching rule file exists. Cook a JSON that denies this UDF from
-        // running any system calls.
-        fprintf(stderr, "**** special case: no rules -> deny\n");
-        rules["sandbox"] = true;
-        return true;
+        fprintf(stderr, "Error: could not open profile rule file %s\n", rulefile.c_str());
+        return false;
     }
 
     // Deserialize JSON from input stream
@@ -291,9 +331,11 @@ bool SignatureHandler::validateProfileRules(std::string rulefile, json &rules)
         return false;
     }
 
-    for (auto &[k, v]: rules["syscalls"].items())
-        for (auto &[name, rule]: v.items())
+    for (auto &element: rules["syscalls"].items())
+        for (auto &syscall_element: element.value().items())
         {
+            auto name = syscall_element.key();
+            auto rule = syscall_element.value();
             if (name.size() && name[0] == '#')
                 continue;
 
@@ -334,13 +376,12 @@ bool SignatureHandler::validateProfileRules(std::string rulefile, json &rules)
                 auto it = sysdefs.find(value);
                 if (it == sysdefs.end())
                     Fail("unrecognized mnemonic '%s'", value.c_str());
-
-                // Overwrite original string-based data with its integer value
-                rule["value"] = it->second;
             }
         }
     return true;
 }
+
+#define JSON_OBJ(k,v) json::object({{k, v}})
 
 bool SignatureHandler::createDirectoryTree()
 {
@@ -351,14 +392,90 @@ bool SignatureHandler::createDirectoryTree()
     dirs.push_back(configdir + "allow");
     dirs.push_back(configdir + "deny");
 
-    struct stat statbuf;
     for (auto &dir: dirs)
-        if (stat(dir.c_str(), &statbuf) < 0 && errno == ENOENT)
+        if (! filesystem_path_exists(dir))
             if (mkdir(dir.c_str(), 0755) < 0)
             {
                 fprintf(stderr, "Error creating directory %s: %s\n", dir.c_str(), strerror(errno));
                 return false;
             }
+
+    // Create default config files
+    json default_cfg, allow_cfg, deny_cfg;
+
+    // "Allow": don't enforce sandboxing rules
+    allow_cfg["#"] = "Run the UDF in a sandbox?";
+    allow_cfg["sandbox"] = false;
+    if (! filesystem_path_exists(configdir + "allow/allow.json"))
+        std::ofstream(configdir + "allow/allow.json") << std::setw(4) << allow_cfg << std::endl;
+
+    // "Deny": don't let the UDF run any syscalls, except for munmap and write(stdout/err)
+    deny_cfg["#"] = "Run the UDF in a sandbox?";
+    deny_cfg["sandbox"] = true;
+    deny_cfg["syscalls"] = json::array({
+        JSON_OBJ("munmap", true),
+        JSON_OBJ("write", json::object({{"arg", 0}, {"op", "equals"}, {"value", 1}})),
+        JSON_OBJ("write", json::object({{"arg", 0}, {"op", "equals"}, {"value", 2}})),
+    });
+    if (! filesystem_path_exists(configdir + "deny/deny.json"))
+        std::ofstream(configdir + "deny/deny.json") << std::setw(4) << deny_cfg << std::endl;
+
+    // "Default": let common-sense system calls execute.
+    // Note that some syscalls are explicitly disabled, even though that's the default,
+    // so that users can easily turn them on if so they wish.
+    default_cfg["#"] = "Run the UDF in a sandbox?";
+    default_cfg["sandbox"] = true;
+    default_cfg["syscalls"] = json::array({
+        JSON_OBJ("# Memory management", ""),
+        JSON_OBJ("brk", true),
+        JSON_OBJ("futex", true),
+        JSON_OBJ("mprotect", true),
+        JSON_OBJ("mmap", true),
+        JSON_OBJ("mmap2", true),
+        JSON_OBJ("munmap", true),
+
+        JSON_OBJ("# Process management", ""),
+        JSON_OBJ("exit_group", true),
+
+        JSON_OBJ("# Terminal-related", ""),
+        JSON_OBJ("ioctl", json::object({{"arg", 1}, {"op", "equals"}, {"value", "TCGETS"}})),
+        JSON_OBJ("ioctl", json::object({{"arg", 1}, {"op", "equals"}, {"value", "TIOCGWINSZ"}})),
+
+        JSON_OBJ("# System information", ""),
+        JSON_OBJ("uname", true),
+
+        JSON_OBJ("# Sockets-related system calls", ""),
+        JSON_OBJ("socket", false),
+        JSON_OBJ("setsockopt", false),
+        JSON_OBJ("connect", false),
+        JSON_OBJ("select", false),
+        JSON_OBJ("poll", false),
+        JSON_OBJ("recv", false),
+        JSON_OBJ("recvfrom", false),
+        JSON_OBJ("send", false),
+        JSON_OBJ("sendto", false),
+        JSON_OBJ("sendmsg", false),
+        JSON_OBJ("ioctl", json::object({{"arg", 1}, {"op", "equals"}, {"value", "FIONREAD"}})),
+
+        JSON_OBJ("# File descriptor", ""),
+        JSON_OBJ("open", json::object({{"arg", 1}, {"op", "is_set"}, {"value", "O_RDONLY"}})),
+        JSON_OBJ("openat", json::object({{"arg", 2}, {"op", "is_set"}, {"value", "O_RDONLY"}})),
+        JSON_OBJ("close", true),
+        JSON_OBJ("read", false),
+        JSON_OBJ("write", json::object({{"arg", 0}, {"op", "equals"}, {"value", 1}})),
+        JSON_OBJ("write", json::object({{"arg", 0}, {"op", "equals"}, {"value", 2}})),
+        JSON_OBJ("fcntl", true),
+        JSON_OBJ("fcntl64", true),
+        JSON_OBJ("stat", true),
+        JSON_OBJ("lstat", true),
+        JSON_OBJ("fstat", true),
+        JSON_OBJ("fstat64", true),
+        JSON_OBJ("lseek", true),
+        JSON_OBJ("_llseek", true)
+    });
+    if (! filesystem_path_exists(configdir + "default/default.json"))
+        std::ofstream(configdir + "default/default.json") << std::setw(4) << default_cfg << std::endl;
+
     return true;
 }
 
