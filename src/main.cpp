@@ -12,6 +12,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,12 +21,12 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <algorithm>
-#include <fstream>
 #include <regex>
 
 #include "io_filter.h"
 #include "dataset.h"
 #include "backend.h"
+#include "user_profile.h"
 #include "json.hpp"
 
 using json = nlohmann::json;
@@ -359,7 +360,7 @@ std::string template_path(std::string backend_extension, std::string argv0)
 
 int main(int argc, char **argv)
 {
-    if(argc < 3)
+    if (argc < 3)
     {
         fprintf(stdout,
             "Syntax: %s <hdf5_file> <udf_file> [--overwrite] [virtual_dataset..]\n\n"
@@ -747,6 +748,15 @@ int main(int argc, char **argv)
         if (sep != std::string::npos)
             payload_datatype = payload_datatype.substr(0, sep);
 
+        /* Sign datasets and UDF */
+        SignatureHandler signature;
+        auto blob = signature.signPayload((const uint8_t *) &bytecode[0], bytecode.length());
+        if (blob == NULL)
+        {
+            fprintf(stderr, "Failed to sign UDF\n");
+            exit(1);
+        }
+
         /* JSON Payload */
         json jas;
         jas["output_dataset"] = info.name;
@@ -754,10 +764,13 @@ int main(int argc, char **argv)
         jas["output_datatype"] = payload_datatype;
         jas["input_datasets"] = input_dataset_names;
         jas["scratch_datasets"] = scratch_dataset_names;
-        jas["bytecode_size"] = bytecode.length();
+        jas["bytecode_size"] = blob->size;
         jas["backend"] = backend->name();
         jas["source_code"] = source_code;
         jas["api_version"] = 2;
+        jas["signature"] = {
+            {"public_key", blob->public_key_base64 }
+        };
 
         std::string jas_str = jas.dump();
         size_t payload_size = jas_str.length() + bytecode.size() + 1;
@@ -780,7 +793,7 @@ int main(int argc, char **argv)
         memcpy(p, &jas_str[0], jas_str.length());
         p += jas_str.length();
         *p = '\0';
-        memcpy(&p[1], &bytecode[0], bytecode.size());
+        memcpy(&p[1], blob->data, blob->size);
 
         /* Create virtual dataset */
         hid_t dset_id = H5Dcreate(file_id, info.name.c_str(), info.hdf5_datatype, space_id, H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
@@ -804,6 +817,7 @@ int main(int argc, char **argv)
         status = H5Sclose(space_id);
         status = H5Fclose(file_id);
         free(payload);
+        delete blob;
     }
     
     return 0;

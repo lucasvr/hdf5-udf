@@ -1,4 +1,4 @@
-# hdf5-udf sine_wave.h5 sine_wave.py SineWave.py:100x10:int32
+# hdf5-udf sine_wave.h5 sine_wave.py SineWave.py:100x100:int32
 import math
 
 def dynamic_dataset():

@@ -29,10 +29,14 @@
 #include <algorithm>
 #include <vector>
 #include <string>
+#include "sysdefs.h"
+#include "json.hpp"
 
 #ifndef SYS_SECCOMP
 #define SYS_SECCOMP 1
 #endif
+
+using json = nlohmann::json;
 
 // List of files allowed to be accessed by the UDF
 static std::vector<std::string> files_allowed;
@@ -135,9 +139,9 @@ bool sandbox_init_syscall_intercept(std::vector<std::string> paths_allowed)
 // System call filtering interface
 ////////////////////////////////////
 
-#define ALLOW(syscall, ...) do { \
-    if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(syscall), __VA_ARGS__) < 0) { \
-        fprintf(stderr, "Failed to configure seccomp rule for '" #syscall "' syscall\n"); \
+#define ALLOW(syscall_nr, ...) do { \
+    if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW, syscall_nr, __VA_ARGS__) < 0) { \
+        fprintf(stderr, "Failed to configure seccomp rule for syscall '%s'\n", name.c_str()); \
         return false; \
     } \
 } while (0)
@@ -161,7 +165,7 @@ static void unallowed_syscall_handler(int signum, siginfo_t *info, void *ucontex
 }
 
 // Entry point, called from Sandbox::init()
-bool sandbox_init_seccomp()
+bool sandbox_init_seccomp(const json &rules)
 {
     // Let the process receive a SIGSYS when it executes a
     // system call that's not allowed.
@@ -177,60 +181,56 @@ bool sandbox_init_seccomp()
         return false;
     }
 
-    // One particular use case of HDF5-UDF is to retrieve data
-    // from servers exposed on the Internet and to provide that
-    // data to the application using the HDF5 dataset interface.
-    // The syscalls below should be sufficient to allow a program
-    // to connect to an external host and communicate with it.
-    // Any other syscall is denied by seccomp and will cause the
-    // UDF thread to be killed.
+    // Iterate over the rules to configure Seccomp.
+    // Note that the rules have been already validated by the time this function is called.
+    if (rules.contains("syscalls"))
+    {
+        for (auto &element: rules["syscalls"].items())
+        {
+            for (auto &syscall_element: element.value().items())
+            {
+                auto name = syscall_element.key();
+                auto rule = syscall_element.value();
+                if ((name.size() && name[0] == '#'))
+                    continue;
 
-    // Fundamental system calls we want to allow
-    ALLOW(brk, 0);
-    ALLOW(exit_group, 0);
+                // Simple case: rule is a boolean
+                auto syscall_nr = seccomp_syscall_resolve_name(name.c_str());
+                if (rule.is_boolean())
+                {
+                    ALLOW(syscall_nr, 0);
+                    continue;
+                }
 
-    // Terminal-related system calls
-    ALLOW(ioctl, 1, SCMP_A1(SCMP_CMP_EQ, TIOCGWINSZ));
-    ALLOW(ioctl, 1, SCMP_A1(SCMP_CMP_EQ, TCGETS));
+                // Rule has specific filters. At this point, any string-based rules
+                // have been already converted into a number by the rule validation
+                // code at SignatureHandler::validateProfileRules().
+                auto rule_arg = rule["arg"].get<unsigned int>();
+                auto rule_op = rule["op"].get<std::string>();
 
-    // Sockets-related system calls
-    ALLOW(socket, 0);
-    ALLOW(setsockopt, 0);
-    ALLOW(ioctl, 1, SCMP_A1(SCMP_CMP_EQ, FIONREAD));
-    ALLOW(connect, 0);
-    ALLOW(select, 0);
-    ALLOW(poll, 0);
-    ALLOW(read, 0);
-    ALLOW(recv, 0);
-    ALLOW(recvfrom, 0);
-    ALLOW(write, 0);
-    ALLOW(send, 0);
-    ALLOW(sendto, 0);
-    ALLOW(sendmsg, 0);
-    ALLOW(close, 0);
+                unsigned long rule_value;
+                if (rule["value"].is_string())
+                {
+                    auto value = rule["value"].get<std::string>();
+                    rule_value = sysdefs.find(value)->second;
+                }
+                else
+                    rule_value = rule["value"].get<unsigned long>();
 
-    // File descriptor operations
-    ALLOW(fcntl, 0);
-    ALLOW(fcntl64, 0);
-
-    // System calls issued by gethostbyname(). Some of these could be potentially
-    // misused by malicious user-defined functions; we rely on the syscall-intercept
-    // routines above to check their string-based arguments to decide to allow or
-    // reject them.
-    ALLOW(stat, 0);
-    ALLOW(lstat, 0);
-    ALLOW(fstat, 0);
-    ALLOW(fstat64, 0);
-    ALLOW(open, 1, SCMP_A1(SCMP_CMP_MASKED_EQ, O_RDONLY, O_RDONLY));
-    ALLOW(openat, 1, SCMP_A2(SCMP_CMP_MASKED_EQ, O_RDONLY, O_RDONLY));
-    ALLOW(mmap, 0);
-    ALLOW(mmap2, 0);
-    ALLOW(munmap, 0);
-    ALLOW(lseek, 0);
-    ALLOW(_llseek, 0);
-    ALLOW(futex, 0);
-    ALLOW(uname, 0);
-    ALLOW(mprotect, 0);    
+                if (rule_op.compare("equals"))
+                {
+                    // We currently support specifying a single argument only
+                    ALLOW(syscall_nr, 1, SCMP_CMP64(rule_arg, SCMP_CMP_EQ, rule_value));
+                    continue;
+                }
+                else if (rule_op.compare("is_set"))
+                {
+                    ALLOW(syscall_nr, 1, SCMP_CMP64(rule_arg, SCMP_CMP_MASKED_EQ, rule_value, rule_value));
+                    continue;
+                }
+            }
+        }
+    }
 
     // Load seccomp rules
     int ret = seccomp_load(ctx);

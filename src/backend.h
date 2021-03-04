@@ -13,6 +13,9 @@
 #include <string>
 #include <fstream>
 #include "dataset.h"
+#include "json.hpp"
+
+using json = nlohmann::json;
 
 struct AssembleData {
     std::string udf_file;                 // UDF file
@@ -59,7 +62,8 @@ public:
         const DatasetInfo &output_dataset,
         const char *output_cast_datatype,
         const char *udf_blob,
-        size_t udf_blob_size)
+        size_t udf_blob_size,
+        const json &rules)
     {
         return false;
     }

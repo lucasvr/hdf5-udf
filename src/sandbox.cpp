@@ -39,14 +39,18 @@ public:
         const DatasetInfo &output_dataset,
         const char *output_cast_datatype,
         const char *udf_blob,
-        size_t udf_blob_size)
+        size_t udf_blob_size,
+        const json &rules)
     { return true; }
 
     std::vector<std::string> udfDatasetNames(std::string udf_file)
     { return std::vector<std::string>(); }
 };
 
-bool Sandbox::init(std::string filterpath, const std::vector<std::string> &paths_allowed)
+bool Sandbox::init(
+    std::string filterpath,
+    const std::vector<std::string> &paths_allowed,
+    const json &rules)
 {
     // The sandbox library is stored in a special ELF section of the filter file.
     // We retrieve it from that section, save it to a temporary file and then
@@ -66,10 +70,10 @@ bool Sandbox::init(std::string filterpath, const std::vector<std::string> &paths
     // Note that we delete the temporary file prior to the initialization of
     // the syscall filter, as the filter is unlikely to allow calls to unlink().
     bool ret = false;
-    bool (*sandbox_init_seccomp)();
+    bool (*sandbox_init_seccomp)(const json &);
     bool (*sandbox_init_intercept)(const std::vector<std::string>);
 
-    sandbox_init_seccomp = (bool(*)())
+    sandbox_init_seccomp = (bool(*)(const json &))
         shlib.loadsym("sandbox_init_seccomp");
     sandbox_init_intercept = (bool(*)(const std::vector<std::string>))
         shlib.loadsym("sandbox_init_syscall_intercept");
@@ -83,7 +87,7 @@ bool Sandbox::init(std::string filterpath, const std::vector<std::string> &paths
     }
     if (sandbox_init_seccomp)
     {
-        ret = sandbox_init_seccomp();
+        ret = sandbox_init_seccomp(rules);
         if (ret == false)
             fprintf(stderr, "Failed to configure sandbox\n");
     }

@@ -224,7 +224,8 @@ bool PythonBackend::run(
     const DatasetInfo &output_dataset,
     const char *output_cast_datatype,
     const char *bytecode,
-    size_t bytecode_size)
+    size_t bytecode_size,
+    const json &rules)
 {
     if (bytecode_size < 16)
     {
@@ -400,7 +401,7 @@ bool PythonBackend::run(
         }
 
         // Execute the user-defined function
-        retval = executeUDF(loadlib, udf, filterpath);
+        retval = executeUDF(loadlib, udf, filterpath, rules);
         if (retval == true)
         {
             // Update output HDF5 dataset with data from shared memory segment
@@ -413,7 +414,11 @@ bool PythonBackend::run(
 }
 
 /* Coordinate the execution of the UDF under a separate process */
-bool PythonBackend::executeUDF(PyObject *loadlib, PyObject *udf, std::string filterpath)
+bool PythonBackend::executeUDF(
+    PyObject *loadlib,
+    PyObject *udf,
+    std::string filterpath,
+    const json &rules)
 {
     /*
      * Execute the user-defined-function under a separate process so that
@@ -424,9 +429,12 @@ bool PythonBackend::executeUDF(PyObject *loadlib, PyObject *udf, std::string fil
     {
         bool ready = true;
 #ifdef ENABLE_SANDBOX
-        Sandbox sandbox;
-        auto paths_allowed = pathsAllowed();
-        ready = sandbox.init(filterpath, paths_allowed);
+        if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
+        {
+            Sandbox sandbox;
+            auto paths_allowed = pathsAllowed();
+            ready = sandbox.init(filterpath, paths_allowed, rules);
+        }
 #endif
         if (ready)
         {

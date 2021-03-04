@@ -16,11 +16,13 @@
 #include <time.h>
 #include <unistd.h>
 #include <iostream>
+#include <fstream>
 
 #include "io_filter.h"
 #include "dataset.h"
 #include "backend.h"
 #include "debug.h"
+#include "user_profile.h"
 #include "json.hpp"
 
 using namespace std;
@@ -227,7 +229,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
 {
     if (flags & H5Z_FLAG_REVERSE)
     {
-        std::string json_string((const char *)*buf);
+        std::string json_string((const char *) *buf);
         json jas = json::parse(json_string);
 
         /* Retrieve metadata stored in the JSON payload */
@@ -240,11 +242,43 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         auto backend_name = jas["backend"].get<std::string>();
         auto source_code = jas["source_code"].get<std::string>();
 
+        json rules;
+        Blob *blob = NULL;
+        char *bytecode = (char *)(((char *) *buf) + *buf_size - bytecode_size);
+        if (jas.contains("signature"))
+        {
+            std::string public_key_base64;
+            if (jas["signature"].contains("public_key"))
+                public_key_base64 = jas["signature"]["public_key"].get<std::string>();
+
+            // Extract UDF
+            auto sighandler = SignatureHandler();
+            blob = sighandler.extractPayload(
+                (const uint8_t *) bytecode, (unsigned long long) bytecode_size, public_key_base64);
+            if (blob == NULL)
+            {
+                fprintf(stderr, "Could not extract payload from signed UDF\n");
+                return 0;
+            }
+
+            // Get seccomp rules associated with this public key
+            if (sighandler.getProfileRules(blob->public_key_path, rules) == false)
+            {
+                fprintf(stderr, "Could not find valid profile rules under the config directory\n");
+                delete blob;
+                return 0;
+            }
+
+            bytecode = (char *) blob->data;
+            bytecode_size = blob->size;
+        }
+
         auto backend = getBackendByName(backend_name);
         if (! backend)
         {
             fprintf(stderr, "No backend has been found to execute %s code\n",
                 backend_name.c_str());
+            delete blob;
             return 0;
         }
 
@@ -252,6 +286,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         if (filterpath.size() == 0)
         {
             fprintf(stderr, "Failed to identify path to HDF5-UDF filter\n");
+            delete blob;
             return 0;
         }
 
@@ -259,7 +294,10 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         bool handle_from_procfs = false;
         hid_t file_id = getDatasetHandle(output_name, &handle_from_procfs);
         if (file_id == -1)
+        {
+            delete blob;
             return 0;
+        }
 
         /* Allocate room for input data */
         std::vector<DatasetHandle *> input_handles;
@@ -271,6 +309,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
             fprintf(stderr, "Failed to process input/scratch datasets\n");
             if (handle_from_procfs)
                 H5Fclose(file_id);
+            delete blob;
             return 0;
         }
 
@@ -308,6 +347,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
                     output_dataset.hdf5_datatype);
                 if (handle_from_procfs)
                     H5Fclose(file_id);
+                delete blob;
                 return 0;
             }
         }
@@ -320,15 +360,15 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
             releaseHdf5Datasets(input_handles, input_info);
             if (handle_from_procfs)
                 H5Fclose(file_id);
+            delete blob;
             return 0;
         }
 
         /* Execute the user-defined function */
         Benchmark benchmark;
         auto dtype = output_dataset.getCastDatatype();
-        char *bytecode = (char *)(((char *) *buf) + *buf_size - bytecode_size);
         if (! backend->run(
-            filterpath, input_info, output_dataset, dtype, bytecode, bytecode_size))
+            filterpath, input_info, output_dataset, dtype, bytecode, bytecode_size, rules))
         {
             nbytes = 0;
         } 
@@ -348,6 +388,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         releaseHdf5Datasets(input_handles, input_info);
         if (handle_from_procfs)
             H5Fclose(file_id);
+        delete blob;
     }
     else
     {

@@ -3702,7 +3702,7 @@ static mz_bool mz_zip_reader_read_central_dir(mz_zip_archive *pZip, mz_uint flag
 					if (MZ_ZIP_CENTRAL_DIR_HEADER_SIZE + filename_size + ext_data_size > n)
 					{
 						buf = MZ_MALLOC(ext_data_size);
-						if(buf==NULL)
+						if (buf==NULL)
 							return mz_zip_set_error(pZip, MZ_ZIP_ALLOC_FAILED);
 
 						if (pZip->m_pRead(pZip->m_pIO_opaque, cdir_ofs + MZ_ZIP_CENTRAL_DIR_HEADER_SIZE + filename_size, buf, ext_data_size) != ext_data_size)

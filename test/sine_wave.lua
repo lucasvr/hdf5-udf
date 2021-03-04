@@ -1,4 +1,4 @@
--- hdf5-udf sine_wave.h5 sine_wave.lua SineWave.lua:100x10:int32
+-- hdf5-udf sine_wave.h5 sine_wave.lua SineWave.lua:100x100:int32
 function dynamic_dataset()
     local udf_data = lib.getData("SineWave.lua")
     local udf_type = lib.getType("SineWave.lua")

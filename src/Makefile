@@ -22,10 +22,10 @@ endif
 
 CXX            = g++
 OBJCOPY        = objcopy
-CXXFLAGS       = $(shell pkg-config --cflags luajit hdf5) \
+CXXFLAGS       = $(shell pkg-config --cflags luajit hdf5 libsodium) \
                  $(shell python3-config --includes) \
                  -fPIC -I. -Wall -O3 -g -ggdb -std=c++14
-LDFLAGS        = $(shell pkg-config --libs luajit hdf5) \
+LDFLAGS        = $(shell pkg-config --libs luajit hdf5 libsodium) \
                  $(PYTHON_LDFLAGS) \
                  -ldl -lm -Wl,--no-undefined
 
@@ -52,13 +52,16 @@ endif
 ######################
 
 ifeq ($(strip $(OPT_SANDBOX)),1)
-CXXFLAGS       += -DENABLE_SANDBOX
-COMMON_SOURCES +=  sandbox.cpp
+CXXFLAGS       += $(shell pkg-config --cflags libseccomp) \
+                  -DENABLE_SANDBOX
+LDFLAGS        += $(shell pkg-config --libs libseccomp)
+COMMON_SOURCES += sandbox.cpp
 
 SANDBOX_TARGET  = libhdf5-udf-sandbox.so
 SANDBOX_SOURCES = sandbox_library.cpp
 SANDBOX_OBJS    = $(patsubst %.cpp,%.o, $(SANDBOX_SOURCES))
-SANDBOX_LDFLAGS = -shared -fPIC -lsyscall_intercept -lseccomp
+SANDBOX_LDFLAGS = $(shell pkg-config --cflags libsyscall_intercept)
+SANDBOX_LDFLAGS = -shared -fPIC $(shell pkg-config --libs libsyscall_intercept)
 endif
 
 ##############
@@ -66,7 +69,7 @@ endif
 ##############
 
 FILTER_TARGET  = libhdf5-udf.so
-FILTER_SOURCES = $(COMMON_SOURCES) io_filter.cpp
+FILTER_SOURCES = $(COMMON_SOURCES) io_filter.cpp user_profile.cpp
 FILTER_OBJS    = $(patsubst %.cpp,%.o, $(FILTER_SOURCES))
 FILTER_LDFLAGS = -shared
 
@@ -75,7 +78,7 @@ FILTER_LDFLAGS = -shared
 ###########
 
 BIN_TARGET     = hdf5-udf
-BIN_SOURCES    = $(COMMON_SOURCES) main.cpp
+BIN_SOURCES    = $(COMMON_SOURCES) main.cpp user_profile.cpp
 BIN_OBJS       = $(patsubst %.cpp,%.o, $(BIN_SOURCES))
 BIN_CXXFLAGS   = -Wall
 
@@ -86,7 +89,7 @@ BIN_CXXFLAGS   = -Wall
 all: $(SANDBOX_TARGET) $(FILTER_TARGET) $(BIN_TARGET) $(SANDBOX_TARGET)
 
 $(SANDBOX_TARGET): $(SANDBOX_OBJS)
-	$(CXX) $^ -C -o $@ $(SANDBOX_LDFLAGS)
+	$(CXX) $^ -C -o $@ $(SANDBOX_LDFLAGS) $(LDFLAGS)
 
 $(FILTER_TARGET): $(FILTER_OBJS) $(SANDBOX_TARGET)
 	$(CXX) $(FILTER_OBJS) -C -o $@ $(FILTER_LDFLAGS) $(LDFLAGS)
@@ -98,7 +101,7 @@ $(FILTER_TARGET): $(FILTER_OBJS) $(SANDBOX_TARGET)
 	fi
 
 $(BIN_TARGET): $(BIN_OBJS)
-	$(CXX) $^ -o $@ $(LDFLAGS)
+	$(CXX) $^ -o $@ $(BIN_LDFLAGS) $(LDFLAGS)
 
 $(SANDBOX_OBJS) $(BIN_OBJS) $(FILTER_OBJS): $(ALL_HEADERS)
 

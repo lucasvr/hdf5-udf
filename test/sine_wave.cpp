@@ -1,4 +1,4 @@
-// hdf5-udf sine_wave.h5 sine_wave.cpp SineWave.cpp:100x10:int32
+// hdf5-udf sine_wave.h5 sine_wave.cpp SineWave.cpp:100x100:int32
 extern "C" void dynamic_dataset()
 {
     auto udf_data = lib.getData<int32_t>("SineWave.cpp");
