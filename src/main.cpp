@@ -358,20 +358,20 @@ std::string template_path(std::string backend_extension, std::string argv0)
     return "";
 }
 
-int main(int argc, char **argv)
+void usage(int errcode)
 {
-    if (argc < 3)
-    {
-        fprintf(stdout,
-            "Syntax: %s <hdf5_file> <udf_file> [--overwrite] [virtual_dataset..]\n\n"
+    fprintf(stdout,
+            "Syntax: hdf5-udf [flags] <hdf5_file> <udf_file> [virtual_dataset..]\n\n"
+            "Flags:\n"
+            "  --overwrite                    Overwrite existing virtual dataset(s)\n"
+            "  --append-sourcecode            Include source code as metadata of the UDF\n\n"
             "Options:\n"
             "  hdf5_file                      Input/output HDF5 file\n"
             "  udf_file                       File implementing the user-defined-function\n"
             "  virtual_dataset                Virtual dataset(s) to create. See syntax below.\n"
             "                                 If omitted, dataset names are picked from udf_file\n"
             "                                 and their resolutions/types are set to match the input\n"
-            "                                 datasets declared on that same file\n"
-            "  --overwrite                    Overwrite existing virtual dataset(s)\n\n"
+            "                                 datasets declared on that same file\n\n"
             "Formatting options for <virtual_dataset>:\n"
             "  name:resolution:type           name:       name of the virtual dataset\n"
             "                                 resolution: XRES, XRESxYRES, or XRESxYRESxZRES\n"
@@ -381,15 +381,16 @@ int main(int argc, char **argv)
             "Formatting options for outputting compound datasets:\n"
             "  name:{member:type[,member:type...]}:resolution\n\n"
             "Examples:\n"
-            "%s sample.h5 simple_vector.lua Simple:500:float\n"
-            "%s sample.h5 sine_wave.lua SineWave:100x10:int32\n"
-            "%s sample.h5 string_generator.lua 'Words:1000:string(80)'\n"
-            "%s sample.h5 virtual.py /Group/Name/VirtualDataset:100x100:uint8\n"
-            "%s sample.h5 compound.cpp 'Observations:{id:uint8,location:string,temperature:float}:1000'\n\n",
-            argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
-        exit(1);
-    }
+            "hdf5-udf sample.h5 simple_vector.lua Simple:500:float\n"
+            "hdf5-udf sample.h5 sine_wave.lua SineWave:100x10:int32\n"
+            "hdf5-udf sample.h5 string_generator.lua 'Words:1000:string(80)'\n"
+            "hdf5-udf sample.h5 virtual.py /Group/Name/VirtualDataset:100x100:uint8\n"
+            "hdf5-udf sample.h5 compound.cpp 'Observations:{id:uint8,location:string,temperature:float}:1000'\n\n");
+        exit(errcode);
+}
 
+int main(int argc, char **argv)
+{
     /* Sanity checks */
     if (H5Zfilter_avail(HDF5_UDF_FILTER_ID) <= 0)
     {
@@ -398,10 +399,32 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    std::string hdf5_file = argv[1];
-    std::string udf_file = argv[2];
+    bool flag_overwrite = false;
+    bool flag_sourcecode = false;
+    std::vector<std::string> args;
+    for (int i=0; i<argc; ++i)
+    {
+        if (strcmp(argv[i], "--overwrite") == 0)
+            flag_overwrite = true;
+        else if (strcmp(argv[i], "--append-sourcecode") == 0)
+            flag_sourcecode = true;
+        else if (strcmp(argv[i], "--help") == 0)
+            usage(0);
+        else if (strncmp(argv[i], "--", 2) == 0)
+        {
+            fprintf(stderr, "Error: unrecognized flag '%s'\n", argv[i]);
+            usage(1);
+        }
+        else
+            args.push_back(argv[i]);
+    }
+
+    if (args.size() < 3)
+        usage(1);
+
     const int first_dataset_index = 3;
-    bool overwrite = false;
+    std::string hdf5_file = args[1];
+    std::string udf_file = args[2];
 
     struct stat statbuf;
     std::vector<std::string> input_files = {hdf5_file, udf_file};
@@ -423,23 +446,18 @@ int main(int argc, char **argv)
     /* Process virtual (output) datasets given in the command line */
     std::vector<DatasetInfo> virtual_datasets;
     std::vector<std::string> delete_list;
-    for (int i=first_dataset_index; i<argc; ++i)
+    for (int i=first_dataset_index; i<args.size(); ++i)
     {
         DatasetInfo info("", std::vector<hsize_t>(), "", -1);
         DatasetOptionsParser parser;
-        if (strcmp(argv[i], "--overwrite") == 0)
+        if (parser.parse(args[i], info) == false)
         {
-            overwrite = true;
-            continue;
-        }
-        if (parser.parse(argv[i], info) == false)
-        {
-            fprintf(stderr, "Failed to parse string '%s'\n", argv[i]);
+            fprintf(stderr, "Failed to parse string '%s'\n", args[i].c_str());
             exit(1);
         }
         if (dataset_exists(hdf5_file, info.name))
         {
-            if (overwrite)
+            if (flag_overwrite)
                 delete_list.push_back(info.name);
             else
             {
@@ -654,7 +672,7 @@ int main(int argc, char **argv)
     std::string source_code;
     std::vector<DatasetInfo> datasets(input_datasets);
     datasets.insert(datasets.end(), virtual_datasets.begin(), virtual_datasets.end());
-    auto template_file = template_path(backend->extension(), argv[0]);
+    auto template_file = template_path(backend->extension(), args[0]);
     auto bytecode = backend->compile(udf_file, template_file, compound_declarations, source_code, datasets);
     if (bytecode.size() == 0)
     {
@@ -766,7 +784,7 @@ int main(int argc, char **argv)
         jas["scratch_datasets"] = scratch_dataset_names;
         jas["bytecode_size"] = blob->size;
         jas["backend"] = backend->name();
-        jas["source_code"] = source_code;
+        jas["source_code"] = flag_sourcecode ? source_code : "";
         jas["api_version"] = 2;
         jas["signature"] = {
             {"public_key", blob->public_key_base64 }
@@ -774,7 +792,7 @@ int main(int argc, char **argv)
 
         std::string jas_str = jas.dump();
         size_t payload_size = jas_str.length() + bytecode.size() + 1;
-        printf("\n%s dataset header:\n%s\n", info.name.c_str(), jas.dump(4, ' ', false, 40).c_str());
+        printf("\n%s dataset header:\n%s\n", info.name.c_str(), jas.dump(4, ' ', false, 45).c_str());
         if (compound_declarations.size())
             printf("\nData structures available to the UDF:\n%s\n", compound_declarations.c_str());
 
