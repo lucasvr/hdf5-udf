@@ -148,7 +148,7 @@ Log_Normal
 tests=(
     # HDF5 file             UDF file       Dynamic dataset
     "example-simple_vector  simple_vector  Simple:1500:float"
-    "example-sine_wave      sine_wave      SineWave:100x10:int32"
+    "example-sine_wave      sine_wave      SineWave:100x100:int32"
 )
 for entry in "${tests[@]}"; do Run_Test "$entry"; done
 
