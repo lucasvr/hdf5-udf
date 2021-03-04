@@ -28,5 +28,7 @@ print("#include <string>")
 print("#include <map>\n")
 print("static std::map<std::string, unsigned long> sysdefs = {")
 for key, value in definitions.items():
+    print(f'#ifdef {key}')
     print(f'    {{"{key}", {key}}},')
+    print('#endif')
 print("};")

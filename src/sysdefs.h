@@ -5,142 +5,427 @@
 #include <map>
 
 static std::map<std::string, unsigned long> sysdefs = {
+#ifdef O_ACCMODE
     {"O_ACCMODE", O_ACCMODE},
+#endif
+#ifdef O_RDONLY
     {"O_RDONLY", O_RDONLY},
+#endif
+#ifdef O_WRONLY
     {"O_WRONLY", O_WRONLY},
+#endif
+#ifdef O_RDWR
     {"O_RDWR", O_RDWR},
+#endif
+#ifdef O_CREAT
     {"O_CREAT", O_CREAT},
+#endif
+#ifdef O_EXCL
     {"O_EXCL", O_EXCL},
+#endif
+#ifdef O_NOCTTY
     {"O_NOCTTY", O_NOCTTY},
+#endif
+#ifdef O_TRUNC
     {"O_TRUNC", O_TRUNC},
+#endif
+#ifdef O_APPEND
     {"O_APPEND", O_APPEND},
+#endif
+#ifdef O_NONBLOCK
     {"O_NONBLOCK", O_NONBLOCK},
+#endif
+#ifdef O_DSYNC
     {"O_DSYNC", O_DSYNC},
+#endif
+#ifdef FASYNC
     {"FASYNC", FASYNC},
+#endif
+#ifdef O_DIRECT
     {"O_DIRECT", O_DIRECT},
+#endif
+#ifdef O_LARGEFILE
     {"O_LARGEFILE", O_LARGEFILE},
+#endif
+#ifdef O_DIRECTORY
     {"O_DIRECTORY", O_DIRECTORY},
+#endif
+#ifdef O_NOFOLLOW
     {"O_NOFOLLOW", O_NOFOLLOW},
+#endif
+#ifdef O_NOATIME
     {"O_NOATIME", O_NOATIME},
+#endif
+#ifdef O_CLOEXEC
     {"O_CLOEXEC", O_CLOEXEC},
+#endif
+#ifdef O_SYNC
     {"O_SYNC", O_SYNC},
+#endif
+#ifdef O_PATH
     {"O_PATH", O_PATH},
+#endif
+#ifdef O_TMPFILE
     {"O_TMPFILE", O_TMPFILE},
+#endif
+#ifdef O_TMPFILE_MASK
+    {"O_TMPFILE_MASK", O_TMPFILE_MASK},
+#endif
+#ifdef O_NDELAY
     {"O_NDELAY", O_NDELAY},
+#endif
+#ifdef F_DUPFD
     {"F_DUPFD", F_DUPFD},
+#endif
+#ifdef F_GETFD
     {"F_GETFD", F_GETFD},
+#endif
+#ifdef F_SETFD
     {"F_SETFD", F_SETFD},
+#endif
+#ifdef F_GETFL
     {"F_GETFL", F_GETFL},
+#endif
+#ifdef F_SETFL
     {"F_SETFL", F_SETFL},
+#endif
+#ifdef F_GETLK
     {"F_GETLK", F_GETLK},
+#endif
+#ifdef F_SETLK
     {"F_SETLK", F_SETLK},
+#endif
+#ifdef F_SETLKW
     {"F_SETLKW", F_SETLKW},
+#endif
+#ifdef F_SETOWN
     {"F_SETOWN", F_SETOWN},
+#endif
+#ifdef F_GETOWN
     {"F_GETOWN", F_GETOWN},
+#endif
+#ifdef F_SETSIG
     {"F_SETSIG", F_SETSIG},
+#endif
+#ifdef F_GETSIG
     {"F_GETSIG", F_GETSIG},
+#endif
+#ifdef F_GETLK64
     {"F_GETLK64", F_GETLK64},
+#endif
+#ifdef F_SETLK64
     {"F_SETLK64", F_SETLK64},
+#endif
+#ifdef F_SETLKW64
     {"F_SETLKW64", F_SETLKW64},
+#endif
+#ifdef F_SETOWN_EX
     {"F_SETOWN_EX", F_SETOWN_EX},
+#endif
+#ifdef F_GETOWN_EX
     {"F_GETOWN_EX", F_GETOWN_EX},
+#endif
+#ifdef F_GETOWNER_UIDS
+    {"F_GETOWNER_UIDS", F_GETOWNER_UIDS},
+#endif
+#ifdef F_OFD_GETLK
     {"F_OFD_GETLK", F_OFD_GETLK},
+#endif
+#ifdef F_OFD_SETLK
     {"F_OFD_SETLK", F_OFD_SETLK},
+#endif
+#ifdef F_OFD_SETLKW
     {"F_OFD_SETLKW", F_OFD_SETLKW},
+#endif
+#ifdef F_OWNER_TID
     {"F_OWNER_TID", F_OWNER_TID},
+#endif
+#ifdef F_OWNER_PID
     {"F_OWNER_PID", F_OWNER_PID},
+#endif
+#ifdef F_OWNER_PGRP
     {"F_OWNER_PGRP", F_OWNER_PGRP},
+#endif
+#ifdef FD_CLOEXEC
     {"FD_CLOEXEC", FD_CLOEXEC},
+#endif
+#ifdef F_RDLCK
     {"F_RDLCK", F_RDLCK},
+#endif
+#ifdef F_WRLCK
     {"F_WRLCK", F_WRLCK},
+#endif
+#ifdef F_UNLCK
     {"F_UNLCK", F_UNLCK},
+#endif
+#ifdef F_EXLCK
     {"F_EXLCK", F_EXLCK},
+#endif
+#ifdef F_SHLCK
     {"F_SHLCK", F_SHLCK},
+#endif
+#ifdef LOCK_SH
     {"LOCK_SH", LOCK_SH},
+#endif
+#ifdef LOCK_EX
     {"LOCK_EX", LOCK_EX},
+#endif
+#ifdef LOCK_NB
     {"LOCK_NB", LOCK_NB},
+#endif
+#ifdef LOCK_UN
     {"LOCK_UN", LOCK_UN},
+#endif
+#ifdef LOCK_MAND
     {"LOCK_MAND", LOCK_MAND},
+#endif
+#ifdef LOCK_READ
     {"LOCK_READ", LOCK_READ},
+#endif
+#ifdef LOCK_WRITE
     {"LOCK_WRITE", LOCK_WRITE},
+#endif
+#ifdef LOCK_RW
     {"LOCK_RW", LOCK_RW},
+#endif
+#ifdef F_LINUX_SPECIFIC_BASE
+    {"F_LINUX_SPECIFIC_BASE", F_LINUX_SPECIFIC_BASE},
+#endif
+#ifdef TCGETS
     {"TCGETS", TCGETS},
+#endif
+#ifdef TCSETS
     {"TCSETS", TCSETS},
+#endif
+#ifdef TCSETSW
     {"TCSETSW", TCSETSW},
+#endif
+#ifdef TCSETSF
     {"TCSETSF", TCSETSF},
+#endif
+#ifdef TCGETA
     {"TCGETA", TCGETA},
+#endif
+#ifdef TCSETA
     {"TCSETA", TCSETA},
+#endif
+#ifdef TCSETAW
     {"TCSETAW", TCSETAW},
+#endif
+#ifdef TCSETAF
     {"TCSETAF", TCSETAF},
+#endif
+#ifdef TCSBRK
     {"TCSBRK", TCSBRK},
+#endif
+#ifdef TCXONC
     {"TCXONC", TCXONC},
+#endif
+#ifdef TCFLSH
     {"TCFLSH", TCFLSH},
+#endif
+#ifdef TIOCEXCL
     {"TIOCEXCL", TIOCEXCL},
+#endif
+#ifdef TIOCNXCL
     {"TIOCNXCL", TIOCNXCL},
+#endif
+#ifdef TIOCSCTTY
     {"TIOCSCTTY", TIOCSCTTY},
+#endif
+#ifdef TIOCGPGRP
     {"TIOCGPGRP", TIOCGPGRP},
+#endif
+#ifdef TIOCSPGRP
     {"TIOCSPGRP", TIOCSPGRP},
+#endif
+#ifdef TIOCOUTQ
     {"TIOCOUTQ", TIOCOUTQ},
+#endif
+#ifdef TIOCSTI
     {"TIOCSTI", TIOCSTI},
+#endif
+#ifdef TIOCGWINSZ
     {"TIOCGWINSZ", TIOCGWINSZ},
+#endif
+#ifdef TIOCSWINSZ
     {"TIOCSWINSZ", TIOCSWINSZ},
+#endif
+#ifdef TIOCMGET
     {"TIOCMGET", TIOCMGET},
+#endif
+#ifdef TIOCMBIS
     {"TIOCMBIS", TIOCMBIS},
+#endif
+#ifdef TIOCMBIC
     {"TIOCMBIC", TIOCMBIC},
+#endif
+#ifdef TIOCMSET
     {"TIOCMSET", TIOCMSET},
+#endif
+#ifdef TIOCGSOFTCAR
     {"TIOCGSOFTCAR", TIOCGSOFTCAR},
+#endif
+#ifdef TIOCSSOFTCAR
     {"TIOCSSOFTCAR", TIOCSSOFTCAR},
+#endif
+#ifdef FIONREAD
     {"FIONREAD", FIONREAD},
+#endif
+#ifdef TIOCINQ
     {"TIOCINQ", TIOCINQ},
+#endif
+#ifdef TIOCLINUX
     {"TIOCLINUX", TIOCLINUX},
+#endif
+#ifdef TIOCCONS
     {"TIOCCONS", TIOCCONS},
+#endif
+#ifdef TIOCGSERIAL
     {"TIOCGSERIAL", TIOCGSERIAL},
+#endif
+#ifdef TIOCSSERIAL
     {"TIOCSSERIAL", TIOCSSERIAL},
+#endif
+#ifdef TIOCPKT
     {"TIOCPKT", TIOCPKT},
+#endif
+#ifdef FIONBIO
     {"FIONBIO", FIONBIO},
+#endif
+#ifdef TIOCNOTTY
     {"TIOCNOTTY", TIOCNOTTY},
+#endif
+#ifdef TIOCSETD
     {"TIOCSETD", TIOCSETD},
+#endif
+#ifdef TIOCGETD
     {"TIOCGETD", TIOCGETD},
+#endif
+#ifdef TCSBRKP
     {"TCSBRKP", TCSBRKP},
+#endif
+#ifdef TIOCSBRK
     {"TIOCSBRK", TIOCSBRK},
+#endif
+#ifdef TIOCCBRK
     {"TIOCCBRK", TIOCCBRK},
+#endif
+#ifdef TIOCGSID
     {"TIOCGSID", TIOCGSID},
+#endif
+#ifdef TIOCGRS485
     {"TIOCGRS485", TIOCGRS485},
+#endif
+#ifdef TIOCSRS485
     {"TIOCSRS485", TIOCSRS485},
+#endif
+#ifdef TIOCGPTN
     {"TIOCGPTN", TIOCGPTN},
+#endif
+#ifdef TIOCSPTLCK
     {"TIOCSPTLCK", TIOCSPTLCK},
+#endif
+#ifdef TIOCGDEV
     {"TIOCGDEV", TIOCGDEV},
+#endif
+#ifdef TCGETX
     {"TCGETX", TCGETX},
+#endif
+#ifdef TCSETX
     {"TCSETX", TCSETX},
+#endif
+#ifdef TCSETXF
     {"TCSETXF", TCSETXF},
+#endif
+#ifdef TCSETXW
     {"TCSETXW", TCSETXW},
+#endif
+#ifdef TIOCSIG
     {"TIOCSIG", TIOCSIG},
+#endif
+#ifdef TIOCVHANGUP
     {"TIOCVHANGUP", TIOCVHANGUP},
+#endif
+#ifdef TIOCGPKT
     {"TIOCGPKT", TIOCGPKT},
+#endif
+#ifdef TIOCGPTLCK
     {"TIOCGPTLCK", TIOCGPTLCK},
+#endif
+#ifdef TIOCGEXCL
     {"TIOCGEXCL", TIOCGEXCL},
+#endif
+#ifdef TIOCGPTPEER
     {"TIOCGPTPEER", TIOCGPTPEER},
+#endif
+#ifdef FIONCLEX
     {"FIONCLEX", FIONCLEX},
+#endif
+#ifdef FIOCLEX
     {"FIOCLEX", FIOCLEX},
+#endif
+#ifdef FIOASYNC
     {"FIOASYNC", FIOASYNC},
+#endif
+#ifdef TIOCSERCONFIG
     {"TIOCSERCONFIG", TIOCSERCONFIG},
+#endif
+#ifdef TIOCSERGWILD
     {"TIOCSERGWILD", TIOCSERGWILD},
+#endif
+#ifdef TIOCSERSWILD
     {"TIOCSERSWILD", TIOCSERSWILD},
+#endif
+#ifdef TIOCGLCKTRMIOS
     {"TIOCGLCKTRMIOS", TIOCGLCKTRMIOS},
+#endif
+#ifdef TIOCSLCKTRMIOS
     {"TIOCSLCKTRMIOS", TIOCSLCKTRMIOS},
+#endif
+#ifdef TIOCSERGSTRUCT
     {"TIOCSERGSTRUCT", TIOCSERGSTRUCT},
+#endif
+#ifdef TIOCSERGETLSR
     {"TIOCSERGETLSR", TIOCSERGETLSR},
+#endif
+#ifdef TIOCSERGETMULTI
     {"TIOCSERGETMULTI", TIOCSERGETMULTI},
+#endif
+#ifdef TIOCSERSETMULTI
     {"TIOCSERSETMULTI", TIOCSERSETMULTI},
+#endif
+#ifdef TIOCMIWAIT
     {"TIOCMIWAIT", TIOCMIWAIT},
+#endif
+#ifdef TIOCGICOUNT
     {"TIOCGICOUNT", TIOCGICOUNT},
+#endif
+#ifdef TIOCPKT_DATA
     {"TIOCPKT_DATA", TIOCPKT_DATA},
+#endif
+#ifdef TIOCPKT_FLUSHREAD
     {"TIOCPKT_FLUSHREAD", TIOCPKT_FLUSHREAD},
+#endif
+#ifdef TIOCPKT_FLUSHWRITE
     {"TIOCPKT_FLUSHWRITE", TIOCPKT_FLUSHWRITE},
+#endif
+#ifdef TIOCPKT_STOP
     {"TIOCPKT_STOP", TIOCPKT_STOP},
+#endif
+#ifdef TIOCPKT_START
     {"TIOCPKT_START", TIOCPKT_START},
+#endif
+#ifdef TIOCPKT_NOSTOP
     {"TIOCPKT_NOSTOP", TIOCPKT_NOSTOP},
+#endif
+#ifdef TIOCPKT_DOSTOP
     {"TIOCPKT_DOSTOP", TIOCPKT_DOSTOP},
+#endif
+#ifdef TIOCPKT_IOCTL
     {"TIOCPKT_IOCTL", TIOCPKT_IOCTL},
+#endif
+#ifdef TIOCSER_TEMT
     {"TIOCSER_TEMT", TIOCSER_TEMT},
+#endif
 };
