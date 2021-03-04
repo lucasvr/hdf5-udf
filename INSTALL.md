@@ -84,22 +84,39 @@ Also, make sure that you install both regular and development packages.
 
 ## Building the code
 
-Simply run `make` followed by `make install`, optionally providing an alternative
-destination directory other than `/usr/local`:
+We use the [Meson](https://mesonbuild.com) build system to manage compilation
+options, dependency tracking, and installation of the compiled package. Please
+follow these steps below to build and install HDF5-UDF.
+
+### Configuration
+
+Assuming an empty or non-existent `build` directory, type:
 
 ```
-$ make
-$ make install DESTDIR=/installation/path
+$ meson -Dwith-python=true -Dwith-lua=true -Dwith-cpp=true . build
 ```
 
-In order to use an alternative compiler, please set the `CXX` variable to the
-path to that executable (e.g., `CXX=clang++`).
+At least one of `-Dwith-python=true`, `-Dwith-lua=true`, or `-Dwith-cpp=true` options
+must be set. It's still possible to build HDF5-UDF without any of these backends, but
+that would be a useless outcome!
 
-By default, `make` will attempt to build all backends and to compile the HDF5
-filter with support for system call filtering. It is possible to disable
-features by providing the following arguments to `make`:
+Support for sandboxing is strongly encouraged to be set, so it's enabled by default.
+If you are conducting local tests and do not plan on reading datasets provided by
+third-party, then it's possible to disable it with `-Dwith-sandbox=false`.
 
-- `OPT_SANDBOX=0`: disable support for system call filtering
-- `OPT_PYTHON=0`: disable Python backend
-- `OPT_LUA=0`: disable Lua/LuaJIT backend
-- `OPT_CPP=0`: disable C/C++ backend
+The installation prefix defaults to `/usr/local`, with the HDF5 I/O filter plugin
+installed under `/usr/local/hdf5/lib/plugin`. The prefix can be changed by adding
+`--prefix=/path/to/prefix` to the command line options. The plugin path can be set
+with `--libexecdir=subdirectory/of/prefix`.
+
+In order to use an alternative compiler, please set the `CXX` environment variable
+so it points to that executable (e.g., `CXX=clang++`).
+
+### Building
+
+Simply run `ninja -C build` to compile the source code with the previously configured
+options.
+
+### Installing
+
+Run `ninja -C build install` to effectively install HDF5-UDF on your filesystem.

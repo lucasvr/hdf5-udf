@@ -1,0 +1,14 @@
+#!/bin/bash
+
+IOFILTER_LIB="$1"
+SANDBOX_LIB="$2"
+SECTION_NAME=".hdf5-udf-sandbox"
+
+cd "$MESON_BUILD_ROOT"
+if ! readelf --sections "$IOFILTER_LIB" | grep -q "$SECTION_NAME"
+then
+    objcopy \
+    --add-section "${SECTION_NAME}=${SANDBOX_LIB}" \
+    --set-section-flags "${SECTION_NAME}=noload,readonly" \
+    "$IOFILTER_LIB"
+fi

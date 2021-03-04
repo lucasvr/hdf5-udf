@@ -331,9 +331,9 @@ std::string template_path(std::string backend_extension, std::string argv0)
     }
     *(sep) = '\0';
 
-    /* Look for the file under $(dirname argv0) */
+    /* Look for the file under $(dirname argv0)/../src */
     struct stat statbuf;
-    int n = snprintf(tmp, sizeof(tmp)-1, "%s/udf_template%s",
+    int n = snprintf(tmp, sizeof(tmp)-1, "%s/../src/udf_template%s",
         dirname_argv0, backend_extension.c_str());
     if (static_cast<size_t>(n) >= sizeof(tmp)-1)
     {
