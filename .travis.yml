@@ -13,7 +13,8 @@ before_install:
 - sudo pip3 install cffi
 
 script:
-- make CXX=clang++
+- CXX=clang++ meson -Dwith-python=true -Dwith-cpp=true -Dwith-lua=true . build
+- ninja -C build
 - pushd test; ./run_tests.sh || travis_terminate 1; popd
 
 env:
