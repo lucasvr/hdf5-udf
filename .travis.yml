@@ -7,7 +7,7 @@ before_install:
 - sudo apt install -y wget gnupg
 - echo "deb https://lucasvr.gobolinux.org/debian/repo/ /" | sudo tee -a /etc/apt/sources.list
 - wget -q -O - https://lucasvr.gobolinux.org/debian/repo/KEY.gpg | sudo apt-key add -
-- sudo add-apt-repository ppa:deadsnakes/ppa
+- sudo add-apt-repository ppa:deadsnakes/ppa -y
 - sudo apt-get -qq update
 - sudo apt install -y python3.9 python3-pip python3-setuptools python3-wheel
 - sudo apt install -y libsyscall-intercept0 libsyscall-intercept-dev luajit libluajit-5.1-dev libseccomp-dev libsodium-dev libhdf5-dev hdf5-tools numdiff
