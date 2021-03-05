@@ -11,6 +11,7 @@ project('HDF5-UDF', ['c', 'cpp'],
     'prefix=/usr/local',
     'libexecdir=hdf5/lib/plugin'])
 
+meson_too_old = meson.version().version_compare('<0.31.0')
 sources = ['src/backend.cpp', 'src/dataset.cpp']
 sandbox_deps = []
 deps = []
@@ -19,8 +20,13 @@ deps = []
 # Required dependencies
 ########################
 
+if meson_too_old
+  deps += [find_library('dl', required: true)]
+else
+  deps += [meson.get_compiler('cpp').find_library('dl', required: true)]
+endif
+
 deps += [
-  meson.get_compiler('cpp').find_library('dl', required: true),
   dependency('hdf5', language: 'c', required: true),
   dependency('libsodium', required: true)
 ]
@@ -40,7 +46,11 @@ endif
 
 if get_option('with-cpp')
   sources += ['src/cpp_backend.cpp', 'src/miniz.cpp']
-  deps += [meson.get_compiler('cpp').find_library('m', required: true)]
+  if meson_too_old
+    deps += [find_library('m', required: true)]
+  else
+    deps += [meson.get_compiler('cpp').find_library('m', required: true)]
+  endif
   add_global_arguments('-DENABLE_CPP', language: 'cpp')
 endif
 
