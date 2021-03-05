@@ -90,9 +90,11 @@ follow these steps below to build and install HDF5-UDF.
 
 ### Configuration
 
-Assuming an empty or non-existent `build` directory, type:
+Meson uses a dedicated build directory. We create one named `build` and
+proceed with the configuration using these commands:
 
 ```
+$ mkdir -p build
 $ meson -Dwith-python=true -Dwith-lua=true -Dwith-cpp=true . build
 ```
 
