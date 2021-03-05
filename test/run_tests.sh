@@ -121,8 +121,8 @@ function Run_Test() {
 }
 
 # Operation
-export HDF5_PLUGIN_PATH=../src
-export PATH=../src:$PATH
+export HDF5_PLUGIN_PATH=../build
+export PATH=../build:$PATH
 RESULT_STDOUT=stdout.txt
 RESULT_H5DUMP=h5dump.txt
 
