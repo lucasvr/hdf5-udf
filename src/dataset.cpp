@@ -146,7 +146,7 @@ std::vector<CompoundMember> getCompoundMembers(hid_t hdf5_datatype)
         if (datatype_name == NULL)
         {
             fprintf(stderr, "Unsupported HDF5 datatype %#lx of compound member '%s'\n",
-                type, name);
+                static_cast<unsigned long>(type), name);
             H5free_memory(name);
             return std::vector<CompoundMember>();
         }
@@ -162,8 +162,9 @@ std::vector<CompoundMember> getCompoundMembers(hid_t hdf5_datatype)
         CompoundMember member = {
             .name = name,
             .type = decl_datatype,
-            .offset = off,
-            .size = size,
+            .usertype = datatype_name,
+            .offset = static_cast<ssize_t>(off),
+            .size = static_cast<ssize_t>(size),
             .is_char_array = hclass == H5T_STRING && is_varstring == false,
         };
         members.push_back(member);
@@ -262,8 +263,9 @@ CompoundMember DatasetInfo::getStringDeclaration(bool is_varstring, size_t size)
     CompoundMember member = {
         .name = name,
         .type = is_varstring ? "char*" : "char",
+        .usertype = "char",
         .offset = 0,
-        .size = size,
+        .size = static_cast<ssize_t>(size),
         .is_char_array = is_varstring == false,
     };
     return member;

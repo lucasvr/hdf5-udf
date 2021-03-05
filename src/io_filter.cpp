@@ -241,7 +241,10 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         auto output_name = jas["output_dataset"].get<std::string>();
         auto backend_name = jas["backend"].get<std::string>();
         if (jas.contains("source_code"))
+        {
+            // Not currently used, but this is how we'd retrieve it
             auto source_code = jas["source_code"].get<std::string>();
+        }
 
         json rules;
         Blob *blob = NULL;
@@ -345,7 +348,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
             if (H5Tset_size(output_dataset.hdf5_datatype, output_dataset_size) < 0)
             {
                 fprintf(stderr, "Failed to set dataset %#lx size\n",
-                    output_dataset.hdf5_datatype);
+                    static_cast<unsigned long>(output_dataset.hdf5_datatype));
                 if (handle_from_procfs)
                     H5Fclose(file_id);
                 delete blob;

@@ -282,7 +282,7 @@ hid_t open_dataset(hid_t file_id, std::string path, bool print_errors)
     if (group_id >= 0)
     {
         auto index = path.find_last_of("/");
-        auto dataset_name = index >= 0 ? path.substr(index+1) : path;
+        auto dataset_name = index != path.npos ? path.substr(index+1) : path;
         dset_id = H5Dopen(group_id, dataset_name.c_str(), H5P_DEFAULT);
         if (dset_id < 0 && print_errors)
             fprintf(stderr, "Error opening dataset %s\n", path.c_str());
@@ -305,7 +305,7 @@ bool dataset_exists(std::string filename, std::string name)
     if (group_id >= 0)
     {
         auto index = name.find_last_of("/");
-        auto dataset_name = index >= 0 ? name.substr(index+1) : name;
+        auto dataset_name = index != name.npos ? name.substr(index+1) : name;
         exists = H5Lexists(group_id, name.c_str(), H5P_DEFAULT);
         H5Gclose(group_id);
     }
@@ -511,7 +511,8 @@ int main(int argc, char **argv)
             auto datatype_name = getDatatypeName(hdf5_datatype);
             if (datatype_name == NULL)
             {
-                fprintf(stderr, "Unsupported HDF5 datatype %#lx\n", hdf5_datatype);
+                fprintf(stderr, "Unsupported HDF5 datatype %#lx\n",
+                    static_cast<unsigned long>(hdf5_datatype));
                 exit(1);
             }
 
@@ -604,7 +605,8 @@ int main(int argc, char **argv)
             }
             if (H5Tset_size(info.hdf5_datatype, string_size) < 0)
             {
-                fprintf(stderr, "Failed to set dataset %#lx to variable size\n", info.hdf5_datatype);
+                fprintf(stderr, "Failed to set dataset %#lx to variable size\n",
+                    static_cast<unsigned long>(info.hdf5_datatype));
                 exit(1);
             }
 

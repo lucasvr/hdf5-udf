@@ -135,7 +135,7 @@ std::string Backend::sanitizedName(std::string name)
         }
 
     // Remove unwanted tokens from the end of the string
-    for (size_t i=name.size()-1; i>=0; --i)
+    for (ssize_t i=name.size()-1; i>=0; --i)
     {
         if (name[i] != '_')
             break;

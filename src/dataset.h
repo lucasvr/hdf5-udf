@@ -21,8 +21,8 @@ struct CompoundMember {
     std::string name;      // ex: identifier
     std::string type;      // ex: uint8_t
     std::string usertype;  // ex: uint8
-    size_t offset;
-    size_t size;
+    ssize_t offset;
+    ssize_t size;
     bool is_char_array;
 };
 
