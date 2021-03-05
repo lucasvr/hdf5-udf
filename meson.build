@@ -4,6 +4,7 @@
 
 project('HDF5-UDF', ['c', 'cpp'],
   version: '1.2',
+  meson_version: '>= 0.40.1',
   default_options: [
     'warning_level=1',
     'cpp_std=c++14',
@@ -11,7 +12,6 @@ project('HDF5-UDF', ['c', 'cpp'],
     'prefix=/usr/local',
     'libexecdir=hdf5/lib/plugin'])
 
-meson_too_old = meson.version().version_compare('<0.31.0')
 sources = ['src/backend.cpp', 'src/dataset.cpp']
 sandbox_deps = []
 deps = []
@@ -20,13 +20,8 @@ deps = []
 # Required dependencies
 ########################
 
-if meson_too_old
-  deps += [find_library('dl', required: true)]
-else
-  deps += [meson.get_compiler('cpp').find_library('dl', required: true)]
-endif
-
 deps += [
+  meson.get_compiler('cpp').find_library('dl', required: true),
   dependency('hdf5', language: 'c', required: true),
   dependency('libsodium', required: true)
 ]
@@ -46,11 +41,7 @@ endif
 
 if get_option('with-cpp')
   sources += ['src/cpp_backend.cpp', 'src/miniz.cpp']
-  if meson_too_old
-    deps += [find_library('m', required: true)]
-  else
-    deps += [meson.get_compiler('cpp').find_library('m', required: true)]
-  endif
+  deps += [meson.get_compiler('cpp').find_library('m', required: true)]
   add_global_arguments('-DENABLE_CPP', language: 'cpp')
 endif
 
@@ -125,6 +116,6 @@ endif
 # Install UDF templates
 ########################
 
-install_data('src/udf_template.cpp', install_dir: get_option('datadir')/'hdf5-udf')
-install_data('src/udf_template.lua', install_dir: get_option('datadir')/'hdf5-udf')
-install_data('src/udf_template.py', install_dir: get_option('datadir')/'hdf5-udf')
+install_data('src/udf_template.cpp', install_dir: get_option('datadir')+'/hdf5-udf')
+install_data('src/udf_template.lua', install_dir: get_option('datadir')+'/hdf5-udf')
+install_data('src/udf_template.py', install_dir: get_option('datadir')+'/hdf5-udf')
