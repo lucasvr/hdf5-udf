@@ -59,12 +59,14 @@ if get_option('with-sandbox')
   add_global_arguments('-DENABLE_SANDBOX', language: 'cpp')
 endif
 
-summary({
-  'Python support': get_option('with-python'),
-  'C/C++ support': get_option('with-cpp'),
-  'Lua support': get_option('with-lua'),
-  'Sandbox support': get_option('with-sandbox'),
-}, section: 'Configuration')
+message('\n' +
+'\n  HDF5-UDF: User-Defined Functions for HDF5\n' +
+'\n  Configuration' +
+'\n    Python support : ' + get_option('with-python').to_string() +
+'\n    C/C++ support  : ' + get_option('with-cpp').to_string() +
+'\n    Lua support    : ' + get_option('with-lua').to_string() +
+'\n    Sandbox support: ' + get_option('with-sandbox').to_string() +
+'\n')
 
 ######################
 # Output main program
