@@ -34,6 +34,7 @@ struct Blob {
     unsigned long long size;
     std::string public_key_base64;
     std::string public_key_path;
+    json metadata;
 };
 
 class SignatureHandler {
@@ -75,7 +76,11 @@ private:
     bool savePublicKey(uint8_t *public_key, std::string path, bool overwrite=false);
 
     // Save secret key to disk
-    bool savePrivateKey(uint8_t *secret_key, std::string path);
+    bool savePrivateKey(
+        uint8_t *secret_key,
+        std::string path,
+        std::string meta_path,
+        json &metadata);
 
     // Validate JSON file previously serialized by getProfileRules().
     bool validateProfileRules(std::string rulefile, json &rules);

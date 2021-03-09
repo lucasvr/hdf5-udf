@@ -770,7 +770,8 @@ int main(int argc, char **argv)
 
         /* Sign datasets and UDF */
         SignatureHandler signature;
-        auto blob = signature.signPayload((const uint8_t *) &bytecode[0], bytecode.length());
+        auto blob = signature.signPayload(
+            (const uint8_t *) &bytecode[0], bytecode.length());
         if (blob == NULL)
         {
             fprintf(stderr, "Failed to sign UDF\n");
@@ -789,7 +790,9 @@ int main(int argc, char **argv)
         jas["source_code"] = flag_sourcecode ? source_code : "";
         jas["api_version"] = 2;
         jas["signature"] = {
-            {"public_key", blob->public_key_base64 }
+            {"public_key", blob->public_key_base64},
+            {"user", blob->metadata["user"]},
+            {"email", blob->metadata["email"]}
         };
 
         std::string jas_str = jas.dump();
