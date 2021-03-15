@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # High-level regression test suite for HDF5-UDF.
 
