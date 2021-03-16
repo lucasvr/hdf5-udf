@@ -14,8 +14,8 @@
 function dynamic_dataset()
     local ds1_data = lib.getData("Dataset1")
     local ds2_data = lib.getData("Dataset2")
-    local udf_data = lib.getData("VirtualDataset")
-    local udf_dims = lib.getDims("VirtualDataset")
+    local udf_data = lib.getData("UserDefinedDataset")
+    local udf_dims = lib.getDims("UserDefinedDataset")
 
     -- A gentle reminder that indexes in Lua start at 1
     local N = udf_dims[1] * udf_dims[2]

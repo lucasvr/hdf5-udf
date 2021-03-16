@@ -15,8 +15,8 @@
 def dynamic_dataset():
     ds1_data = lib.getData("Dataset1")
     ds2_data = lib.getData("Dataset2")
-    udf_data = lib.getData("VirtualDataset")
-    udf_dims = lib.getDims("VirtualDataset")
+    udf_data = lib.getData("UserDefinedDataset")
+    udf_dims = lib.getDims("UserDefinedDataset")
 
     for i in range(udf_dims[0] * udf_dims[1]):
         udf_data[i] = ds1_data[i] + ds2_data[i]

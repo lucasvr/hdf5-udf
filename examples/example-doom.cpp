@@ -1,5 +1,5 @@
 /*
- * Play Doom through a virtual HDF5 dataset!
+ * Play Doom through a user-defined HDF5 dataset!
  * 
  * This example relies on a modified Doom engine that shares the display
  * over a System V shared memory segment. You can download it from

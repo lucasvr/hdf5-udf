@@ -74,7 +74,7 @@ function Run_Test() {
 
     for backend in "cpp" "py" "lua"
     do
-    Log_Normal "checking ${file_name}.${backend}"
+        Log_Normal "checking ${file_name}.${backend}"
         [ ! -e "${file_name}.${backend}" ] && continue
 
         # Adjust variable and dataset names so they're named after the backend being tested
@@ -136,7 +136,7 @@ cp -a ../examples/example-*.h5 .
 #
 # To allow reuse of HDF5 files, each backend operates on dynamic datasets whose
 # names are suffixed after that backend. For instance, 'test.cpp' will work on a
-# dynamic dataset named 'VirtualDataset.cpp', 'test.lua' on 'VirtualDataset.lua'
+# dynamic dataset named 'UserDefinedDataset.cpp', 'test.lua' on 'UserDefinedDataset.lua'
 # and so on. When adding new entries to the 'tests' array, please omit that suffix;
 # the Run_Test() function will take care of putting it back when it's needed.
 
@@ -159,7 +159,7 @@ Log_Normal "*******************************"
 Log_Normal
 tests=(
     # HDF5 file            UDF file             Dynamic dataset
-    "example-add_datasets  test-multi-datasets  VirtualDataset"
+    "example-add_datasets  test-multi-datasets  UserDefinedDataset"
 )
 for entry in "${tests[@]}"; do Run_Test "$entry"; done
 
@@ -188,7 +188,7 @@ Log_Normal "*** Compound tests ***"
 Log_Normal "**********************"
 Log_Normal
 tests=(
-     HDF5 file                        UDF file                  Dynamic dataset
+    # HDF5 file                        UDF file                  Dynamic dataset
     "example-compound-nostring_simple  test-compound-nostring    Temperature:1000:double"
     "example-compound-nostring_mixed   test-compound-nostring    Temperature:1000:double"
     "example-compound-varstring_simple test-compound-string      Temperature:1000:double"
