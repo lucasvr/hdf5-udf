@@ -180,6 +180,8 @@ DatasetInfo::DatasetInfo(
     std::string in_datatype,
     hid_t in_hdf5_datatype)
     :
+    is_input_dataset(true),
+    needs_overwriting(false),
     name(in_name),
     datatype(in_datatype),
     hdf5_datatype(in_hdf5_datatype),
@@ -246,7 +248,7 @@ const char *DatasetInfo::getCastDatatype() const
 void DatasetInfo::printInfo(std::string dataset_type) const
 {
     printf("%s dataset: %s, resolution=%lld",
-        dataset_type.c_str(), name.c_str(), dimensions[0]);
+        dataset_type.c_str(), name.c_str(), dimensions.size() ? dimensions[0] : -1);
     for (size_t i=1; i<dimensions.size(); ++i)
         printf("x%lld", dimensions[i]);
     size_t size = H5Tget_size(hdf5_datatype);

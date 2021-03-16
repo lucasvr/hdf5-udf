@@ -12,7 +12,7 @@ project('HDF5-UDF', ['c', 'cpp'],
     'prefix=/usr/local',
     'libexecdir=hdf5/lib/plugin'])
 
-sources = ['src/backend.cpp', 'src/dataset.cpp']
+sources = ['src/backend.cpp', 'src/dataset.cpp', 'src/libudf.cpp']
 sandbox_deps = []
 deps = []
 

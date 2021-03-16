@@ -47,6 +47,8 @@ public:
     std::vector<CompoundMember> getCompoundMembers() const;
     CompoundMember getStringDeclaration(bool is_varstring, size_t size) const;
 
+    bool is_input_dataset;           /* True if this is an input dataset */
+    bool needs_overwriting;          /* Overwrite dataset if it already exists? */
     std::string name;                /* Dataset name */
     std::string datatype;            /* Datatype, given as string */
     std::string dimensions_str;      /* Dimensions, given as string */
