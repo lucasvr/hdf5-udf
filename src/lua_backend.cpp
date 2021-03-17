@@ -427,7 +427,7 @@ std::string LuaBackend::compoundToStruct(const DatasetInfo &info, bool hardcoded
     // just a struct pointer.
     std::string cstruct = "#pragma pack(1)\n";
     cstruct += "struct " + sanitizedName(info.name) + "_t {\n";
-    size_t current_offset = 0, pad = 0;
+    ssize_t current_offset = 0, pad = 0;
     for (auto &member: info.members)
     {
         if (member.offset > current_offset)
