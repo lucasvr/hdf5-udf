@@ -39,9 +39,6 @@ bool libudf_set_option(const char *option, const char *value, udf_context *ctx);
 // Add a UDF dataset description to the compilation chain.
 bool libudf_push_dataset(const char *description, udf_context *ctx);
 
-// Scan the HDF5 and UDF files for dependencies.
-bool libudf_scan(udf_context *ctx);
-
 // Compile the given UDF into bytecode/executable form.
 bool libudf_compile(udf_context *ctx);
 

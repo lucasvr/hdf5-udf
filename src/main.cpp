@@ -91,19 +91,23 @@ int main(int argc, char **argv)
     }
     CHECK(hdf5_file.size() && udf_file.size());
 
+    // Initialize the UDF library
     udf_context *ctx;
     CHECK(ctx = libudf_init(hdf5_file.c_str(), udf_file.c_str()));
 
+    // Propagate key/value options to the library
     for (auto &option: options)
         CHECK(libudf_set_option(option.first.c_str(), option.second.c_str(), ctx));
 
+    // Provide the description of all UDF datasets to the library
     for (auto &description: descriptions)
         CHECK(libudf_push_dataset(description.c_str(), ctx));
 
-    // UDF compilation and storage pipeline
-    CHECK(libudf_scan(ctx));
+    // Compile and store the UDF on the target HDF5 file
     CHECK(libudf_compile(ctx));
     CHECK(libudf_store(ctx));
-    
+
+    // Done
+    libudf_destroy(ctx);
     return 0;
 }

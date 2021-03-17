@@ -46,8 +46,10 @@ using json = nlohmann::json;
 } while(0)
 
 #define CHECK_ARG_PTR(arg) do { \
-    if (arg == NULL) \
+    if (arg == NULL) { \
+        fprintf(stderr, "%s: ", __func__); \
         FAIL("NULL argument '" #arg "'"); \
+    } \
 } while(0)
 
 #define EXPORT extern "C"
@@ -86,6 +88,7 @@ typedef struct udf_context {
 // Helper functions
 /////////////////////
 
+static bool libudf_scan(udf_context *ctx);
 static bool libudf_validate_udf_datasets(udf_context *ctx);
 
 static int getUserStringSize(std::string user_type)
@@ -598,7 +601,137 @@ EXPORT bool libudf_push_dataset(const char *description, udf_context *ctx)
     return true;
 }
 
-EXPORT bool libudf_scan(udf_context *ctx)
+EXPORT bool libudf_compile(udf_context *ctx)
+{
+    CHECK_ARG_PTR(ctx);
+
+    if (libudf_scan(ctx) == false)
+        return false;
+
+    std::vector<DatasetInfo> datasets(ctx->input_datasets);
+    datasets.insert(datasets.end(), ctx->udf_datasets.begin(), ctx->udf_datasets.end());
+
+    auto template_file = templatePath(ctx->backend->extension());
+    ctx->bytecode = ctx->backend->compile(
+        ctx->udf_file,
+        template_file,
+        ctx->compound_declarations,
+        ctx->sourcecode,
+        datasets);
+    if (ctx->bytecode.size() == 0)
+        FAIL("failed to compile UDF file");
+
+    return true;
+}
+
+EXPORT bool libudf_store(udf_context *ctx)
+{
+    CHECK_ARG_PTR(ctx);
+    CHECK_ARG_PTR(ctx->backend);
+    bool retval = true;
+
+    // It is possible to write UDFs that define several datasets in a single
+    // file. On the loop below we check which of the output datasets already
+    // exist on the target file. Those that already exist are pushed into the
+    // 'to_delete' vector so we can safely overwrite them.
+    std::vector<std::string> to_delete;
+    for (auto &info: ctx->udf_datasets)
+        if (info.needs_overwriting)
+            to_delete.push_back(info.name);
+
+    HDF5_Handler h5(ctx->hdf5_file);
+    if (h5.openFile(H5F_ACC_RDWR) == false)
+        return false;
+    if (h5.deleteDatasets(to_delete) == false)
+        return false;
+
+    for (auto &info: ctx->udf_datasets)
+    {
+        // Configure the HDF5-UDF filter
+        if (h5.configureFilter(info.dimensions.size(), info.dimensions.data()) == false)
+            return false;
+
+        /// Prepare metadata (JSON payload)
+        std::vector<std::string> input_dataset_names, scratch_dataset_names;
+        std::transform(
+            ctx->input_datasets.begin(),
+            ctx->input_datasets.end(),
+            std::back_inserter(input_dataset_names),
+            [](DatasetInfo &info) -> std::string { return info.name; });
+
+        for (auto &other: ctx->udf_datasets)
+            if (other.name.compare(info.name) != 0)
+                scratch_dataset_names.push_back(other.name);
+
+        // Remove the output string size (if given) from the datatype
+        auto payload_datatype = info.datatype;
+        auto sep = payload_datatype.find("(");
+        if (sep != std::string::npos)
+            payload_datatype = payload_datatype.substr(0, sep);
+
+        // Sign datasets and the UDF
+        SignatureHandler signature;
+        auto blob = signature.signPayload(
+            (const uint8_t *) &ctx->bytecode[0], ctx->bytecode.length());
+        if (blob == NULL)
+            FAIL("failed to sign UDF");
+
+        // JSON payload
+        auto opt = ctx->options.find("save_sourcecode");
+        bool save_sourcecode = opt != ctx->options.end() && opt->second.compare("true") == 0;
+
+        json jas;
+        jas["output_dataset"] = info.name;
+        jas["output_resolution"] = info.dimensions;
+        jas["output_datatype"] = payload_datatype;
+        jas["input_datasets"] = input_dataset_names;
+        jas["scratch_datasets"] = scratch_dataset_names;
+        jas["bytecode_size"] = blob->size;
+        jas["backend"] = ctx->backend->name();
+        jas["source_code"] = save_sourcecode ? ctx->sourcecode : "";
+        jas["api_version"] = 2;
+        jas["signature"] = {
+            {"public_key", blob->public_key_base64},
+            {"user", blob->metadata["user"]},
+            {"email", blob->metadata["email"]}
+        };
+
+        std::string jas_str = jas.dump();
+        size_t payload_size = jas_str.length() + ctx->bytecode.size() + 1;
+        INFO("\n%s dataset header:\n%s\n", info.name.c_str(), jas.dump(4, ' ', false, 45).c_str());
+        if (ctx->compound_declarations.size())
+            INFO("\nData structures available to the UDF:\n%s\n", ctx->compound_declarations.c_str());
+
+        // Sanity check: the JSON and the bytecode must fit in the dataset
+        hsize_t grid_size = std::accumulate(std::begin(info.dimensions), std::end(info.dimensions), 1, std::multiplies<hsize_t>());
+        if (payload_size > (grid_size * H5Tget_size(info.hdf5_datatype)))
+            FAIL("len(JSON+bytecode) > UDF dataset dimensions");
+
+        // Prepare payload data
+        char *payload = (char *) calloc(grid_size, H5Tget_size(info.hdf5_datatype));
+        char *p = payload;
+        memcpy(p, &jas_str[0], jas_str.length());
+        p += jas_str.length();
+        *p = '\0';
+        memcpy(&p[1], blob->data, blob->size);
+
+        // Create UDF dataset
+        retval = h5.createUserDefinedDataset(info.name, info.hdf5_datatype, payload);
+
+        // Close and release resources
+        free(payload);
+        delete blob;
+    }
+
+    return retval;
+}
+
+
+///////////////////////////////////////////////////////
+// Private functions previously exposed as public API
+///////////////////////////////////////////////////////
+
+static bool libudf_scan(udf_context *ctx)
 {
     CHECK_ARG_PTR(ctx);
 
@@ -751,127 +884,4 @@ static bool libudf_validate_udf_datasets(udf_context *ctx)
     }
 
     return true;
-}
-
-EXPORT bool libudf_compile(udf_context *ctx)
-{
-    CHECK_ARG_PTR(ctx);
-    CHECK_ARG_PTR(ctx->backend);
-
-    std::vector<DatasetInfo> datasets(ctx->input_datasets);
-    datasets.insert(datasets.end(), ctx->udf_datasets.begin(), ctx->udf_datasets.end());
-
-    auto template_file = templatePath(ctx->backend->extension());
-    ctx->bytecode = ctx->backend->compile(
-        ctx->udf_file,
-        template_file,
-        ctx->compound_declarations,
-        ctx->sourcecode,
-        datasets);
-    if (ctx->bytecode.size() == 0)
-        FAIL("failed to compile UDF file");
-
-    return true;
-}
-
-EXPORT bool libudf_store(udf_context *ctx)
-{
-    CHECK_ARG_PTR(ctx);
-    CHECK_ARG_PTR(ctx->backend);
-    bool retval = true;
-
-    // It is possible to write UDFs that define several datasets in a single
-    // file. On the loop below we check which of the output datasets already
-    // exist on the target file. Those that already exist are pushed into the
-    // 'to_delete' vector so we can safely overwrite them.
-    std::vector<std::string> to_delete;
-    for (auto &info: ctx->udf_datasets)
-        if (info.needs_overwriting)
-            to_delete.push_back(info.name);
-
-    HDF5_Handler h5(ctx->hdf5_file);
-    if (h5.openFile(H5F_ACC_RDWR) == false)
-        return false;
-    if (h5.deleteDatasets(to_delete) == false)
-        return false;
-
-    for (auto &info: ctx->udf_datasets)
-    {
-        // Configure the HDF5-UDF filter
-        if (h5.configureFilter(info.dimensions.size(), info.dimensions.data()) == false)
-            return false;
-
-        /// Prepare metadata (JSON payload)
-        std::vector<std::string> input_dataset_names, scratch_dataset_names;
-        std::transform(
-            ctx->input_datasets.begin(),
-            ctx->input_datasets.end(),
-            std::back_inserter(input_dataset_names),
-            [](DatasetInfo &info) -> std::string { return info.name; });
-
-        for (auto &other: ctx->udf_datasets)
-            if (other.name.compare(info.name) != 0)
-                scratch_dataset_names.push_back(other.name);
-
-        // Remove the output string size (if given) from the datatype
-        auto payload_datatype = info.datatype;
-        auto sep = payload_datatype.find("(");
-        if (sep != std::string::npos)
-            payload_datatype = payload_datatype.substr(0, sep);
-
-        // Sign datasets and the UDF
-        SignatureHandler signature;
-        auto blob = signature.signPayload(
-            (const uint8_t *) &ctx->bytecode[0], ctx->bytecode.length());
-        if (blob == NULL)
-            FAIL("failed to sign UDF");
-
-        // JSON payload
-        auto opt = ctx->options.find("save_sourcecode");
-        bool save_sourcecode = opt != ctx->options.end() && opt->second.compare("true") == 0;
-
-        json jas;
-        jas["output_dataset"] = info.name;
-        jas["output_resolution"] = info.dimensions;
-        jas["output_datatype"] = payload_datatype;
-        jas["input_datasets"] = input_dataset_names;
-        jas["scratch_datasets"] = scratch_dataset_names;
-        jas["bytecode_size"] = blob->size;
-        jas["backend"] = ctx->backend->name();
-        jas["source_code"] = save_sourcecode ? ctx->sourcecode : "";
-        jas["api_version"] = 2;
-        jas["signature"] = {
-            {"public_key", blob->public_key_base64},
-            {"user", blob->metadata["user"]},
-            {"email", blob->metadata["email"]}
-        };
-
-        std::string jas_str = jas.dump();
-        size_t payload_size = jas_str.length() + ctx->bytecode.size() + 1;
-        INFO("\n%s dataset header:\n%s\n", info.name.c_str(), jas.dump(4, ' ', false, 45).c_str());
-        if (ctx->compound_declarations.size())
-            INFO("\nData structures available to the UDF:\n%s\n", ctx->compound_declarations.c_str());
-
-        // Sanity check: the JSON and the bytecode must fit in the dataset
-        hsize_t grid_size = std::accumulate(std::begin(info.dimensions), std::end(info.dimensions), 1, std::multiplies<hsize_t>());
-        if (payload_size > (grid_size * H5Tget_size(info.hdf5_datatype)))
-            FAIL("len(JSON+bytecode) > UDF dataset dimensions");
-
-        // Prepare payload data
-        char *payload = (char *) calloc(grid_size, H5Tget_size(info.hdf5_datatype));
-        char *p = payload;
-        memcpy(p, &jas_str[0], jas_str.length());
-        p += jas_str.length();
-        *p = '\0';
-        memcpy(&p[1], blob->data, blob->size);
-
-        // Create UDF dataset
-        retval = h5.createUserDefinedDataset(info.name, info.hdf5_datatype, payload);
-
-        // Close and release resources
-        free(payload);
-        delete blob;
-    }
-
-    return retval;
 }
