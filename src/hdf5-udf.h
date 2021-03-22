@@ -1,12 +1,12 @@
 /*
  * HDF5-UDF: User-Defined Functions for HDF5
  *
- * File: libudf.h
+ * File: hdf5-udf.h
  *
  * Public C/C++ API
  */
-#ifndef __libudf_h
-#define __libudf_h
+#ifndef __hdf5_udf_h
+#define __hdf5_udf_h
 
 extern "C" {
 

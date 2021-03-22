@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 #include <map>
-#include "libudf.h"
+#include "hdf5-udf.h"
 
 #define CHECK(ops) do { \
     if (! (ops)) \

@@ -12,7 +12,12 @@ project('HDF5-UDF', ['c', 'cpp'],
     'prefix=/usr/local',
     'libexecdir=hdf5/lib/plugin'])
 
-sources = ['src/backend.cpp', 'src/dataset.cpp', 'src/libudf.cpp']
+sources = [
+  'src/backend.cpp',
+  'src/dataset.cpp',
+  'src/libudf.cpp',
+  'src/user_profile.cpp'
+]
 sandbox_deps = []
 deps = []
 
@@ -70,12 +75,25 @@ message('\n' +
 '\n')
 
 ######################
+# Output main library
+######################
+
+hdf5_udf_lib = library(
+  'hdf5-udf',
+  sources,
+  version: '2.0',
+  soversion: '0',
+  dependencies: deps,
+  install: true)
+
+######################
 # Output main program
 ######################
 
 executable(
   'hdf5-udf',
-  sources + ['src/main.cpp', 'src/user_profile.cpp'],
+  ['src/main.cpp'],
+  link_with: hdf5_udf_lib,
   dependencies: deps,
   install: true)
 
@@ -84,8 +102,9 @@ executable(
 #########################
 
 iofilter_lib = library(
-  'hdf5-udf',
-  sources + ['src/io_filter.cpp', 'src/user_profile.cpp'],
+  'hdf5-udf-iofilter',
+  ['src/io_filter.cpp'],
+  link_with: hdf5_udf_lib,
   dependencies: deps,
   install_dir: get_option('libexecdir'),
   install: true)
@@ -111,6 +130,13 @@ if get_option('with-sandbox')
     ],
     build_by_default: true)
 endif
+
+##################
+# Install headers
+##################
+install_headers(
+  'src/hdf5-udf.h'
+)
 
 ########################
 # Install UDF templates
