@@ -66,7 +66,7 @@ std::string getFilterPath()
     }
     for (auto &path: paths) {
         struct stat statbuf;
-        auto p = path + "/libhdf5-udf.so";
+        auto p = path + "/libhdf5-udf-iofilter.so";
         if (stat(p.c_str(), &statbuf) == 0)
             return p;
     }
