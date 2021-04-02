@@ -206,16 +206,82 @@ std::string PythonBackend::compile(
     return "";
 }
 
-/* Helper function: deinitializes the Python interpreter */
-static void teardown(std::vector<PyObject *> decref, void *libpython)
-{
-    for (auto mod = decref.rbegin(); mod != decref.rend(); ++mod)
-        Py_XDECREF(*mod);
-    Py_Finalize();
-    if (libpython)
-        dlclose(libpython);
-    dataset_info.clear();
-}
+/* Helper class: manage Python interpreter lifecycle */
+struct PythonInterpreter {
+    PythonInterpreter() :
+        libpython(NULL),
+        nested_session(false),
+        interpreter(NULL),
+        my_state(NULL)
+    {
+    }
+
+    bool init() {
+        // We currently depend on Python 3
+        if (PY_MAJOR_VERSION != 3)
+        {
+            fprintf(stderr, "Error: Python3 is required\n");
+            return false;
+        }
+
+        nested_session = Py_IsInitialized();
+        if (nested_session)
+        {
+            // Create a new thread state object and make it current
+            interpreter = PyInterpreterState_Main();
+            my_state = PyThreadState_New(interpreter);
+            PyEval_AcquireThread(my_state);
+        }
+        else
+        {
+            // Initialize the interpreter
+            Py_InitializeEx(0);
+
+            // Workaround for CFFI import errors due to missing symbols. We force libpython
+            // to be loaded and for all symbols to be resolved by dlopen()
+            void *libpython = dlopen("libpython3.so", RTLD_NOW | RTLD_GLOBAL);
+            if (! libpython)
+            {
+                char libname[64];
+                snprintf(libname, sizeof(libname)-1, "libpython3.%d.so", PY_MINOR_VERSION);
+                libpython = dlopen(libname, RTLD_NOW | RTLD_GLOBAL);
+                if (! libpython)
+                    fprintf(stderr, "Warning: could not load %s\n", libname);
+            }
+        }
+        return true;
+    }
+
+    ~PythonInterpreter() {
+        PyErr_Clear();
+        for (auto mod = decref.rbegin(); mod != decref.rend(); ++mod)
+            Py_XDECREF(*mod);
+        if (nested_session)
+        {
+            PyEval_ReleaseThread(my_state);
+            PyThreadState_Clear(my_state);
+            PyThreadState_Delete(my_state);
+        }
+        else
+            Py_Finalize();
+        if (libpython)
+            dlclose(libpython);
+        dataset_info.clear();
+    }
+
+    // dlopen handle
+    void *libpython;
+
+    // Have we been invoked from an existing Python session?
+    bool nested_session;
+
+    // List of objects we have to Py_DECREF() on exit
+    std::vector<PyObject *> decref;
+
+    // Python thread state
+    PyInterpreterState *interpreter;
+    PyThreadState *my_state;
+};
 
 /* Execute the user-defined-function embedded in the given buffer */
 bool PythonBackend::run(
@@ -252,30 +318,10 @@ bool PythonBackend::run(
     dataset_info.insert(
         dataset_info.end(), input_datasets.begin(), input_datasets.end());
 
-    // List of objects we have to Py_DECREF() on exit
-    std::vector<PyObject *> decref;
-
-    // We currently depend on Python 3
-    if (PY_MAJOR_VERSION != 3)
-    {
-        fprintf(stderr, "Error: Python3 is required\n");
+    // Init Python interpreter if needed
+    PythonInterpreter python;
+    if (python.init() == false)
         return false;
-    }
-
-    // Workaround for CFFI import errors due to missing symbols. We force libpython
-    // to be loaded and for all symbols to be resolved by dlopen()
-    void *libpython = dlopen("libpython3.so", RTLD_NOW | RTLD_GLOBAL);
-    if (! libpython)
-    {
-        char libname[64];
-        snprintf(libname, sizeof(libname)-1, "libpython3.%d.so", PY_MINOR_VERSION);
-        libpython = dlopen(libname, RTLD_NOW | RTLD_GLOBAL);
-        if (! libpython)
-            fprintf(stderr, "Warning: could not load %s\n", libname);
-    }
-
-    // Init Python interpreter
-    Py_Initialize();
 
     // The offset to the actual bytecode may change across Python versions.
     // Please look under $python_sources/Lib/importlib/_bootstrap_external.py
@@ -305,34 +351,30 @@ bool PythonBackend::run(
         PyObject *err = PyErr_Occurred();
         if (err)
             PyErr_Print();
-        PyErr_Clear();
-        teardown(decref, libpython);
         return false;
     }
-    decref.push_back(obj);
+    python.decref.push_back(obj);
 
     PyObject *module = PyImport_ExecCodeModule("udf_module", obj);
     if (! module)
     {
         fprintf(stderr, "Failed to import code object\n");
         PyErr_Print();
-        teardown(decref, libpython);
         return false;
     }
-    decref.push_back(module);
+    python.decref.push_back(module);
 
     // Load essential modules prior to the launch of the user-defined-function
     // so we can keep strict sandbox rules for third-party code.
     PyObject *module_name = PyUnicode_FromString("cffi");
-    decref.push_back(module_name);
+    python.decref.push_back(module_name);
     PyObject *cffi_module = PyImport_Import(module_name);
     if (! cffi_module)
     {
         fprintf(stderr, "Failed to import the cffi module\n");
-        teardown(decref, libpython);
         return false;
     }
-    decref.push_back(cffi_module);
+    python.decref.push_back(cffi_module);
 
     // From the documentation: unlike other functions that steal references,
     // PyModule_AddObject() only decrements the reference count of value on success
@@ -340,7 +382,6 @@ bool PythonBackend::run(
     if (PyModule_AddObject(module, "cffi", cffi_module) < 0)
     {
         Py_DECREF(cffi_module);
-        teardown(decref, libpython);
         return false;
     }
 
@@ -348,17 +389,16 @@ bool PythonBackend::run(
     PyObject *cffi_dict = PyModule_GetDict(cffi_module);
     PyObject *ffi = cffi_dict ? PyDict_GetItemString(cffi_dict, "FFI") : NULL;
     PyObject *ffi_instance = ffi ? PyObject_CallObject(ffi, NULL) : NULL;
-    decref.push_back(ffi_instance);
+    python.decref.push_back(ffi_instance);
 
     // Get a reference to cffi.FFI().dlopen()
     PyObject *ffi_dlopen = ffi_instance ? PyObject_GetAttrString(ffi_instance, "dlopen") : NULL;
     if (! ffi_dlopen)
     {
         fprintf(stderr, "Failed to retrieve method cffi.FFI().dlopen()\n");
-        teardown(decref, libpython);
         return false;
     }
-    decref.push_back(ffi_dlopen);
+    python.decref.push_back(ffi_dlopen);
 
     // Get handles for lib.load() and for the dynamic_dataset() UDF entry point
     bool retval = false;
@@ -379,7 +419,6 @@ bool PythonBackend::run(
         if (PyObject_SetAttrString(lib, "ffi", ffi_instance) < 0)
         {
             fprintf(stderr, "Failed to initialize lib.ffi\n");
-            teardown(decref, libpython);
             return false;
         }
 
@@ -388,14 +427,13 @@ bool PythonBackend::run(
         PyObject *pypath = Py_BuildValue("s", filterpath.c_str());
         PyTuple_SetItem(pyargs, 0, pypath);
         PyObject *dlopen_ret = PyObject_CallObject(ffi_dlopen, pyargs);
-        decref.push_back(pyargs);
+        python.decref.push_back(pyargs);
         if (dlopen_ret)
         {
-            decref.push_back(dlopen_ret);
+            python.decref.push_back(dlopen_ret);
             if (PyObject_SetAttrString(lib, "filterlib", dlopen_ret) < 0)
             {
                 fprintf(stderr, "Failed to initialize lib.ffi\n");
-                teardown(decref, libpython);
                 return false;
             }
         }
@@ -409,7 +447,6 @@ bool PythonBackend::run(
         }
     }
 
-    teardown(decref, libpython);
     return retval;
 }
 
