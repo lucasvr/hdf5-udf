@@ -19,7 +19,7 @@ using json = nlohmann::json;
 
 struct AssembleData {
     std::string udf_file;                 // UDF file
-    std::string template_file;            // backend-specific template file
+    std::string template_string;          // backend-specific template string
 
     std::string compound_placeholder;     // placeholder string in template file
     std::string compound_decl;            // declaration of auto-generated C structures
@@ -50,7 +50,6 @@ public:
     // Compile an input file into executable form
     virtual std::string compile(
         std::string udf_file,
-        std::string template_file,
         std::string compound_declarations,
         std::string &source_code,
         std::vector<DatasetInfo> &datasets) {
@@ -81,10 +80,15 @@ public:
         return std::string("");
     }
 
-    // Helper function: combine the UDF template file and the user-defined-function
-    // file into one, saving the result to a temporary file on disk that ends on the
-    // on the provided extension. The user-defined-function is injected in the template
-    // file right where the placeholder string is found.
+    // Return the template string for this backend
+    virtual std::string templateString() {
+        return std::string("");
+    }
+
+    // Helper function: combine the UDF template string and the user-defined-function,
+    // saving the result to a temporary file on disk that ends on the on the provided
+    // extension. The user-defined-function is injected in the template string right
+    // where the placeholder string is placed.
     std::string assembleUDF(const AssembleData &data);
 
     // Helper function: save a data blob to a temporary file on disk whose name ends

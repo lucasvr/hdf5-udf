@@ -18,6 +18,7 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include "udf_template_lua.h"
 #include "lua_backend.h"
 #include "anon_mmap.h"
 #include "dataset.h"
@@ -55,7 +56,7 @@ extern "C" int index_of(const char *element)
     return -1;
 }
 
-/* Functions exported to the Lua template library (udf_template.lua) */
+/* Functions exported to the Lua template library */
 extern "C" void *luaGetData(const char *element)
 {
     int index = index_of(element);
@@ -146,14 +147,13 @@ std::string LuaBackend::extension()
 /* Compile Lua to bytecode using LuaJIT. Returns the bytecode as a string. */
 std::string LuaBackend::compile(
     std::string udf_file,
-    std::string template_file,
     std::string compound_declarations,
     std::string &source_code,
     std::vector<DatasetInfo> &datasets)
 {
     AssembleData data = {
         .udf_file                 = udf_file,
-        .template_file            = template_file,
+        .template_string          = std::string((char *) udf_template_lua),
         .compound_placeholder     = "// compound_declarations_placeholder",
         .compound_decl            = compound_declarations,
         .methods_decl_placeholder = "",

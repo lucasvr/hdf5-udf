@@ -109,41 +109,6 @@ static int getUserStringSize(std::string user_type)
         FAIL_INT("invalid string syntax: %s", user_type.c_str());
 }
 
-// Get the template file, if one exists for the given backend
-static std::string templatePath(std::string backend_extension)
-{
-    char dirname_argv0[PATH_MAX], tmp[PATH_MAX];
-    memset(dirname_argv0, 0, sizeof(dirname_argv0));
-    if (! realpath("/proc/self/exe", dirname_argv0))
-        FAIL_STR("can't resolve path to '/proc/self/exe': %s", strerror(errno));
-
-    char *sep = strrchr(dirname_argv0, '/');
-    if (! sep)
-        FAIL_STR("can't parse %s: missing / separator", dirname_argv0);
-
-    *(sep) = '\0';
-
-    // Look for the file under $(dirname argv0)/../src
-    struct stat statbuf;
-    int n = snprintf(tmp, sizeof(tmp)-1, "%s/../src/udf_template%s",
-        dirname_argv0, backend_extension.c_str());
-    if (static_cast<size_t>(n) >= sizeof(tmp)-1)
-        FAIL_STR("path component exceeds PATH_MAX");
-    else if (stat(tmp, &statbuf) == 0)
-        return std::string(tmp);
-
-    // Look for the file under $(dirname argv0)/../share/hdf5-udf
-    n = snprintf(tmp, sizeof(tmp)-1, "%s/../share/hdf5-udf/udf_template%s",
-        dirname_argv0, backend_extension.c_str());
-    if (static_cast<size_t>(n) >= sizeof(tmp)-1)
-        FAIL_STR("path component exceeds PATH_MAX");
-    else if (stat(tmp, &statbuf) == 0)
-        return std::string(tmp);
-
-    // Bad installation or given backend does not provide a template file
-    return "";
-}
-
 static bool udfDatasetAlreadySeen(std::string name, udf_context *ctx)
 {
     for (auto &entry: ctx->udf_datasets)
@@ -611,10 +576,8 @@ EXPORT bool libudf_compile(udf_context *ctx)
     std::vector<DatasetInfo> datasets(ctx->input_datasets);
     datasets.insert(datasets.end(), ctx->udf_datasets.begin(), ctx->udf_datasets.end());
 
-    auto template_file = templatePath(ctx->backend->extension());
     ctx->bytecode = ctx->backend->compile(
         ctx->udf_file,
-        template_file,
         ctx->compound_declarations,
         ctx->sourcecode,
         datasets);

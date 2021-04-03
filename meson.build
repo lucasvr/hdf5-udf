@@ -22,6 +22,31 @@ syscall_intercept_dep = ''
 seccomp_dep = ''
 deps = []
 
+
+#######################################
+# Automatically generated dependencies
+#######################################
+
+file2hex = find_program('src/file_to_hex.py')
+udf_template_cpp = custom_target(
+  'udf_template_cpp',
+  input: ['src/udf_template.cpp'],
+  output: ['udf_template_cpp.h'],
+  command: [file2hex, '@INPUT@', '@SOURCE_ROOT@/src/@OUTPUT@']
+)
+udf_template_lua = custom_target(
+  'udf_template_lua',
+  input: ['src/udf_template.lua'],
+  output: ['udf_template_lua.h'],
+  command: [file2hex, '@INPUT@', '@SOURCE_ROOT@/src/@OUTPUT@']
+)
+udf_template_py = custom_target(
+  'udf_template_py',
+  input: ['src/udf_template.py'],
+  output: ['udf_template_py.h'],
+  command: [file2hex, '@INPUT@', '@SOURCE_ROOT@/src/@OUTPUT@']
+)
+
 ########################
 # Required dependencies
 ########################
@@ -80,7 +105,7 @@ message('\n' +
 
 hdf5_udf_lib = shared_library(
   'hdf5-udf',
-  sources,
+  sources + [udf_template_cpp, udf_template_lua, udf_template_py],
   version: '2.0',
   soversion: '0',
   dependencies: deps,
@@ -147,12 +172,3 @@ pkg.generate(
 install_headers(
   'src/hdf5-udf.h'
 )
-
-
-########################
-# Install UDF templates
-########################
-
-install_data('src/udf_template.cpp', install_dir: get_option('datadir')+'/hdf5-udf')
-install_data('src/udf_template.lua', install_dir: get_option('datadir')+'/hdf5-udf')
-install_data('src/udf_template.py', install_dir: get_option('datadir')+'/hdf5-udf')

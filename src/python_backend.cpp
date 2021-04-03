@@ -22,6 +22,7 @@
 #include <locale>
 #include <codecvt>
 #include <algorithm>
+#include "udf_template_py.h"
 #include "python_backend.h"
 #include "cpp_backend.h"
 #include "anon_mmap.h"
@@ -36,7 +37,7 @@ static std::vector<DatasetInfo> dataset_info;
 // Buffer used to hold the compound-to-struct name produced by pythonGetCast()
 static char compound_cast_name[256];
 
-/* Functions exported to the Python template library (udf_template.py) */
+/* Functions exported to the Python template library */
 extern "C" void *pythonGetData(const char *element)
 {
     for (size_t i=0; i<dataset_info.size(); ++i)
@@ -102,14 +103,13 @@ std::string PythonBackend::extension()
 /* Compile Python to a bytecode. Returns the bytecode as a string object. */
 std::string PythonBackend::compile(
     std::string udf_file,
-    std::string template_file,
     std::string compound_declarations,
     std::string &source_code,
     std::vector<DatasetInfo> &datasets)
 {
     AssembleData data = {
         .udf_file                 = udf_file,
-        .template_file            = template_file,
+        .template_string          = std::string((char *) udf_template_py),
         .compound_placeholder     = "// compound_declarations_placeholder",
         .compound_decl            = compound_declarations,
         .methods_decl_placeholder = "",
@@ -475,7 +475,7 @@ bool PythonBackend::executeUDF(
 #endif
         if (ready)
         {
-            // Run 'lib.load(filterpath)' from our udf_template.py
+            // Run 'lib.load(filterpath)' from udf_template_py
             PyObject *pyargs = PyTuple_New(1);
             PyObject *pypath = Py_BuildValue("s", filterpath.c_str());
             PyTuple_SetItem(pyargs, 0, pypath);

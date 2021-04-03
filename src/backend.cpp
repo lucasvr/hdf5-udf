@@ -45,40 +45,31 @@ std::string Backend::assembleUDF(const AssembleData &data)
 		(std::istreambuf_iterator<char>(ifs)),
         (std::istreambuf_iterator<char>()));
 
-    /* Basic check: does the template file exist? */
-    if (data.template_file.size() == 0)
-    {
-        fprintf(stderr, "Failed to find UDF template file\n");
-        return "";
-    }
-    std::ifstream ifstr(data.template_file);
-    std::string udf(
-		(std::istreambuf_iterator<char>(ifstr)),
-        (std::istreambuf_iterator<char>()));
+    std::string udf(data.template_string);
 
     /* Populate placeholders */
     udf = textReplace(udf, data.methods_decl_placeholder, data.methods_decl);
     if (udf.size() == 0)
     {
-        fprintf(stderr, "Missing methods_decl placeholder in %s\n", data.template_file.c_str());
+        fprintf(stderr, "Missing methods_decl placeholder in the template string\n");
         return "";
     }
     udf = textReplace(udf, data.methods_impl_placeholder, data.methods_impl);
     if (udf.size() == 0)
     {
-        fprintf(stderr, "Missing methods_impl placeholder in %s\n", data.template_file.c_str());
+        fprintf(stderr, "Missing methods_impl placeholder in the template string\n");
         return "";
     }
     udf = textReplace(udf, data.compound_placeholder, data.compound_decl);
     if (udf.size() == 0)
     {
-        fprintf(stderr, "Missing compound placeholder in %s\n", data.template_file.c_str());
+        fprintf(stderr, "Missing compound placeholder in the template string\n");
         return "";
     }
     udf = textReplace(udf, data.callback_placeholder, inputFileBuffer);
     if (udf.size() == 0)
     {
-        fprintf(stderr, "Missing callback placeholder in %s\n", data.template_file.c_str());
+        fprintf(stderr, "Missing callback placeholder in the template string\n");
         return "";
     }
 

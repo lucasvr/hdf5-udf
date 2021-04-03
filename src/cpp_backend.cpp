@@ -23,6 +23,7 @@
 #include <string>
 #include <algorithm>
 #include "sharedlib_manager.h"
+#include "udf_template_cpp.h"
 #include "cpp_backend.h"
 #include "anon_mmap.h"
 #include "dataset.h"
@@ -46,7 +47,6 @@ std::string CppBackend::extension()
 /* Compile C to a shared object using GCC. Returns the shared object as a string. */
 std::string CppBackend::compile(
     std::string udf_file,
-    std::string template_file,
     std::string compound_declarations,
     std::string &source_code,
     std::vector<DatasetInfo> &datasets)
@@ -75,7 +75,7 @@ std::string CppBackend::compile(
     }
     AssembleData data = {
         .udf_file                 = udf_file,
-        .template_file            = template_file,
+        .template_string          = std::string((char *) udf_template_cpp),
         .compound_placeholder     = "// compound_declarations_placeholder",
         .compound_decl            = compound_declarations,
         .methods_decl_placeholder = "// methods_declaration_placeholder",
@@ -255,7 +255,7 @@ bool CppBackend::run(
         if (shlib.open(so_file) == false)
             return false;
 
-        /* Get references to the UDF and the APIs defined in our C++ template file */
+        /* Get references to the UDF and the APIs defined in our C++ template */
         void (*udf)(void) = (void (*)()) shlib.loadsym("dynamic_dataset");
         auto hdf5_udf_data =
             static_cast<std::vector<void *>*>(shlib.loadsym("hdf5_udf_data"));

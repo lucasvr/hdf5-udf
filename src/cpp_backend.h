@@ -21,7 +21,6 @@ public:
     // Compile an input file into executable form
     std::string compile(
         std::string udf_file,
-        std::string template_file,
         std::string compound_declarations,
         std::string &source_code,
         std::vector<DatasetInfo> &input_datasets);
