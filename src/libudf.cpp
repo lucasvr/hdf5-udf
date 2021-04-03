@@ -655,7 +655,7 @@ EXPORT bool libudf_store(udf_context *ctx)
         jas["api_version"] = 2;
         jas["signature"] = {
             {"public_key", blob->public_key_base64},
-            {"user", blob->metadata["user"]},
+            {"name", blob->metadata["name"]},
             {"email", blob->metadata["email"]}
         };
 

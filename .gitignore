@@ -9,3 +9,5 @@ hdf5-udf
 udf_template_cpp.h
 udf_template_lua.h
 udf_template_py.h
+pyhdf5-udf.c
+.vscode
