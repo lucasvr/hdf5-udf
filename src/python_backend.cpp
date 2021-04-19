@@ -567,6 +567,11 @@ std::vector<std::string> PythonBackend::udfDatasetNames(std::string udf_file)
         {
             auto start = line.substr(n).find_first_of("\"");
             auto end = line.substr(n+start+1).find_first_of("\"");
+            if (start == std::string::npos && end == std::string::npos)
+            {
+                start = line.substr(n).find_first_of("'");
+                end = line.substr(n+start+1).find_first_of("'");
+            }
             auto name = line.substr(n).substr(start+1, end);
             output.push_back(name);
         }
