@@ -11,6 +11,9 @@ on this project.
 """
 
 import json
+import hdf5_udf_resources
+
+from os import path
 from jsonschema import validate
 from _pyhdf5_udf import lib, ffi
 
@@ -66,6 +69,8 @@ class UserDefinedFunction:
             raise TypeError("Unsupported data type: only str and bytes are allowed")
         elif type(value) not in [bool, str, bytes]:
             raise TypeError("Unsupported data type: only str, bytes, and bool are allowed")
+        if type(value) == bool:
+            value = str(value).lower()
         return lib.libudf_set_option(
             bytes(option, 'utf-8'),
             bytes(value, 'utf-8'),
@@ -119,50 +124,11 @@ class UserDefinedFunction:
             True if successful, False otherwise.
         """
         # Validate dictionary keys and data types
-        schema = {
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "$id": "https://github.com/lucasvr/hdf5-udf",
-            "description": "JSON schema for HDF5-UDF datasets",
-            "type": "object",
-            "properties": {
-                "name": {
-                    "description": "Dataset name",
-                    "type": "string"
-                },
-                "datatype": {
-                    "description": "Data type",
-                    "type": "string"
-                },
-                "resolution": {
-                    "description": "Dataset dimensions",
-                    "type": "array",
-                    "items": {
-                        "type": "number",
-                        "exclusiveMinimum": 0
-                    },
-                    "minItems": 1
-                },
-                "members": {
-                    "description": "Compound members",
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "name": {
-                                "description": "Compound member name",
-                                "type": "string"
-                            },
-                            "datatype": {
-                                "description": "Compound member data type",
-                                "type": "string"
-                            },
-                        }
-                    },
-                    "minItems": 1
-                }
-            },
-            "required": ["name", "datatype", "resolution"]
-        }
+        schemafile = path.join(
+            path.dirname(hdf5_udf_resources.__file__),
+            "hdf5_udf-schema.json")
+        with open(schemafile, "r") as f:
+            schema = json.load(f)
 
         validate(instance=description, schema=schema)
 

@@ -1,0 +1,45 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "**Schema**",
+    "type": "object",
+    "properties": {
+        "name": {
+            "description": "**Dataset name**",
+            "type": "string"
+        },
+        "datatype": {
+            "description": "**Data type**",
+            "type": "string",
+            "enum": ["int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64", "float", "double", "string", "compound"]
+        },
+        "resolution": {
+            "description": "**Dataset dimensions**",
+            "type": "array",
+            "items": {
+                "type": "number",
+                "exclusiveMinimum": 0
+            },
+            "minItems": 1
+        },
+        "members": {
+            "description": "**Compound members**",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "description": "**Compound member name**",
+                        "type": "string"
+                    },
+                    "datatype": {
+                        "description": "**Compound member data type**",
+                        "type": "string",
+                        "enum": ["int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64", "float", "double", "string"]
+                    }
+                }
+            },
+            "minItems": 1
+        }
+    },
+    "required": ["name", "datatype", "resolution"]
+}
