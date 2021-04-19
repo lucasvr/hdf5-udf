@@ -5,7 +5,6 @@ import re
 import glob
 import cffi
 import shutil
-import pathlib
 
 libname = "_pyhdf5_udf"
 
@@ -20,8 +19,7 @@ def clean():
 
 def build(ffibuilder):
     """ Build the Python bindings """
-    this_dir = pathlib.Path().resolve()
-    h_file_name = f"{this_dir}/../src/hdf5-udf.h"
+    h_file_name = "/usr/include/hdf5-udf.h"
     with open(h_file_name) as h_file:
         # Remove preprocessor directives
         lns = h_file.read().splitlines()
@@ -39,8 +37,7 @@ def build(ffibuilder):
         libname,
         f'#include "{libname}.h"',
         libraries=["hdf5-udf"],
-        library_dirs=[f"{this_dir}/../build"],
-        include_dirs=[this_dir],
+        include_dirs=["."],
         extra_link_args=["-Wl,-rpath,."],
     )
     ffibuilder.compile()
