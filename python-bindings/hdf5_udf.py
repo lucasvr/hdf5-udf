@@ -38,11 +38,6 @@ class UserDefinedFunction:
     def __exit__(self, exc_type, exc_value, traceback):
         self.destroy()
 
-    def destroy(self):
-        """Release resources allocated for the object."""
-        lib.libudf_destroy(self.ctx)
-        self.ctx = ffi.NULL
-
     def set_option(self, option="", value=""):
         """Set an option given by a key/value pair.
 
@@ -50,16 +45,27 @@ class UserDefinedFunction:
         ----------
         option : str
             Name of the option to configure. Recognized option names include:
-            - "overwrite": "true" to overwrite existing UDF dataset.
-            - "save_sourcecode": "true" to save the source code as metadata.
-        value : str
+
+            - "overwrite": Overwrite existing UDF dataset? (default: False)
+            - "save_sourcecode": Save the source code as metadata? (default: False)
+        value : str, bool
             Value to set `option` to.
+
+        Raises
+        ------
+        TypeError
+            If the given data type is not recognized
 
         Returns
         -------
         bool
             True if successful, False otherwise.
         """
+
+        if type(option) not in [str, bytes]:
+            raise TypeError("Unsupported data type: only str and bytes are allowed")
+        elif type(value) not in [bool, str, bytes]:
+            raise TypeError("Unsupported data type: only str, bytes, and bool are allowed")
         return lib.libudf_set_option(
             bytes(option, 'utf-8'),
             bytes(value, 'utf-8'),
@@ -73,24 +79,23 @@ class UserDefinedFunction:
         description : dict
             Describe the dataset: its name, data type, size, and members
             (if a compound data type). For native datasets the following
-            keys are expected:
-            - "name": `str`
-            - "datatype": `str`
-            - "resolution": `array of numbers`
+            keys are expected: ``name``, ``datatype``, ``resolution``.
 
-            Compound datasets must provide an extra `members` key:
-            - "members": `array of objects`
+            Compound datasets must provide an extra ``members`` key.
+            Objects of the ``members`` array must include two properties:
+            ``name`` and ``datatype``.
 
-            Objects of the `members` array must include two properties:
-            - "name": `str`
-            - "datatype": `str`
+        Examples
+        --------
+        Dataset with a native data type:
 
-            Examples
-            --------
-            Dataset with a native data type:
+        .. code-block::
+
             {"name": "MyDataset", "datatype": "int32", "resolution": [100,100]}
 
-            Dataset with a compound data type:
+        Dataset with a compound data type:
+        .. code-block::
+
             {
                 "name": "MyCompoundDataset",
                 "datatype": "compound",
@@ -117,7 +122,7 @@ class UserDefinedFunction:
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": "https://github.com/lucasvr/hdf5-udf",
-            "description": "A dataset dynamically produced by HDF5-UDF",
+            "description": "JSON schema for HDF5-UDF datasets",
             "type": "object",
             "properties": {
                 "name": {
@@ -135,7 +140,7 @@ class UserDefinedFunction:
                         "type": "number",
                         "exclusiveMinimum": 0
                     },
-                    "minItems": 1,
+                    "minItems": 1
                 },
                 "members": {
                     "description": "Compound members",
@@ -194,3 +199,18 @@ class UserDefinedFunction:
             True if successful, False otherwise.
         """
         return lib.libudf_store(self.ctx)
+
+    def destroy(self):
+        """Release resources allocated for the object.
+
+        This function must be called to ensure handles are closed and avoid
+        resource leaks. It is best, however, to use simply use a context
+        manager to define `UserDefinedFunction` objects::
+
+            with UserDefinedFunction(hdf5_file='file.h5', udf_file='udf.py') as udf:
+                udf.push_dataset(...)
+                udf.compile()
+                udf.store()
+        """
+        lib.libudf_destroy(self.ctx)
+        self.ctx = ffi.NULL
