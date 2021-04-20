@@ -105,7 +105,7 @@ int main(int argc, char **argv)
 
     // Compile and store the UDF on the target HDF5 file
     CHECK(libudf_compile(ctx));
-    CHECK(libudf_store(ctx));
+    CHECK(libudf_store(NULL, 0, ctx));
 
     // Done
     libudf_destroy(ctx);

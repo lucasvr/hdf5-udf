@@ -163,10 +163,22 @@ class UserDefinedFunction:
         
         Returns
         -------
-        bool
-            True if successful, False otherwise.
+        dict
+            A dictionary with the metadata written to the HDF5 file, on success.
+            On failure, returns a dictionary with an `error` member and an
+            associated string with a description of that error.
         """
-        return lib.libudf_store(self.ctx)
+        size = 16384
+        buf = ffi.new(f"char[{size}]")
+        result = lib.libudf_store(buf, size, self.ctx)
+        if result == True:
+            return json.loads(ffi.string(buf))
+
+        n = lib.libudf_get_error(buf, size, self.ctx)
+        if n >= size:
+            buf[size-1] = '\0'
+        errormsg = {"error": ffi.string(buf)}
+        return errormsg
 
     def destroy(self):
         """Release resources allocated for the object.

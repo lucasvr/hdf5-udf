@@ -28,28 +28,27 @@
 
 using json = nlohmann::json;
 
-#define INFO(msg...) printf(msg)
+#ifdef DEBUG
+# define DEBUG_MSG(msg...) fprintf(stderr, msg)
+# define DEBUG_DATASET(dataset, info) dataset.printInfo(info)
+#else
+# define DEBUG_MSG(msg...) do { } while(0)
+# define DEBUG_DATASET(dataset, info) do { } while(0)
+#endif
 
-#define FAIL(msg...) do { \
-    fprintf(stderr, "Error: "); fprintf(stderr, msg); fprintf(stderr, "\n"); \
-    return false; \
+#define DO_FAIL(retval, msg...) do { \
+    snprintf(ctx->errormsg, sizeof(ctx->errormsg)-1, msg); \
+    DEBUG_MSG("Error: "); DEBUG_MSG(msg); DEBUG_MSG("\n"); \
+    return retval; \
 } while(0)
 
-#define FAIL_INT(msg...) do { \
-    fprintf(stderr, "Error: "); fprintf(stderr, msg); fprintf(stderr, "\n"); \
-    return -1; \
-} while(0)
-
-#define FAIL_STR(msg...) do { \
-    fprintf(stderr, "Error: "); fprintf(stderr, msg); fprintf(stderr, "\n"); \
-    return ""; \
-} while(0)
-
+#define FAIL(msg...)      DO_FAIL(false, msg)
+#define FAIL_INT(msg...)  DO_FAIL(-1, msg)
+#define FAIL_STR(msg...)  DO_FAIL("", msg)
+#define FAIL_NULL(msg...) DO_FAIL(NULL, msg)
 #define CHECK_ARG_PTR(arg) do { \
-    if (arg == NULL) { \
-        fprintf(stderr, "%s: ", __func__); \
-        FAIL("NULL argument '" #arg "'"); \
-    } \
+    if (arg == NULL) \
+        DO_FAIL(false, "NULL argument '" #arg "'"); \
 } while(0)
 
 #define EXPORT extern "C"
@@ -82,6 +81,9 @@ typedef struct udf_context {
     std::string sourcecode;
     std::string bytecode;
     bool needs_overwriting;
+
+    // Error status
+    char errormsg[1024];
 } udf_context;
 
 /////////////////////
@@ -91,7 +93,7 @@ typedef struct udf_context {
 static bool libudf_scan(udf_context *ctx);
 static bool libudf_validate_udf_datasets(udf_context *ctx);
 
-static int getUserStringSize(std::string user_type)
+static int getUserStringSize(std::string user_type, udf_context *ctx)
 {
      // UDF strings can be defined as 'string' or as 'string(N)'.
      // In the first case the string size is determined by the
@@ -128,14 +130,15 @@ static bool isInputDataset(std::string name, udf_context *ctx)
 
 class HDF5_Handler {
 public:
-    HDF5_Handler(std::string hdf5_file_path) :
+    HDF5_Handler(std::string hdf5_file_path, udf_context *&ctx_) :
         hdf5_file(hdf5_file_path),
         file_id(-1),
         dset_id(-1),
         space_id(-1),
         dcpl_id(-1),
         hdf5_datatype(-1),
-        datatype_name(NULL) { }
+        datatype_name(NULL),
+        ctx(ctx_) { }
 
     ~HDF5_Handler() {
         if (dcpl_id >= 0)
@@ -180,6 +183,7 @@ public:
     hid_t hdf5_datatype;
     const char *datatype_name;
     std::vector<hsize_t> dimensions;
+    udf_context *ctx;
 };
 
 bool HDF5_Handler::openFile(int mode)
@@ -328,6 +332,7 @@ bool HDF5_Handler::extractInfo()
 
 class DatasetOptionsParser {
 public:
+    DatasetOptionsParser(udf_context *&ctx_) : ctx(ctx_) {}
     bool parse(std::string text, DatasetInfo &out);
 private:
     bool parseName(std::string text, DatasetInfo &out);
@@ -335,6 +340,7 @@ private:
     bool parseDataType(std::string text, DatasetInfo &out, size_t size);
     bool parseCompoundMembers(std::string text, DatasetInfo &out, size_t &size);
     bool is_compound;
+    udf_context *ctx;
 };
 
 bool DatasetOptionsParser::parse(std::string text, DatasetInfo &out)
@@ -378,10 +384,8 @@ bool DatasetOptionsParser::parseDimensions(std::string text, DatasetInfo &out)
     std::string res(text.substr(sep+1));
     size_t num_dims = std::count(res.begin(), res.end(), 'x') + 1;
     if (num_dims < 1 || num_dims > 3)
-    {
-        fprintf(stderr, "Error: unsupported number of dimensions (%jd)\n", num_dims);
-        return false;
-    }
+        FAIL("unsupported number of dimensions (%jd)", num_dims);
+
     auto x = res.substr(0, res.find_first_of(":"));
     try
     {
@@ -401,8 +405,7 @@ bool DatasetOptionsParser::parseDimensions(std::string text, DatasetInfo &out)
     }
     catch (std::invalid_argument &e)
     {
-        fprintf(stderr, "Failed to extract dimensions from '%s'\n", text.c_str());
-        return false;
+        FAIL("could not extract dimensions from '%s'", text.c_str());
     }
     return true;
 }
@@ -419,13 +422,12 @@ bool DatasetOptionsParser::parseDataType(std::string text, DatasetInfo &out, siz
             if (type == static_cast<size_t>(H5T_C_S1))
             {
                 type = H5Tcopy(H5T_C_S1);
-                auto size = getUserStringSize(member.usertype);
+                auto size = getUserStringSize(member.usertype, ctx);
                 if (size < 0)
                 {
-                    fprintf(stderr, "Invalid syntax describing string element in compound\n");
                     H5Tclose(out.hdf5_datatype);
                     H5Tclose(type);
-                    return false;
+                    FAIL("invalid syntax describing string element in compound");
                 }
                 H5Tset_size(type, size);
             }
@@ -447,10 +449,7 @@ bool DatasetOptionsParser::parseDataType(std::string text, DatasetInfo &out, siz
         out.datatype = text.substr(sep+1);
         out.hdf5_datatype = getHdf5Datatype(out.datatype);
         if (out.hdf5_datatype < 0)
-        {
-            fprintf(stderr, "Datatype '%s' is not supported\n", out.datatype.c_str());
-            return false;
-        }
+            FAIL("datatype '%s' is not supported", out.datatype.c_str());
         out.hdf5_datatype = H5Tcopy(out.hdf5_datatype);
     }
     return true;
@@ -461,10 +460,8 @@ bool DatasetOptionsParser::parseCompoundMembers(std::string text, DatasetInfo &o
     /* Format: dataset_name{member:type[,member:type...]}:dimensions */
     auto start = text.find_first_of("{"), end = text.find_last_of("}");
     if (start == std::string::npos || end == std::string::npos)
-    {
-        fprintf(stderr, "Invalid syntax to describe a compound dataset\n");
-        return false;
-    }
+        FAIL("compound dataset: invalid syntax");
+
     auto memberlist = text.substr(start+1, end-start-1);
     std::regex re("([A-Za-z0-9_]+:[A-Za-z0-9_()]+)");
     std::smatch matches;
@@ -489,15 +486,12 @@ bool DatasetOptionsParser::parseCompoundMembers(std::string text, DatasetInfo &o
         member.usertype = type;
         member.offset = size;
         member.size = is_string ?
-            getUserStringSize(type) :
+            getUserStringSize(type, ctx) :
             getStorageSize(getHdf5Datatype(type));
         member.is_char_array = is_string;
 
         if (is_string && member.size < 0)
-        {
-            fprintf(stderr, "Invalid syntax in compound dataset description\n");
-            return false;
-        }
+            FAIL("compound dataset: invalid syntax");
 
         out.members.push_back(member);
         memberlist = matches.suffix().str();
@@ -547,13 +541,13 @@ EXPORT bool libudf_push_dataset(const char *description, udf_context *ctx)
     DatasetInfo info("", std::vector<hsize_t>(), "", -1);
     info.is_input_dataset = false;
 
-    DatasetOptionsParser parser;
+    DatasetOptionsParser parser(ctx);
     if (parser.parse(description, info) == false)
         FAIL("failed to parse string '%s'", description);
 
-    HDF5_Handler h5(ctx->hdf5_file);
+    HDF5_Handler h5(ctx->hdf5_file, ctx);
     if (h5.openFile(H5F_ACC_RDONLY) == false)
-        return false;
+        FAIL("failed to open %s", ctx->hdf5_file.c_str());
     else if (h5.hasDataset(info.name))
     {
         auto opt = ctx->options.find("overwrite");
@@ -587,7 +581,7 @@ EXPORT bool libudf_compile(udf_context *ctx)
     return true;
 }
 
-EXPORT bool libudf_store(udf_context *ctx)
+EXPORT bool libudf_store(char *metadata, size_t size, udf_context *ctx)
 {
     CHECK_ARG_PTR(ctx);
     CHECK_ARG_PTR(ctx->backend);
@@ -602,7 +596,7 @@ EXPORT bool libudf_store(udf_context *ctx)
         if (info.needs_overwriting)
             to_delete.push_back(info.name);
 
-    HDF5_Handler h5(ctx->hdf5_file);
+    HDF5_Handler h5(ctx->hdf5_file, ctx);
     if (h5.openFile(H5F_ACC_RDWR) == false)
         return false;
     if (h5.deleteDatasets(to_delete) == false)
@@ -661,9 +655,9 @@ EXPORT bool libudf_store(udf_context *ctx)
 
         std::string jas_str = jas.dump();
         size_t payload_size = jas_str.length() + ctx->bytecode.size() + 1;
-        INFO("\n%s dataset header:\n%s\n", info.name.c_str(), jas.dump(4, ' ', false, 45).c_str());
+        DEBUG_MSG("\n%s dataset header:\n%s\n", info.name.c_str(), jas.dump(4, ' ', false, 45).c_str());
         if (ctx->compound_declarations.size())
-            INFO("\nData structures available to the UDF:\n%s\n", ctx->compound_declarations.c_str());
+            DEBUG_MSG("\nData structures available to the UDF:\n%s\n", ctx->compound_declarations.c_str());
 
         // Sanity check: the JSON and the bytecode must fit in the dataset
         hsize_t grid_size = std::accumulate(std::begin(info.dimensions), std::end(info.dimensions), 1, std::multiplies<hsize_t>());
@@ -680,6 +674,8 @@ EXPORT bool libudf_store(udf_context *ctx)
 
         // Create UDF dataset
         retval = h5.createUserDefinedDataset(info.name, info.hdf5_datatype, payload);
+        if (retval == true && metadata != NULL && size > 0)
+            snprintf(metadata, size-1, "%s", jas.dump().c_str());
 
         // Close and release resources
         free(payload);
@@ -689,6 +685,12 @@ EXPORT bool libudf_store(udf_context *ctx)
     return retval;
 }
 
+EXPORT size_t libudf_get_error(char *buf, size_t size, udf_context *ctx)
+{
+    CHECK_ARG_PTR(buf);
+    CHECK_ARG_PTR(ctx);
+    return snprintf(buf, size, "%s", ctx->errormsg);
+}
 
 ///////////////////////////////////////////////////////
 // Private functions previously exposed as public API
@@ -721,7 +723,7 @@ static bool libudf_scan(udf_context *ctx)
     // names and their dimensions/datatypes.
     for (auto &name: ctx->backend->udfDatasetNames(ctx->udf_file))
     {
-        HDF5_Handler h5(ctx->hdf5_file);
+        HDF5_Handler h5(ctx->hdf5_file, ctx);
         if (h5.openFile(H5F_ACC_RDONLY) == false)
             return false;
 
@@ -759,7 +761,7 @@ static bool libudf_scan(udf_context *ctx)
                 ctx->compound_declarations += ctx->backend->compoundToStruct(info, true);
             }
 
-            info.printInfo("Input");
+            DEBUG_DATASET(info, "Input");
             ctx->input_datasets.push_back(std::move(info));
         }
         else if (! udfDatasetAlreadySeen(name, ctx))
@@ -792,7 +794,7 @@ static bool libudf_validate_udf_datasets(udf_context *ctx)
             // the write data, and that fails badly because we're using the write
             // data buffer to hold the UDF bytecode -- so that call to strlen() is
             // likely to crash the application.
-            int string_size = getUserStringSize(info.datatype);
+            int string_size = getUserStringSize(info.datatype, ctx);
             if (string_size < 0)
                 FAIL("failed to parse string size in '%s'", info.datatype.c_str());
 
@@ -820,7 +822,7 @@ static bool libudf_validate_udf_datasets(udf_context *ctx)
         }
 
         if (info.dimensions.size() > 0) {
-            info.printInfo("User-defined");
+            DEBUG_DATASET(info, "User-defined");
             continue;
         }
 
@@ -843,7 +845,7 @@ static bool libudf_validate_udf_datasets(udf_context *ctx)
         info.hdf5_datatype = H5Tcopy(ctx->input_datasets[0].hdf5_datatype);
         info.datatype = ctx->input_datasets[0].datatype;
         info.dimensions = ctx->input_datasets[0].dimensions;
-        info.printInfo("User-defined");
+        DEBUG_DATASET(info, "User-defined");
     }
 
     return true;
