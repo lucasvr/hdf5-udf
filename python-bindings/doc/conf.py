@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.abspath('..'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'HDF5-UDF'
+project = 'PyHDF5-UDF'
 copyright = '2021, Lucas C. Villa Real'
 author = 'Lucas C. Villa Real'
 

@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="hdf5-udf",
+    name="PyHDF5-UDF",
     version="1.0",
     description="User-defined functions for HDF5 - Python bindings",
     description_content_type="text/x-rst",
@@ -14,7 +14,7 @@ setup(
     url="https://pyhdf5-udf.readthedocs.io",
 
     py_modules=["hdf5_udf"],
-    python_requires=">=3.6",
+    python_requires=">=3.5.10",
     setup_requires=[
         "wheel",
         "cffi>=1.0.0"

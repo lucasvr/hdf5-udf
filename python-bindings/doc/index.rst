@@ -1,7 +1,5 @@
-.. HDF5-UDF documentation master file, created by
+.. PyHDF5-UDF documentation master file, created by
    sphinx-quickstart on Thu Apr 15 22:42:44 2021.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
 
 .. toctree::
    :maxdepth: 2
@@ -11,8 +9,8 @@
 User-Defined functions for HDF5 - Python bindings
 =================================================
 
-Installing HDF5-UDF bindings for Python
----------------------------------------
+Installing PyHDF5-UDF
+---------------------
 
 This package depends on the `HDF5-UDF <https://github.com/lucasvr/hdf5-udf>`_
 library. Once you have it installed on your system, PIP will bring you the
@@ -20,7 +18,7 @@ latest and greatest:
 
 .. code-block::
 
-   pip install hdf5-udf
+   pip install pyhdf5-udf
 
 Getting started
 ----------------

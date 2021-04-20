@@ -6,7 +6,7 @@ import glob
 import cffi
 import shutil
 
-libname = "_pyhdf5_udf"
+libname = "_hdf5_udf"
 
 def clean():
     """ Remove temporarily built objects """
@@ -28,18 +28,7 @@ def build(ffibuilder):
         flt = map(lambda ln: ln.replace('}', ''), flt)
         ffibuilder.cdef(str("\n").join(flt))
 
-    with open(f"{libname}.h", "w") as f:
-        flt = map(lambda ln: ln.replace('extern "C" {', ''), lns)
-        flt = map(lambda ln: ln.replace('}', ''), flt)
-        f.write(str("\n").join(flt))
-
-    ffibuilder.set_source(
-        libname,
-        f'#include "{libname}.h"',
-        libraries=["hdf5-udf"],
-        include_dirs=["."],
-        extra_link_args=["-Wl,-rpath,."],
-    )
+    ffibuilder.set_source(libname, None)
     ffibuilder.compile()
 
 ffibuilder = cffi.FFI()

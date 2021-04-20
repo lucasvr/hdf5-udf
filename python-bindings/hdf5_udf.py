@@ -6,7 +6,7 @@
 This module provides a Python interface to HDF5-UDF so that users can
 embed routines on HDF5 files programmatically.
 
-Please refer to https://github.com/lucasvr/hdf5-udf for more details
+Please refer to https://pyhdf5-udf.readthedocs.io for more details
 on this project.
 """
 
@@ -15,7 +15,9 @@ import hdf5_udf_resources
 
 from os import path
 from jsonschema import validate
-from _pyhdf5_udf import lib, ffi
+from _hdf5_udf import ffi
+
+lib = ffi.dlopen("libhdf5-udf.so")
 
 class UserDefinedFunction:
     """Store a user-defined function on a HDF5 file.
