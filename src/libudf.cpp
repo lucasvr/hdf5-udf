@@ -581,7 +581,7 @@ EXPORT bool libudf_compile(udf_context *ctx)
     return true;
 }
 
-EXPORT bool libudf_store(char *metadata, size_t size, udf_context *ctx)
+EXPORT bool libudf_store(char *metadata, size_t *size, udf_context *ctx)
 {
     CHECK_ARG_PTR(ctx);
     CHECK_ARG_PTR(ctx->backend);
@@ -602,6 +602,7 @@ EXPORT bool libudf_store(char *metadata, size_t size, udf_context *ctx)
     if (h5.deleteDatasets(to_delete) == false)
         return false;
 
+    json metadata_array = json::array();
     for (auto &info: ctx->udf_datasets)
     {
         // Configure the HDF5-UDF filter
@@ -674,13 +675,16 @@ EXPORT bool libudf_store(char *metadata, size_t size, udf_context *ctx)
 
         // Create UDF dataset
         retval = h5.createUserDefinedDataset(info.name, info.hdf5_datatype, payload);
-        if (retval == true && metadata != NULL && size > 0)
-            snprintf(metadata, size-1, "%s", jas.dump().c_str());
+        if (retval == true)
+            metadata_array.emplace_back(jas);
 
         // Close and release resources
         free(payload);
         delete blob;
     }
+
+    if (metadata != NULL && size  != NULL && *size > 0)
+        *size = snprintf(metadata, (*size)-1, "%s", metadata_array.dump().c_str());
 
     return retval;
 }

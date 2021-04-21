@@ -11,11 +11,20 @@
 #include <string>
 #include <vector>
 #include <map>
+#include "json.hpp"
 #include "hdf5-udf.h"
 
+using json = nlohmann::json;
+
 #define CHECK(ops) do { \
-    if (! (ops)) \
+    if (! (ops)) { \
+        if (ctx) { \
+            char errormsg[1024]; \
+            libudf_get_error(errormsg, sizeof(errormsg), ctx); \
+            fprintf(stderr, "Error: %s\n", errormsg); \
+        } \
         exit(1); \
+    } \
 } while(0)
 
 int usage(int errcode, std::string unrecognized="")
@@ -56,6 +65,7 @@ int main(int argc, char **argv)
 {
     std::map<std::string, std::string> options;
     std::vector<std::string> args;
+    udf_context *ctx = NULL;
 
     // Parse command line options
     for (int i=0; i<argc; ++i)
@@ -92,7 +102,6 @@ int main(int argc, char **argv)
     CHECK(hdf5_file.size() && udf_file.size());
 
     // Initialize the UDF library
-    udf_context *ctx;
     CHECK(ctx = libudf_init(hdf5_file.c_str(), udf_file.c_str()));
 
     // Propagate key/value options to the library
@@ -104,8 +113,26 @@ int main(int argc, char **argv)
         CHECK(libudf_push_dataset(description.c_str(), ctx));
 
     // Compile and store the UDF on the target HDF5 file
+    size_t bufsize = 16384;
+    std::string buf;
+    buf.reserve(bufsize);
     CHECK(libudf_compile(ctx));
-    CHECK(libudf_store(NULL, 0, ctx));
+    CHECK(libudf_store(&buf[0], &bufsize, ctx));
+    buf[bufsize] = '\0';
+
+    // The buffer is serialized and may include the source-code fragment
+    // which is too large to be printed. Here we deserialize it and chop
+    // some bytes off the source-code attribute to make it fit on the screen.
+    try {
+        auto metadata = json::parse(buf.c_str());
+        printf("Dataset header:\n[");
+        for (auto it = metadata.begin(); it != metadata.end(); ++it) {
+            const char comma = it == metadata.end()-1 ? ']' : ',';
+            printf("%s%c\n", (*it).dump(4, ' ', false, 45).c_str(), comma);
+        }
+    } catch (std::exception& e) {
+        printf("Dataset header:\n%s\n", buf.c_str());
+    }
 
     // Done
     libudf_destroy(ctx);

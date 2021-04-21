@@ -43,9 +43,10 @@ bool libudf_push_dataset(const char *description, udf_context *ctx);
 bool libudf_compile(udf_context *ctx);
 
 // Store the compiled UDF on the target file.
-// If "metadata" is non-NULL, then up to "size" bytes of the serialized JSON
+// If "metadata" is non-NULL, then up to "*size" bytes of the serialized JSON
 // metadata, stored in the HDF5, are returned (including the NULL terminator).
-bool libudf_store(char *metadata, size_t size, udf_context *ctx);
+// On return, *size contains the number of bytes written to metadata.
+bool libudf_store(char *metadata, size_t *size, udf_context *ctx);
 
 // Get the last error message.
 size_t libudf_get_error(char *buf, size_t size, udf_context *ctx);

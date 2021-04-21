@@ -144,8 +144,6 @@ class UserDefinedFunction:
             for element in d["members"]:
                 members += "{}:{},".format(element["name"], element["datatype"])
             desc = f"{d['name']}:{{{members[:-1]}}}:{resolution}"
-        import sys
-        sys.stderr.write(f"{desc}\n")
         return lib.libudf_push_dataset(bytes(desc, 'utf-8'), self.ctx)
 
     def compile(self):
@@ -168,16 +166,17 @@ class UserDefinedFunction:
             On failure, returns a dictionary with an `error` member and an
             associated string with a description of that error.
         """
-        size = 16384
-        buf = ffi.new(f"char[{size}]")
+        size = ffi.new("size_t *")
+        size[0] = 16384
+        buf = ffi.new(f"char[{size[0]}]")
         result = lib.libudf_store(buf, size, self.ctx)
         if result == True:
             return json.loads(ffi.string(buf))
 
-        n = lib.libudf_get_error(buf, size, self.ctx)
-        if n >= size:
-            buf[size-1] = '\0'
-        errormsg = {"error": ffi.string(buf)}
+        n = lib.libudf_get_error(buf, size[0], self.ctx)
+        if n >= size[0]:
+            buf[size[0]-1] = '\0'
+        errormsg = {"error": ffi.string(buf).decode("utf-8")}
         return errormsg
 
     def destroy(self):
