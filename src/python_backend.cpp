@@ -134,6 +134,7 @@ std::string PythonBackend::compile(
             (char *) "python3",
             (char *) "-m",
             (char *) "compileall",
+            (char *) "-q",         // output error messages only
             (char *) "-l",         // don't recurse into subdirectories
             (char *) "-f",         // force rebuild even if timestamps are up to date
             (char *) py_file.c_str(),
