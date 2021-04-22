@@ -50,6 +50,8 @@ be executed by members of that profile. Three profiles are created:
 - **allow**: poses no restrictions. The UDF is treated as a regular process with
   no special requirements.
 
+.. image:: https://raw.githubusercontent.com/lucasvr/hdf5-udf/master/images/profiles.png
+
 Signing UDFs
 ------------
 

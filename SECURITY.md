@@ -42,6 +42,8 @@ be executed by members of that profile. Three profiles are created:
 - **allow**: poses no restrictions. The UDF is treated as a regular process with
   no special requirements.
 
+![](images/profiles.png)
+
 ### Signing UDFs
 
 UDFs are **automatically signed** at the time of their attachment to the HDF5 file.
