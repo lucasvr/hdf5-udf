@@ -48,8 +48,7 @@ UDFs are **automatically signed** at the time of their attachment to the HDF5 fi
 The public key from `username.pub` and contact information from `username.meta`
 are incorporated as metadata and saved next to the UDF bytecode in the HDF5 file.
 
-Associating UDFs with a trust profile
--------------------------------------
+### Associating UDFs with a trust profile
 
 Self-signed UDFs are automatically placed on the `allow` profile. This means that
 UDFs you create on your own machine will run, on that same machine, as a regular
