@@ -50,8 +50,6 @@ be executed by members of that profile. Three profiles are created:
 - **allow**: poses no restrictions. The UDF is treated as a regular process with
   no special requirements.
 
-.. image:: https://raw.githubusercontent.com/lucasvr/hdf5-udf/master/images/profiles.png
-
 Signing UDFs
 ------------
 
@@ -76,3 +74,7 @@ any actions that require the execution of system calls (other than writing to
 It is possible to change the trust level by simply **moving that public key to a
 different profile directory**. The next time a UDF signed by that key is read,
 the seccomp rules associated with that profile will be enforced.
+
+.. image:: https://raw.githubusercontent.com/lucasvr/hdf5-udf/master/images/profiles.png
+   :width: 400
+   :align: center
