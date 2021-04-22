@@ -2,6 +2,7 @@
    sphinx-quickstart on Thu Apr 15 22:42:44 2021.
 
 .. toctree::
+   :hidden:
    :maxdepth: 2
    :caption: Contents:
 
@@ -100,6 +101,9 @@ JSON schema for HDF5-UDF datasets
 =================================
 
 .. jsonschema:: ../hdf5_udf_resources/hdf5_udf-schema.json
+
+.. include:: security.rst
+
 
 Indices and tables
 ==================
