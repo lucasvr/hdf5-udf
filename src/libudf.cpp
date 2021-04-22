@@ -175,6 +175,9 @@ public:
     // Extract metadata of an open dataset: number of dimensions, data type, etc.
     bool extractInfo();
 
+    // Extract UDF metadata (JSON payload)
+    bool extractUDFMetadata(std::string &json_payload);
+
     std::string hdf5_file;
     hid_t file_id;
     hid_t dset_id;
@@ -216,8 +219,7 @@ hid_t HDF5_Handler::openGroup(std::string path, bool print_errors)
         if (group_ids.back() < 0)
         {
             if (print_errors)
-                fprintf(stderr, "Failed to open group '%s' in '%s'\n",
-                    groups[i].c_str(), path.c_str());
+                FAIL("could not open group '%s' in '%s'", groups[i].c_str(), path.c_str());
             break;
         }
         parent_id = group_ids.back();
@@ -323,6 +325,38 @@ bool HDF5_Handler::extractInfo()
     if (datatype_name == NULL)
         FAIL("unsupported HDF5 datatype %#lx", (long) hdf5_datatype);
 
+    return true;
+}
+
+bool HDF5_Handler::extractUDFMetadata(std::string &json_payload)
+{
+    if (hdf5_datatype < 0 && extractInfo() == false)
+        return false;
+
+    // Note: ideally, we'd like to resort to H5Dget_offset() to get the dataset
+    // offset relative to the beginning of the file and then read the UDF metadata
+    // by ourselves. However, H5Dget_offset does not work with chunked datasets,
+    // which we use to store UDFs.
+    // An alternative would be to retrieve the underlying file handle with
+    // H5Fget_vfd_handle() and then read the file offset at /proc/self/fdinfo/N,
+    // but does not work either: the file offset is reported as 0 after the handle
+    // is obtained (based on observation, not code inspection).
+    // So, we introduce a  semantic modification to our I/O filter read path: if
+    // there's an environment variable named "IOFILTER_READ_METADATA", then the I/O
+    // filter returns the JSON  metadata associated with the dataset -- otherwise
+    // the standard read operation executes. Not an ideal solution, but it works.
+
+    char *rdata = new char[1024*1024];
+    setenv("IOFILTER_READ_METADATA", "1", 1);
+    herr_t ret = H5Dread(dset_id, hdf5_datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata);
+    unsetenv("IOFILTER_READ_METADATA");
+    if (ret < 0)
+    {
+        delete[] rdata;
+        FAIL("error reading UDF dataset metadata");
+    }
+    json_payload.assign(rdata, strlen(rdata));
+    delete[] rdata;
     return true;
 }
 
@@ -687,6 +721,28 @@ EXPORT bool libudf_store(char *metadata, size_t *size, udf_context *ctx)
         *size = snprintf(metadata, (*size)-1, "%s", metadata_array.dump().c_str());
 
     return retval;
+}
+
+EXPORT bool libudf_get_metadata(const char *dataset, char *metadata, size_t *size, udf_context *ctx)
+{
+    CHECK_ARG_PTR(dataset);
+    CHECK_ARG_PTR(size);
+    CHECK_ARG_PTR(ctx);
+
+    std::string json_payload;
+    HDF5_Handler handle(ctx->hdf5_file, ctx);
+    if (handle.openFile(H5F_ACC_RDONLY) == false)
+        return false;
+    if (handle.openDataset(dataset, true) == false)
+        return false;
+    if (handle.extractUDFMetadata(json_payload) == false)
+        return false;
+    if (metadata && *size < json_payload.size())
+        FAIL("output buffer is too small to hold the metadata");
+    else if (metadata)
+        memcpy(metadata, json_payload.data(), json_payload.size());
+    *size = json_payload.size();
+    return true;
 }
 
 EXPORT size_t libudf_get_error(char *buf, size_t size, udf_context *ctx)

@@ -25,9 +25,9 @@ class UserDefinedFunction:
     Parameters
     ----------
     hdf5_file : str
-        Path to existing HDF5 file
+        Path to existing HDF5 file (required)
     udf_file : str
-        Path to file implementing the user-defined function
+        Path to file implementing the user-defined function (optional)
     """
     def __init__(self, hdf5_file="", udf_file=""):
         self.ctx = lib.libudf_init(
@@ -170,6 +170,32 @@ class UserDefinedFunction:
         size[0] = 16384
         buf = ffi.new(f"char[{size[0]}]")
         result = lib.libudf_store(buf, size, self.ctx)
+        if result == True:
+            return json.loads(ffi.string(buf))
+
+        n = lib.libudf_get_error(buf, size[0], self.ctx)
+        if n >= size[0]:
+            buf[size[0]-1] = '\0'
+        errormsg = {"error": ffi.string(buf).decode("utf-8")}
+        return errormsg
+
+    def get_metadata(self, dataset):
+        """Retrieve metadata of an existing UDF dataset.
+
+        Returns
+        -------
+        dict
+            A dictionary with the UDF metadata: its name, the backend needed to
+            execute it, the bytecode size, the dataset resolution, data type,
+            and other relevant information.
+            On failure, returns a dictionary with an `error` member and an
+            associated string with a description of that error.
+        """
+        dataset = bytes(dataset, 'utf-8')
+        size = ffi.new("size_t *")
+        size[0] = 1024*1024
+        buf = ffi.new(f"char[{size[0]}]")
+        result = lib.libudf_get_metadata(dataset, buf, size, self.ctx)
         if result == True:
             return json.loads(ffi.string(buf))
 
