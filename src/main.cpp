@@ -36,7 +36,7 @@ int usage(int errcode, std::string unrecognized="")
         "Syntax: hdf5-udf [flags] <hdf5_file> <udf_file> [udf_dataset..]\n\n"
         "Flags:\n"
         "  --overwrite              Overwrite existing UDF dataset(s)\n"
-        "  --append-sourcecode      Include source code as metadata of the UDF\n\n"
+        "  --save-sourcecode        Include source code as metadata of the UDF\n\n"
         "Options:\n"
         "  hdf5_file                Input/output HDF5 file\n"
         "  udf_file                 File implementing the user-defined-function\n"
@@ -72,7 +72,7 @@ int main(int argc, char **argv)
     {
         if (strcmp(argv[i], "--overwrite") == 0)
             options["overwrite"] = "true";
-        else if (strcmp(argv[i], "--append-sourcecode") == 0)
+        else if (strcmp(argv[i], "--save-sourcecode") == 0)
             options["save_sourcecode"] = "true";
         else if (strcmp(argv[i], "--help") == 0)
             exit(usage(0));
