@@ -41,8 +41,11 @@ class SignatureHandler {
 public:
     SignatureHandler()
     {
+        const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
         const char *home = getenv("HOME");
-        if (home)
+        if (xdg_config_home)
+            configdir = std::string(xdg_config_home) + "/hdf5-udf/";
+        else if (home)
             configdir = std::string(home) + "/.config/hdf5-udf/";
         else
             configdir = "/tmp/hdf5-udf/";
