@@ -1,10 +1,10 @@
-hdf5-udf (2.0) unstable; urgency=low
+hdf5-udf (2.0) stable; urgency=low
 
   * Introduce support for UDF signing
   * Provide HDF5-UDF as a library
   * New build system based on Meson + Ninja
 
-  -- Lucas C. Villa Real <lucasvr@br.ibm.com>  Tue, 20 Apr 2021 17:11:33 -0300
+ -- Lucas C. Villa Real <lucasvr@br.ibm.com>  Tue, 20 Apr 2021 17:11:33 -0300
 
 hdf5-udf (1.2) unstable; urgency=low
 

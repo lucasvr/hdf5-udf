@@ -25,7 +25,7 @@ ARG GIT_URL=https://github.com/lucasvr/hdf5-udf
 RUN mkdir /prereqs
 COPY --from=syscall-builder /root/syscall-intercept/build-deb/*.deb /prereqs/
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential libhdf5-dev python3 \
-    python3-dev python3-cffi libseccomp-dev luajit libluajit-5.1-dev pkg-config \
+    python3-dev python3-cffi libseccomp-dev luajit libluajit-5.1-dev libsodium-dev meson ninja-build pkg-config \
     git libcapstone-dev devscripts debhelper
 RUN dpkg -i /prereqs/*.deb
 

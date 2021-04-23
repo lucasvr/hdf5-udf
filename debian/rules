@@ -42,12 +42,11 @@ export DH_VERBOSE = 1
 
 # main packaging script based on dh7 syntax
 %:
-	dh $@  
+	dh $@
 
 # debmake generated override targets
-# Use "make prefix=/usr" (override prefix=/usr/local in Makefile)
-override_dh_auto_install:
-	dh_auto_install -- prefix=/usr PLUGINDIR=/usr/local/hdf5/lib/plugin
+override_dh_auto_configure:
+	dh_auto_configure -- -Dwith-python=true -Dwith-lua=true -Dwith-cpp=true
 
 # Allow the installation of plugin files to /usr/local
 override_dh_usrlocal:

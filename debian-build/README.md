@@ -3,8 +3,8 @@
 The Dockerfile located in this folder can be used to build Debian package artifacts for this repository.
 
 1. `cd ./debian-build`
-2. `docker build . -t hdf5-udf-builder`
-3. `docker run --rm -it hdf5-udf-builder`
+2. `docker build . -t hdf5-udf-builder --network host`
+3. `docker run --rm -it hdf5-udf-builder --network host`
 4. `cd /root`
 
 The `syscall_intercept` and `hdf5-udf` directories will contain all build artifacts.

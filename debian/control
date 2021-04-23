@@ -2,7 +2,7 @@ Source: hdf5-udf
 Section: devel
 Priority: optional
 Maintainer: Lucas C. Villa Real <lucasvr@gobolinux.org>
-Build-Depends: debhelper (>=11~), libhdf5-dev, python3-dev, python3-cffi, python3-cffi, libseccomp-dev, luajit, libluajit-5.1-dev, pkg-config, libsyscall-intercept0
+Build-Depends: debhelper (>=11~), libhdf5-dev, python3-dev, python3-cffi, python3-cffi, libseccomp-dev, luajit, libluajit-5.1-dev, pkg-config, libsyscall-intercept0, libsodium-dev, meson, ninja-build
 Standards-Version: 4.1.4
 Homepage: https://github.com/lucasvr/hdf5-udf
 
@@ -10,7 +10,5 @@ Package: hdf5-udf
 Architecture: any
 Multi-Arch: foreign
 Depends: ${misc:Depends}, ${shlibs:Depends}
-Description: HDF5-UDF is a mechanism to dynamically generate HDF5 datasets through user-defined functions (UDFs) written in Lua, Python, or C/C++.
- User-defined functions are compiled into executable form and the result is embedded into HDF5.
- A supporting library gives access to existing datasets from user code so that data analysis and
- derivation of other data can be produced.
+Description: User-Defined Functions for HDF5 provides a mechanism to attach software routines written in Lua, Python, or C/C++ as HDF5 datasets. When such a dataset is read by the application, the associated code executes and produces the datasets contents on-the-fly.
+ A supporting library gives access to existing datasets from user code so that data analysis and derivation of other data can be produced.
