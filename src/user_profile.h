@@ -8,7 +8,9 @@
 #ifndef __user_profile_h
 #define __user_profile_h
 
+#include <sys/types.h>
 #include <dirent.h>
+#include <pwd.h>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -48,7 +50,13 @@ public:
         else if (home)
             configdir = std::string(home) + "/.config/hdf5-udf/";
         else
-            configdir = "/tmp/hdf5-udf/";
+        {
+            auto pwp = getpwuid(getuid());
+            if (pwp)
+                configdir = "/tmp/hdf5-udf." + std::string(pwp->pw_name) + "/";
+            else
+                configdir = "/tmp/hdf5-udf";
+        }
     }
 
     ~SignatureHandler() {}
