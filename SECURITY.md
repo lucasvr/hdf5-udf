@@ -26,10 +26,10 @@ Starting with HDF5-UDF 2.0, a private and public key pair is automatically gener
 and saved to the user's home directory (under `~/.config/hdf5-udf`) the first time
 a dataset is created. The files are named after the currently logged user name:
 
-- `~/.config/hdf5-udf/username.pub`: public key
 - `~/.config/hdf5-udf/username.priv` private key
-- `~/.config/hdf5-udf/username.meta`: contact information (email and full name,
-  manually configured)
+- `~/.config/hdf5-udf/username.pub`: public information: public key, email, and full
+  name. The last two pieces of information are automatically assembled from `hostname`
+  and `/etc/passwd`. Please review and adjust the file as you see fit.
 
 A directory structure providing different `trust profiles` is also created. Inside
 each profile directory exists a JSON file which states the system calls allowed to
