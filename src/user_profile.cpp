@@ -57,6 +57,25 @@ std::string filesystem_basename(std::string path)
     return basename(tmp);
 }
 
+bool get_raw_key(const json &pk, std::string &raw_key)
+{
+    macaron::Base64 base64;
+    auto errmsg = base64.Decode(pk.get<std::string>(), raw_key);
+    if (errmsg.size() > 0)
+    {
+        fprintf(stderr, "Base64: %s\n", errmsg.c_str());
+        return false;
+    }
+    return true;
+}
+
+bool get_base64_key(uint8_t *raw_key, size_t size, std::string &base64_key)
+{
+    macaron::Base64 base64;
+    base64_key = base64.Encode(raw_key, size);
+    return true;
+}
+
 int globError(const char *epath, int eerrno)
 {
     if (eerrno != ENOENT)
@@ -86,7 +105,12 @@ Blob *SignatureHandler::extractPayload(
     json &signature,
     bool first_call)
 {
-    if (first_call && sodium_init() == -1)
+    if (first_call && ! signature.contains("public_key"))
+    {
+        fprintf(stderr, "Error: signature does not contain a public_key\n");
+        return NULL;
+    }
+    else if (first_call && sodium_init() == -1)
     {
         fprintf(stderr, "Failed to initialize libsodium\n");
         return NULL;
@@ -133,31 +157,36 @@ Blob *SignatureHandler::findPublicKey(
     {
         // Read public key
         auto path = globbuf.gl_pathv[i];
-        ifstream file(path, ios::in|ios::binary|ios::ate);
+        ifstream file(path);
         if (! file.is_open())
         {
             fprintf(stderr, "Error opening %s: %s\n", path, strerror(errno));
             continue;
         }
-        auto file_size = file.tellg();
-        file.seekg(0, ios::beg);
-        auto pub_key = new uint8_t[file_size];
-        file.read((char *) pub_key, file_size);
+        json candidate;
+        file >> candidate;
+        file.close();
+
+        if (! candidate.contains("public_key"))
+        {
+            fprintf(stderr, "Error: %s does not contain a public_key entry\n", path);
+            continue;
+        }
+
+        std::string public_key;
+        if (get_raw_key(candidate["public_key"], public_key) == false)
+        {
+            fprintf(stderr, "Error: failed to parse public key from file %s\n", path);
+            continue;
+        }
 
         // Attempt to decrypt the input data with the public key read
         auto data = new uint8_t[size_in];
         auto size = size_in;
-        if (crypto_sign_open(data, &size, in, size_in, pub_key) != 0)
+        if (crypto_sign_open(data, &size, in, size_in, (unsigned char *) &public_key[0]) != 0)
         {
-            const char *extra = i == globbuf.gl_pathc-1 ? "" : ", will try another key";
-            fprintf(stderr, "Could not decode UDF with %s%s\n", path, extra);
-            delete[] pub_key;
             delete[] data;
             continue;
-        }
-        else
-        {
-            fprintf(stderr, "Successfully decoded UDF with %s\n", path);
         }
 
         // Create a new Blob object and set its public_key_path member.
@@ -165,8 +194,6 @@ Blob *SignatureHandler::findPublicKey(
         // file holding the seccomp rules for this UDF.
         auto blob = new Blob(data, size);
         blob->public_key_path = path;
-
-        delete[] pub_key;
         return blob;
     }
 
@@ -184,33 +211,24 @@ bool SignatureHandler::importPublicKey(json &signature)
     // Import public key into the 'deny' repository.
     // Any system calls attempted to be executed by UDFs
     // signed by this key will be rejected by HDF5-UDF.
-    std::string public_key, public_key_base64 = "";
-    if (signature.contains("public_key"))
-        public_key_base64 = signature["public_key"].get<std::string>();
+    std::string email = signature.contains("email") ?
+        signature["email"].get<std::string>() : "unknown";
 
-    macaron::Base64 base64;
-    auto errmsg = base64.Decode(public_key_base64, public_key);
-    if (errmsg.size() > 0)
+    // Find a valid name slot
+    for (int i=0; i<1024; ++i)
     {
-        fprintf(stderr, "Base64: %s\n", errmsg.c_str());
-        return false;
+        std::stringstream ss;
+        ss << configdir << "deny/" << email;
+        if (i > 0)
+            ss << "." << i;
+        ss << ".pub";
+
+        struct stat statbuf;
+        if (stat(ss.str().c_str(), &statbuf) != 0)
+            return saveFile(signature, ss.str(), true);
     }
 
-    // Guarantee a unique file name for the new file
-    std::string path = configdir + "deny/XXXXXX";
-    int fd = mkstemp(&path[0]);
-    if (fd < 0)
-    {
-        fprintf(stderr, "Failed to create file at %s/deny: %s\n",
-            configdir.c_str(), strerror(errno));
-        return false;
-    }
-    close(fd);
-    unlink(path.c_str());
-
-    savePublicKey((uint8_t *) public_key.c_str(), path + ".pub", true);
-    saveMetadata(signature, path + ".meta", true);
-    return true;
+    return false;
 }
 
 Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_in)
@@ -224,15 +242,7 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
     uint8_t public_key[crypto_sign_PUBLICKEYBYTES];
     uint8_t secret_key[crypto_sign_SECRETKEYBYTES];
     std::string path;
-
-    // Default metadata
-    struct utsname uts;
-    memset(&uts, 0, sizeof(uts));
-    uname(&uts);
-    json metadata;
-    auto pw = getpwuid(getuid());
-    metadata["name"] = pw ? (strlen(pw->pw_gecos) ? pw->pw_gecos : pw->pw_name) : "Unknown";
-    metadata["email"] = pw ? std::string(pw->pw_name) + "@" + std::string(uts.nodename) : "user@email";
+    json public_json;
 
     // User's own private key is stored as $configdir/*.priv
     // Note that we pick the first one returned by glob().
@@ -245,20 +255,35 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
         globfree(&globbuf);
 
         // Read private key from the file
-        ifstream file(path, ios::in|ios::binary|ios::ate);
+        ifstream file(path);
         if (! file.is_open())
         {
             fprintf(stderr, "Error opening private key %s\n", path.c_str());
             return NULL;
         }
-        else if (file.tellg() != crypto_sign_SECRETKEYBYTES)
+        json private_json;
+        file >> private_json;
+        file.close();
+
+        if (! private_json.contains("private_key"))
         {
-            fprintf(stderr, "Error: private key %s has %d bytes, expected %u instead\n",
-                path.c_str(), static_cast<int>(file.tellg()), crypto_sign_SECRETKEYBYTES);
+            fprintf(stderr, "Error: %s does not contain a private_key entry\n", path.c_str());
             return NULL;
         }
-        file.seekg(0, ios::beg);
-        file.read((char *) secret_key, crypto_sign_SECRETKEYBYTES);
+
+        std::string secret_key_str;
+        if (get_raw_key(private_json["private_key"], secret_key_str) == false)
+        {
+            fprintf(stderr, "Error: failed to parse private key from file %s\n", path.c_str());
+            return NULL;
+        }
+        else if (secret_key_str.size() != crypto_sign_SECRETKEYBYTES)
+        {
+            fprintf(stderr, "Error: private key %s has %d bytes, expected %u instead\n",
+                path.c_str(), static_cast<int>(secret_key_str.size()), crypto_sign_SECRETKEYBYTES);
+            return NULL;
+        }
+        memcpy(secret_key, &secret_key_str[0], crypto_sign_SECRETKEYBYTES);
 
         // Extract the public key from the secret key
         if (crypto_sign_ed25519_sk_to_pk(public_key, secret_key) != 0)
@@ -268,10 +293,10 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
         }
 
         // Attempt to read key metadata
-        std::string meta_path = path.substr(0, path.find_last_of('.')) + ".meta";
-        ifstream meta_file(meta_path);
-        if (meta_file.is_open())
-            meta_file >> metadata;
+        std::string public_path = path.substr(0, path.find_last_of('.')) + ".pub";
+        ifstream public_file(public_path);
+        if (public_file.is_open())
+            public_file >> public_json;
     }
     else if (ret == GLOB_NOMATCH)
     {
@@ -282,18 +307,42 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
             return NULL;
         }
 
-        if (! createDirectoryTree())
+        std::string base64_public_key, base64_private_key;
+        if (get_base64_key(public_key, crypto_sign_PUBLICKEYBYTES, base64_public_key) == false)
         {
-            fprintf(stderr, "Unable to store generated public and secret keys on disk\n");
+            fprintf(stderr, "Failed to convert public key to base64\n");
             return NULL;
         }
+        if (get_base64_key(secret_key, crypto_sign_SECRETKEYBYTES, base64_private_key) == false)
+        {
+            fprintf(stderr, "Failed to convert private key to base64\n");
+            return NULL;
+        }
+
+        if (! createDirectoryTree())
+        {
+            fprintf(stderr, "Unable to save generated public and secret keys\n");
+            return NULL;
+        }
+
+        // Create metadata
+        struct utsname uts;
+        memset(&uts, 0, sizeof(uts));
+        uname(&uts);
+        auto pw = getpwuid(getuid());
+        json private_json;
+
+        private_json["private_key"] = base64_private_key;
+        public_json["name"] = pw ? (strlen(pw->pw_gecos) ? pw->pw_gecos : pw->pw_name) : "Unknown";
+        public_json["email"] = pw ? std::string(pw->pw_name) + "@" + std::string(uts.nodename) : "user@email";
+        public_json["public_key"] = base64_public_key;
 
         // Save both keys to disk
         std::string private_path = configdir + (pw ? pw->pw_name : "my") + ".priv";
         std::string public_path = configdir + (pw ? pw->pw_name : "my") + ".pub";
-        std::string meta_path = configdir + (pw ? pw->pw_name : "my") + ".meta";
-        savePrivateKey(secret_key, private_path, meta_path, metadata);
-        savePublicKey(public_key, public_path);
+
+        saveFile(private_json, private_path);
+        saveFile(public_json, public_path);
     }
     else if (ret != 0)
     {
@@ -311,10 +360,8 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
         return NULL;
     }
 
-    macaron::Base64 base64;
-    auto public_key_base64 = base64.Encode(public_key, crypto_sign_PUBLICKEYBYTES);
-    auto blob = new Blob(signed_message, signed_message_len, public_key_base64);
-    blob->metadata = metadata;
+    auto blob = new Blob(signed_message, signed_message_len, public_json["public_key"]);
+    blob->metadata = public_json;
     return blob;
 }
 
@@ -489,16 +536,6 @@ bool SignatureHandler::createDirectoryTree()
         JSON_OBJ("uname", true),
 
         JSON_OBJ("# Sockets-related system calls", ""),
-        JSON_OBJ("socket", false),
-        JSON_OBJ("setsockopt", false),
-        JSON_OBJ("connect", false),
-        JSON_OBJ("select", false),
-        JSON_OBJ("poll", false),
-        JSON_OBJ("recv", false),
-        JSON_OBJ("recvfrom", false),
-        JSON_OBJ("send", false),
-        JSON_OBJ("sendto", false),
-        JSON_OBJ("sendmsg", false),
         JSON_OBJ("ioctl", json::object({{"arg", 1}, {"op", "equals"}, {"value", "FIONREAD"}})),
 
         JSON_OBJ("# File descriptor", ""),
@@ -523,45 +560,13 @@ bool SignatureHandler::createDirectoryTree()
     return true;
 }
 
-bool SignatureHandler::savePublicKey(uint8_t *public_key, std::string path, bool overwrite)
+bool SignatureHandler::saveFile(const json &metadata, std::string path, bool overwrite)
 {
     struct stat statbuf;
     if (overwrite || stat(path.c_str(), &statbuf) != 0)
     {
         ofstream file(path);
-        file.write((char *) public_key, crypto_sign_PUBLICKEYBYTES);
-    }
-    return true;
-}
-
-bool SignatureHandler::saveMetadata(json metadata, std::string path, bool overwrite)
-{
-    struct stat statbuf;
-    if (overwrite || stat(path.c_str(), &statbuf) != 0)
-    {
-        ofstream file(path);
-        if (metadata.contains("public_key"))
-            metadata.erase("public_key");
         file << std::setw(4) << metadata << std::endl;
-    }
-    return true;
-}
-
-bool SignatureHandler::savePrivateKey(
-    uint8_t *secret_key,
-    std::string path,
-    std::string meta_path,
-    json &metadata)
-{
-    ifstream file(path);
-    if (! file.is_open())
-    {
-        // Write private key data
-        ofstream priv_file(path);
-        priv_file.write((char *) secret_key, crypto_sign_SECRETKEYBYTES);
-
-        // Write metadata
-        saveMetadata(metadata, meta_path, true);
     }
     return true;
 }

@@ -93,18 +93,8 @@ private:
     // Create directory structure at @configdir
     bool createDirectoryTree();
 
-    // Save public key to disk
-    bool savePublicKey(uint8_t *public_key, std::string path, bool overwrite=false);
-
-    // Save metadata to disk
-    bool saveMetadata(json j, std::string path, bool overwrite=false);
-
-    // Save secret key to disk
-    bool savePrivateKey(
-        uint8_t *secret_key,
-        std::string path,
-        std::string meta_path,
-        json &metadata);
+    // Save JSON to disk
+    bool saveFile(const json &metadata, std::string path, bool overwrite=false);
 
     // Validate JSON file previously serialized by getProfileRules().
     bool validateProfileRules(std::string rulefile, json &rules);
