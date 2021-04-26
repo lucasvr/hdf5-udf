@@ -10,6 +10,7 @@
 
 #include <sys/types.h>
 #include <dirent.h>
+#include <glob.h>
 #include <pwd.h>
 #include <iostream>
 #include <fstream>
@@ -67,7 +68,8 @@ public:
     Blob *extractPayload(
         const uint8_t *in,
         unsigned long long size_in,
-        std::string public_key_base64);
+        json &signature,
+        bool first_call=true);
 
     // Given a payload (such as a UDF), attempt to sign it using the
     // user's own private key. Directory structures are created as
@@ -80,11 +82,22 @@ public:
     bool getProfileRules(std::string public_key_path, json &rules);
 
 private:
+    Blob *findPublicKey(
+        const uint8_t *in,
+        unsigned long long size_in,
+        glob_t &globbuf);
+
+    // Import a given public key and its metadata and save both to disk
+    bool importPublicKey(json &signature);
+
     // Create directory structure at @configdir
     bool createDirectoryTree();
 
     // Save public key to disk
     bool savePublicKey(uint8_t *public_key, std::string path, bool overwrite=false);
+
+    // Save metadata to disk
+    bool saveMetadata(json j, std::string path, bool overwrite=false);
 
     // Save secret key to disk
     bool savePrivateKey(

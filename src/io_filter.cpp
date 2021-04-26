@@ -256,14 +256,12 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         char *bytecode = (char *)(((char *) *buf) + *buf_size - bytecode_size);
         if (jas.contains("signature"))
         {
-            std::string public_key_base64;
-            if (jas["signature"].contains("public_key"))
-                public_key_base64 = jas["signature"]["public_key"].get<std::string>();
-
             // Extract UDF
             auto sighandler = SignatureHandler();
             blob = sighandler.extractPayload(
-                (const uint8_t *) bytecode, (unsigned long long) bytecode_size, public_key_base64);
+                (const uint8_t *) bytecode,
+                (unsigned long long) bytecode_size,
+                jas["signature"]);
             if (blob == NULL)
             {
                 fprintf(stderr, "Could not extract payload from signed UDF\n");
