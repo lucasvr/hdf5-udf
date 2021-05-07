@@ -258,7 +258,7 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
         ifstream file(path);
         if (! file.is_open())
         {
-            fprintf(stderr, "Error opening private key %s\n", path.c_str());
+            fprintf(stderr, "Error opening private key file %s\n", path.c_str());
             return NULL;
         }
         json private_json;
@@ -292,11 +292,15 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
             return NULL;
         }
 
-        // Attempt to read key metadata
+        // Read public key and metadata file
         std::string public_path = path.substr(0, path.find_last_of('.')) + ".pub";
         ifstream public_file(public_path);
-        if (public_file.is_open())
-            public_file >> public_json;
+        if (! public_file.is_open())
+        {
+            fprintf(stderr, "Error opening public key file %s\n",public_path.c_str());
+            return NULL;
+        }
+        public_file >> public_json;
     }
     else if (ret == GLOB_NOMATCH)
     {
