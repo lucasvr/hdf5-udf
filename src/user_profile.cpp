@@ -461,8 +461,10 @@ bool SignatureHandler::validateProfileRules(std::string rulefile, json &rules)
 
             // Check that opcode is valid
             auto rule_op = rule["op"].get<std::string>();
-            if (rule_op.compare("equals") && rule_op.compare("is_set"))
+            if (rule_op.compare("equals") && rule_op.compare("masked_equals"))
                 Fail("invalid value for opcode: '%s'", rule_op.c_str());
+            else if (rule_op.compare("masked_equals") == 0 && ! rule.contains("mask"))
+                Fail("missing 'mask' element for opcode '%s'", rule_op.c_str());
 
             // Check that any given mnemonics are supported
             if (rule["value"].is_string())
@@ -543,8 +545,18 @@ bool SignatureHandler::createDirectoryTree()
         JSON_OBJ("ioctl", json::object({{"arg", 1}, {"op", "equals"}, {"value", "FIONREAD"}})),
 
         JSON_OBJ("# File descriptor", ""),
-        JSON_OBJ("open", json::object({{"arg", 1}, {"op", "is_set"}, {"value", "O_RDONLY"}})),
-        JSON_OBJ("openat", json::object({{"arg", 2}, {"op", "is_set"}, {"value", "O_RDONLY"}})),
+        JSON_OBJ("open", json::object({
+            {"arg", 1},
+            {"op", "masked_equals"},
+            {"mask", "O_ACCMODE"},
+            {"value", "O_RDONLY"}
+        })),
+        JSON_OBJ("openat", json::object({
+            {"arg", 2},
+            {"op", "masked_equals"},
+            {"mask", "O_ACCMODE"},
+            {"value", "O_RDONLY"}
+        })),
         JSON_OBJ("close", true),
         JSON_OBJ("read", false),
         JSON_OBJ("write", json::object({{"arg", 0}, {"op", "equals"}, {"value", 1}})),

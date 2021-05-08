@@ -169,8 +169,6 @@ bool sandbox_init_seccomp(const json &rules)
 {
     // Let the process receive a SIGSYS when it executes a
     // system call that's not allowed.
-    scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_TRAP);
-
     struct sigaction action;
     memset(&action, 0, sizeof(action));
     action.sa_flags = SA_SIGINFO;
@@ -180,6 +178,17 @@ bool sandbox_init_seccomp(const json &rules)
         fprintf(stderr, "Failed setting a handler for SIGSYS: %s\n", strerror(errno));
         return false;
     }
+
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGSYS);
+    if (sigprocmask(SIG_UNBLOCK, &mask, NULL))
+    {
+        fprintf(stderr, "Failed to remove SIGSYS from list of blocked signals\n");
+        return false;
+    }
+
+    scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_TRAP);
 
     // Iterate over the rules to configure Seccomp.
     // Note that the rules have been already validated by the time this function is called.
@@ -208,7 +217,7 @@ bool sandbox_init_seccomp(const json &rules)
                 auto rule_arg = rule["arg"].get<unsigned int>();
                 auto rule_op = rule["op"].get<std::string>();
 
-                unsigned long rule_value;
+                unsigned long rule_value, rule_mask;
                 if (rule["value"].is_string())
                 {
                     auto value = rule["value"].get<std::string>();
@@ -217,15 +226,22 @@ bool sandbox_init_seccomp(const json &rules)
                 else
                     rule_value = rule["value"].get<unsigned long>();
 
-                if (rule_op.compare("equals"))
+                if (rule_op.compare("equals") == 0)
                 {
                     // We currently support specifying a single argument only
                     ALLOW(syscall_nr, 1, SCMP_CMP64(rule_arg, SCMP_CMP_EQ, rule_value));
                     continue;
                 }
-                else if (rule_op.compare("is_set"))
+                else if (rule_op.compare("masked_equals") == 0)
                 {
-                    ALLOW(syscall_nr, 1, SCMP_CMP64(rule_arg, SCMP_CMP_MASKED_EQ, rule_value, rule_value));
+                    if (rule["mask"].is_string())
+                    {
+                        auto value = rule["mask"].get<std::string>();
+                        rule_mask = sysdefs.find(value)->second;
+                    }
+                    else
+                        rule_mask = rule["mask"].get<unsigned long>();
+                    ALLOW(syscall_nr, 1, SCMP_CMP64(rule_arg, SCMP_CMP_MASKED_EQ, rule_mask, rule_value));
                     continue;
                 }
             }
