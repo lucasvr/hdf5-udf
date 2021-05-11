@@ -67,23 +67,14 @@ It is possible to change the trust level by simply **moving that public key to a
 different profile directory**. The next time a UDF signed by that key is read,
 the seccomp rules associated with that profile will be enforced.
 
-### Syscall Intercept
+### Ptrace
 
-System-call filtering is easy to handle until we look into handling syscalls
-issued by Glibc itself -- such as the `gethostbyname` family of functions.
-`gethostbyname` needs to query the DNS server to resolve host names into IP
-addresses. Glibc finds that server by `stat`-ing and `open`-ing `/etc/resolv.conf`
-on the host filesystem. It also performs calls to `uname`, attempts to access
-`/lib/libnss_files.so`, and more. It is possible to configure **seccomp** rules
-so that only specific arguments can be provided to the allowed system calls.
-However, string-based arguments are not supported by the filters. Consequently,
-we have to combine **seccomp** with another mechanism to provide fine-grained
-control of filesystem operations.
+It is possible to configure **seccomp** rules so that only system calls with
+specific arguments are allowed to execute. The exception is that string-based arguments are not processed by **seccomp** filters. Consequently, we have to
+combine **seccomp** with another mechanism to provide fine-grained control of 
+path-based filesystem operations.
 
-**syscall_intercept** is a library developed by Intel that allows one to intercept
-system calls issued by the UDF and by Glibc itself. It is possible to catch calls
-to e.g., `open` and choose to allow or deny the syscall according to the arguments
-provided to the function (including those string-based).
-
-We use **syscall_intercept** on top of **seccomp** to prevent UDFs from accessing 
-files not included in a predefined list.
+We use the **ptrace** interface to intercept system calls issued by the UDF.
+Attempts to access the filesystem are then checked against the trust profile
+associated with that UDF. Accesses that violate the list of configured paths
+lead the UDF process to be terminated.

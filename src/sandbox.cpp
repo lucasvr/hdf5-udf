@@ -3,153 +3,162 @@
  *
  * File: sandbox.cpp
  *
- * High-level interfaces to seccomp and syscall-intercept.
+ * High-level interfaces to seccomp and system call interception for
+ * path-based filtering.
  */
 #include <stdio.h>
+#include <stdbool.h>
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
-#include <dlfcn.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <elf.h>
+#include <sys/ioctl.h>
+#include <seccomp.h>
+#include <syscall.h>
+#include <signal.h>
+#include <algorithm>
+#include <vector>
+#include <string>
 #include "sandbox.h"
-#include "backend.h"
+#include "sysdefs.h"
+#include "json.hpp"
 
-#define SANDBOX_SECTION_NAME ".hdf5-udf-sandbox"
+#ifndef SYS_SECCOMP
+#define SYS_SECCOMP 1
+#endif
 
-// Declare a dummy backend so we can call Backend::saveToDisk()
-class DummyBackend : public Backend {
-public:
-    std::string name() { return ""; }
-    std::string extension() { return ""; }
-
-    std::string compile(
-        std::string udf_file,
-        std::string template_file,
-        std::string cdecl,
-        std::string &source_code,
-        std::vector<DatasetInfo> &input_datasets)
-    { return ""; }
-
-    bool run(
-        const std::string filterpath,
-        const std::vector<DatasetInfo> &input_datasets,
-        const DatasetInfo &output_dataset,
-        const char *output_cast_datatype,
-        const char *udf_blob,
-        size_t udf_blob_size,
-        const json &rules)
-    { return true; }
-
-    std::vector<std::string> udfDatasetNames(std::string udf_file)
-    { return std::vector<std::string>(); }
-};
+using json = nlohmann::json;
 
 bool Sandbox::init(
     std::string filterpath,
     const std::vector<std::string> &paths_allowed,
     const json &rules)
 {
-    // The sandbox library is stored in a special ELF section of the filter file.
-    // We retrieve it from that section, save it to a temporary file and then
-    // dlopen() that file so we can retrieve its symbols.
-    auto so_file = extractSymbol(filterpath, SANDBOX_SECTION_NAME);
-    if (so_file.size() == 0)
-    {
-        fprintf(stderr, "Failed to extract sandbox code from shared library\n");
-        return false;
-    }
-    if (shlib.open(so_file) == false)
-    {
-        unlink(so_file.c_str());
-        return false;
-    }
-
-    // Note that we delete the temporary file prior to the initialization of
-    // the syscall filter, as the filter is unlikely to allow calls to unlink().
-    bool ret = false;
-    bool (*sandbox_init_seccomp)(const json &);
-    bool (*sandbox_init_intercept)(const std::vector<std::string>);
-
-    sandbox_init_seccomp = (bool(*)(const json &))
-        shlib.loadsym("sandbox_init_seccomp");
-    sandbox_init_intercept = (bool(*)(const std::vector<std::string>))
-        shlib.loadsym("sandbox_init_syscall_intercept");
-    unlink(so_file.c_str());
-
-    if (sandbox_init_intercept)
-    {
-        ret = sandbox_init_intercept(paths_allowed);
-        if (ret == false)
-            fprintf(stderr, "Failed to configure sandbox\n");
-    }
-    if (sandbox_init_seccomp)
-    {
-        ret = sandbox_init_seccomp(rules);
-        if (ret == false)
-            fprintf(stderr, "Failed to configure sandbox\n");
-    }
+    bool ret = initSeccomp(rules);
+    if (ret == false)
+        fprintf(stderr, "Failed to configure sandbox\n");
     return ret;
 }
 
-std::string Sandbox::extractSymbol(std::string elf, std::string symbol_name)
+////////////////////////////////////
+// System call filtering interface
+////////////////////////////////////
+
+#define ALLOW(syscall_nr, ...) do { \
+    if (seccomp_rule_add(ctx, SCMP_ACT_ALLOW, syscall_nr, __VA_ARGS__) < 0) { \
+        fprintf(stderr, "Failed to configure seccomp rule for syscall '%s'\n", name.c_str()); \
+        return false; \
+    } \
+} while (0)
+
+static void unallowed_syscall_handler(int signum, siginfo_t *info, void *ucontext)
 {
-    int fd = open(elf.c_str(), O_RDONLY);
-    if (fd < 0)
+    if (info->si_code == SYS_SECCOMP)
     {
-        fprintf(stderr, "Failed to open %s: %s\n", elf.c_str(), strerror(errno));
-        return "";
+        // Note: not every function is async-signal-safe (i.e., functions which can
+        // be safely called within a signal handler). For instance, buffered I/O and
+        // memory allocation are not -- and we use both here for the sake of convenience.
+        // If the program gets interrupted by another signal while we call one of those
+        // functions and the new signal handler also executes one of those functions
+        // chances are that we'll end up with memory corruption. On the good side, we're
+        // just about to kill the process anyway, so this may not hurt at all.
+        char *name = seccomp_syscall_resolve_num_arch(info->si_arch, info->si_syscall);
+        fprintf(stderr, "UDF attempted to execute blocked syscall %s\n", name);
+        free(name);
+        _exit(1);
     }
-    struct stat statbuf;
-    if (fstat(fd, &statbuf) < 0)
+}
+
+bool Sandbox::initSeccomp(const json &rules)
+{
+    // Let the process receive a SIGSYS when it executes a
+    // system call that's not allowed.
+    struct sigaction action;
+    memset(&action, 0, sizeof(action));
+    action.sa_flags = SA_SIGINFO;
+    action.sa_sigaction = unallowed_syscall_handler;
+    if (sigaction(SIGSYS, &action, NULL) < 0)
     {
-        fprintf(stderr, "Failed to stat %s: %s\n", elf.c_str(), strerror(errno));
-        close(fd);
-        return "";
+        fprintf(stderr, "Failed setting a handler for SIGSYS: %s\n", strerror(errno));
+        return false;
     }
 
-    // ELF header
-    Elf64_Ehdr header;
-    read(fd, &header, sizeof(header));
-
-    // ELF symbol table
-    auto symbol_table_size = header.e_shnum * header.e_shentsize;
-    Elf64_Shdr *symbol_table = (Elf64_Shdr *) malloc(symbol_table_size);
-    pread(fd, symbol_table, symbol_table_size, header.e_shoff);
-
-    // ELF string table index
-    auto string_table_offset = symbol_table[header.e_shstrndx].sh_offset;
-    auto string_table_size = symbol_table[header.e_shstrndx].sh_size;
-    char *string_table = (char *) malloc(string_table_size);
-    pread(fd, string_table, string_table_size, string_table_offset);
-
-    std::string payload;
-    for (auto i=0; i<header.e_shnum; ++i)
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGSYS);
+    if (sigprocmask(SIG_UNBLOCK, &mask, NULL))
     {
-        auto my_name = string_table + symbol_table[i].sh_name;
-        auto my_size = symbol_table[i].sh_size;
-        if (symbol_name.compare(my_name) == 0)
+        fprintf(stderr, "Failed to remove SIGSYS from list of blocked signals\n");
+        return false;
+    }
+
+    scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_TRAP);
+
+    // Iterate over the rules to configure Seccomp.
+    // Note that the rules have been already validated by the time this function is called.
+    if (rules.contains("syscalls"))
+    {
+        for (auto &element: rules["syscalls"].items())
         {
-            // Read the library that we have previously attached to this symbol
-            payload.resize(my_size);
-            pread(fd, (void *) payload.data(), my_size, symbol_table[i].sh_offset);
-            break;
+            for (auto &syscall_element: element.value().items())
+            {
+                auto name = syscall_element.key();
+                auto rule = syscall_element.value();
+                if ((name.size() && name[0] == '#'))
+                    continue;
+
+                // Simple case: rule is a boolean
+                auto syscall_nr = seccomp_syscall_resolve_name(name.c_str());
+                if (rule.is_boolean())
+                {
+                    ALLOW(syscall_nr, 0);
+                    continue;
+                }
+
+                // Rule has specific filters. At this point, any string-based rules
+                // have been already converted into a number by the rule validation
+                // code at SignatureHandler::validateProfileRules().
+                auto rule_arg = rule["arg"].get<unsigned int>();
+                auto rule_op = rule["op"].get<std::string>();
+
+                unsigned long rule_value, rule_mask;
+                if (rule["value"].is_string())
+                {
+                    auto value = rule["value"].get<std::string>();
+                    rule_value = sysdefs.find(value)->second;
+                }
+                else
+                    rule_value = rule["value"].get<unsigned long>();
+
+                if (rule_op.compare("equals") == 0)
+                {
+                    // We currently support specifying a single argument only
+                    ALLOW(syscall_nr, 1, SCMP_CMP64(rule_arg, SCMP_CMP_EQ, rule_value));
+                    continue;
+                }
+                else if (rule_op.compare("masked_equals") == 0)
+                {
+                    if (rule["mask"].is_string())
+                    {
+                        auto value = rule["mask"].get<std::string>();
+                        rule_mask = sysdefs.find(value)->second;
+                    }
+                    else
+                        rule_mask = rule["mask"].get<unsigned long>();
+                    ALLOW(syscall_nr, 1, SCMP_CMP64(rule_arg, SCMP_CMP_MASKED_EQ, rule_mask, rule_value));
+                    continue;
+                }
+            }
         }
     }
 
-    free(string_table);
-    free(symbol_table);
-    close(fd);
+    // Load seccomp rules
+    int ret = seccomp_load(ctx);
+    seccomp_release(ctx);
+    if (ret < 0)
+        fprintf(stderr, "Failed to load seccomp filter: %s\n", strerror(errno));
 
-    DummyBackend backend;
-    auto so_file = backend.writeToDisk(payload.data(), payload.size(), ".so");
-    if (so_file.size() == 0)
-    {
-        fprintf(stderr, "Failed to write payload to disk\n");
-        return "";
-    }
-    chmod(so_file.c_str(), 0755);
-    return so_file;
+    return ret == 0;
 }

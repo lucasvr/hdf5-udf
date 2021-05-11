@@ -2,9 +2,8 @@
 
 ## Debian and Ubuntu
 
-The HDF5-UDF package and the syscall_intercept dependency are both hosted
-on a PPA repository. Please run the following commands to include that PPA
-on the list of sources searched by `apt`:
+The HDF5-UDF package is hosted on a PPA repository. Please run the following
+commands to include that PPA on the list of sources searched by `apt`:
 
 ```
 $ apt install -y wget gnupg
@@ -12,12 +11,12 @@ $ echo "deb https://lucasvr.gobolinux.org/debian/repo/ /" >> /etc/apt/sources.li
 $ wget -q -O - https://lucasvr.gobolinux.org/debian/repo/KEY.gpg | apt-key add -
 ```
 
-And then install the binary packages (along with LuaJIT, so that you can
+And then install the binary package (along with LuaJIT, if you want to
 write and read UDFs written in the Lua language) with:
 
 ```
 $ apt update
-$ apt install -y hdf5-udf libsyscall-intercept0 luajit
+$ apt install -y hdf5-udf luajit
 ```
 
 Last, but not least, make sure that the `cffi` Python package is installed so
@@ -29,9 +28,8 @@ $ pip3 install cffi
 
 ## Fedora and RHEL
 
-We host the HDF5-UDF and the syscall_intercept dependency on a YUM
-repository. Please run the following commands to let your system
-search for packages on that location:
+We host the HDF5-UDF package on a YUM repository. Please run the following
+commands to let your system search for packages on that location:
 
 ```
 $ wget -q -O /etc/pki/rpm-gpg/RPM-GPG-KEY-hdf5-udf https://lucasvr.gobolinux.org/fedora/repo/KEY.gpg
@@ -45,10 +43,10 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-hdf5-udf
 EOF
 ```
 
-And now you are ready to install the packages with YUM:
+And now you are ready to install the package with YUM:
 
 ```
-$ yum install -y hdf5-udf libsyscall_intercept
+$ yum install -y hdf5-udf
 ```
 
 Last, please make sure that the `cffi` Python package is installed with:
@@ -70,11 +68,10 @@ pieces of software to allow the embedding of bytecode and their execution:
    alternatively, the [Clang compiler](https://clang.llvm.org).
 
 It is possible to compile the code so that only a restricted number of system
-calls can be executed by the user-defined functions. We rely on three packages
+calls can be executed by the user-defined functions. We rely on two packages
 to limit what the UDF process can do:
 
 - The [libseccomp](https://github.com/seccomp/libseccomp) library
-- The [syscall_intercept](https://github.com/pmem/syscall_intercept) library
 - The [libsodium](https://libsodium.gitbook.io) package, used for UDF signing
   and mapping of foreign public keys to `seccomp` rules
 

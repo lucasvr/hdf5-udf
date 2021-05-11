@@ -29,8 +29,7 @@ public:
         const json &rules);
 
 private:
-    std::string extractSymbol(std::string elf, std::string symbol_name);
-    SharedLibraryManager shlib;
+    bool initSeccomp(const json &rules);
 };
 
 #endif

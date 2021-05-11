@@ -18,7 +18,6 @@ sources = [
   'src/libudf.cpp',
   'src/user_profile.cpp'
 ]
-syscall_intercept_dep = ''
 seccomp_dep = ''
 deps = []
 
@@ -84,9 +83,7 @@ endif
 
 if get_option('with-sandbox')
   sources += ['src/sandbox.cpp']
-  seccomp_dep = dependency('libseccomp', required: true)
-  syscall_intercept_dep = dependency('libsyscall_intercept', required: true)
-  deps += [seccomp_dep]
+  deps += [dependency('libseccomp', required: true)]
   add_global_arguments('-DENABLE_SANDBOX', language: 'cpp')
 endif
 
@@ -134,35 +131,13 @@ iofilter_lib = shared_library(
   install_dir: get_option('libexecdir'),
   install: true)
 
-#########################
-# Output sandbox library
-#########################
-
-if get_option('with-sandbox')
-  sandbox_lib = shared_library(
-    'hdf5-udf-sandbox',
-    ['src/sandbox_library.cpp'],
-    dependencies: [seccomp_dep, syscall_intercept_dep],
-    install: false)
-
-  custom_target('ELF section for sandbox',
-    input: [sandbox_lib, iofilter_lib],
-    output: ['dummy'],
-    command: [
-      join_paths(meson.source_root(), 'src/modify_elf_section'),
-      iofilter_lib.full_path(),
-      sandbox_lib.full_path()
-    ],
-    build_by_default: true)
-endif
-
 ############################################
 # Install headers, generate pkg-config file
 ############################################
 pkg = import('pkgconfig')
 pkg.generate(
   libraries: [seccomp_dep, hdf5_udf_lib],
-  libraries_private: [syscall_intercept_dep],
+  libraries_private: [],
   name: 'HDF5-UDF',
   version: '2.0',
   filebase: 'hdf5-udf',
