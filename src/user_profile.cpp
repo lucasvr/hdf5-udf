@@ -164,8 +164,16 @@ Blob *SignatureHandler::findPublicKey(
             continue;
         }
         json candidate;
-        file >> candidate;
-        file.close();
+        try
+        {
+            file >> candidate;
+            file.close();
+        }
+        catch (nlohmann::detail::parse_error& e)
+        {
+            fprintf(stderr, "Error parsing %s:\n%s\n", path, e.what());
+            continue;
+        }
 
         if (! candidate.contains("public_key"))
         {
@@ -262,8 +270,16 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
             return NULL;
         }
         json private_json;
-        file >> private_json;
-        file.close();
+        try
+        {
+            file >> private_json;
+            file.close();
+        }
+        catch (nlohmann::detail::parse_error& e)
+        {
+            fprintf(stderr, "Error parsing %s:\n%s\n", path.c_str(), e.what());
+            return NULL;
+        }
 
         if (! private_json.contains("private_key"))
         {
@@ -300,7 +316,15 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
             fprintf(stderr, "Error opening public key file %s\n",public_path.c_str());
             return NULL;
         }
-        public_file >> public_json;
+        try
+        {
+            public_file >> public_json;
+        }
+        catch (nlohmann::detail::parse_error& e)
+        {
+            fprintf(stderr, "Error parsing %s:\n%s\n", path.c_str(), e.what());
+            return NULL;
+        }
     }
     else if (ret == GLOB_NOMATCH)
     {
@@ -396,7 +420,15 @@ bool SignatureHandler::getProfileRules(std::string public_key_path, json &rules)
     }
 
     // Deserialize JSON from input stream
-    file >> rules;
+    try
+    {
+        file >> rules;
+    }
+    catch (nlohmann::detail::parse_error& e)
+    {
+        fprintf(stderr, "Error parsing %s:\n%s\n", rulefile.c_str(), e.what());
+        return false;
+    }
 
     return validateProfileRules(rulefile, rules);
 }
