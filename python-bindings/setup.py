@@ -11,7 +11,7 @@ setup(
     long_description_content_type="text/x-rst",
     author="Lucas C. Villa Real",
     author_email="lucasvr@gmail.com",
-    url="https://pyhdf5-udf.readthedocs.io",
+    url="https://hdf5-udf.readthedocs.io",
 
     py_modules=["hdf5_udf"],
     python_requires=">=3.5.10",
