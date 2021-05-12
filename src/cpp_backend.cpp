@@ -222,8 +222,7 @@ bool CppBackend::run(
      * Unfortunately we have to make a trip to disk so we can dlopen()
      * and dlsym() the function we are looking for in a portable way.
      */
-    auto ext = this->extension();
-    auto so_file = Backend::writeToDisk(decompressed_shlib.data(), decompressed_shlib.size(), ext);
+    auto so_file = Backend::writeToDisk(decompressed_shlib.data(), decompressed_shlib.size(), ".so");
     if (so_file.size() == 0)
     {
         fprintf(stderr, "Will not be able to load the UDF function\n");
