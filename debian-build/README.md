@@ -4,7 +4,7 @@ The Dockerfile located in this folder can be used to build Debian package artifa
 
 1. `cd ./debian-build`
 2. `docker build . -t hdf5-udf-builder --network host`
-3. `docker run --rm -it hdf5-udf-builder --network host`
+3. `docker run --rm -it --network host hdf5-udf-builder`
 4. `cd /root`
 
 The `hdf5-udf` directory will contain all build artifacts.
