@@ -4,13 +4,13 @@ from setuptools import setup, find_packages
 
 setup(
     name="PyHDF5-UDF",
-    version="1.0",
+    version="1.1",
     description="User-defined functions for HDF5 - Python bindings",
     description_content_type="text/x-rst",
     long_description=open("README.txt").read(),
     long_description_content_type="text/x-rst",
     author="Lucas C. Villa Real",
-    author_email="lucasvr@gmail.com",
+    author_email="lucasvr@gobolinux.org",
     url="https://hdf5-udf.readthedocs.io",
 
     py_modules=["hdf5_udf"],
