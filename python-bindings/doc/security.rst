@@ -43,12 +43,17 @@ A directory structure providing different `trust profiles` is also created. Insi
 each profile directory exists a JSON file which states the system calls allowed to
 be executed by members of that profile. Three profiles are created:
 
+- **deny**: strict settings that allow writing to ``stdout`` and ``stderr``,
+  memory allocation, and basic process management (so the process can ``exit()``).
 - **default**: a sane configuration that allows memory allocation, opening files in
   read-only mode, writing to ``stdout`` and ``stderr``, and interfacing with the
   terminal device.
-- **deny**: strict settings that simply allow writing to ``stdout`` and ``stderr``.
 - **allow**: poses no restrictions. The UDF is treated as a regular process with
   no special requirements.
+
+The profile configuration files also state which filesystem paths can be accessed
+by UDFs. An attempt to access a filesystem object not covered in the config file
+causes the UDF to be terminated with `SIGKILL`.
 
 Signing UDFs
 ------------

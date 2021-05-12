@@ -6,7 +6,7 @@
 This module provides a Python interface to HDF5-UDF so that users can
 embed routines on HDF5 files programmatically.
 
-Please refer to https://pyhdf5-udf.readthedocs.io for more details
+Please refer to https://hdf5-udf.readthedocs.io for more details
 on this project.
 """
 

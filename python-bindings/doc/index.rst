@@ -1,4 +1,4 @@
-.. PyHDF5-UDF documentation master file, created by
+.. HDF5-UDF documentation master file, created by
    sphinx-quickstart on Thu Apr 15 22:42:44 2021.
 
 .. toctree::
@@ -7,14 +7,21 @@
    :caption: Contents:
 
 
-User-Defined functions for HDF5 - Python bindings
-=================================================
+User-Defined functions for HDF5
+===============================
 
-Installing PyHDF5-UDF
----------------------
+Installing the main library
+---------------------------
 
-This package depends on the `HDF5-UDF <https://github.com/lucasvr/hdf5-udf>`_
-library. Once you have it installed on your system, PIP will bring you the
+Please refer to the project page on `GitHub <https://github.com/lucasvr/hdf5-udf/blob/master/INSTALL.md>`
+for up-to-date instructions on how to install the HDF5-UDF library and its
+utilities from binary packages or in source code form.
+
+
+Installing the Python bindings
+------------------------------
+
+Once the main library has been installed on your system, PIP will bring you the
 latest and greatest:
 
 .. code-block::
@@ -22,7 +29,7 @@ latest and greatest:
    pip install pyhdf5-udf
 
 Getting started
-----------------
+===============
 
 We begin by writing the function that we will compile and store on HDF5. In the
 example below, the dataset will be named "simple". Note the calls to `lib.getData()`
