@@ -9,11 +9,13 @@
 #define __user_profile_h
 
 #include <sys/types.h>
+#include <pcrecpp.h>
 #include <dirent.h>
 #include <glob.h>
 #include <pwd.h>
 #include <iostream>
 #include <fstream>
+#include <vector>
 #include <string>
 #include "json.hpp"
 
@@ -98,8 +100,14 @@ private:
 
     // Validate JSON file previously serialized by getProfileRules().
     bool validateProfileRules(std::string rulefile, json &rules);
+    bool validateSandbox(std::string rulefile, json &rules);
+    bool validateSyscalls(std::string rulefile, json &rules);
+    bool validateFilesystem(std::string rulefile, json &rules);
 
     // Default configuration path
     std::string configdir;
+
+    // PCRE regexes
+    std::vector<pcrecpp::RE> regexes;
 };
 #endif

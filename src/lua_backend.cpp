@@ -322,7 +322,7 @@ bool LuaBackend::run(
         if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
         {
             Sandbox sandbox;
-            ready = sandbox.init(filterpath, std::vector<std::string>(), rules);
+            ready = sandbox.initChild(filterpath, rules);
         }
 #endif
         if (ready)
@@ -353,9 +353,21 @@ bool LuaBackend::run(
     }
     else if (pid > 0)
     {
-        int status;
-        waitpid(pid, &status, 0);
-        ret = WIFEXITED(status) ? WEXITSTATUS(status) == 0 : false;
+        bool need_waitpid = true;
+#ifdef ENABLE_SANDBOX
+        if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
+        {
+            Sandbox sandbox;
+            ret = sandbox.initParent(filterpath, rules, pid);
+            need_waitpid = false;
+        }
+#endif
+        if (need_waitpid)
+        {
+            int status;
+            waitpid(pid, &status, 0);
+            ret = WIFEXITED(status) ? WEXITSTATUS(status) == 0 : false;
+        }
 
         // Update output HDF5 dataset with data from shared memory segment
         memcpy(output_dataset.data, mm.mm, room_size);

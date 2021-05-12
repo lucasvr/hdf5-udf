@@ -462,6 +462,7 @@ bool PythonBackend::executeUDF(
      * Execute the user-defined-function under a separate process so that
      * seccomp can kill it (if needed) without crashing the entire program
      */
+    bool retval = false;
     pid_t pid = fork();
     if (pid == 0)
     {
@@ -470,8 +471,7 @@ bool PythonBackend::executeUDF(
         if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
         {
             Sandbox sandbox;
-            auto paths_allowed = pathsAllowed();
-            ready = sandbox.init(filterpath, paths_allowed, rules);
+            ready = sandbox.initChild(filterpath, rules);
         }
 #endif
         if (ready)
@@ -503,42 +503,24 @@ bool PythonBackend::executeUDF(
     }
     else if (pid > 0)
     {
-        int status;
-        waitpid(pid, &status, 0);
-        return WIFEXITED(status) ? WEXITSTATUS(status) == 0 : false;
+        bool need_waitpid = true;
+#ifdef ENABLE_SANDBOX
+        if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
+        {
+            Sandbox sandbox;
+            retval = sandbox.initParent(filterpath, rules, pid);
+            need_waitpid = false;
+        }
+#endif
+        if (need_waitpid)
+        {
+            int status;
+            waitpid(pid, &status, 0);
+            retval = WIFEXITED(status) ? WEXITSTATUS(status) == 0 : false;
+        }
     }
-    return false;
-}
 
-/* List of paths we need to access (called after Py_Initialize()) */
-std::vector<std::string> PythonBackend::pathsAllowed()
-{
-    std::vector<std::string> paths_allowed;
-    std::wstringstream input(Py_GetPath());
-    std::wstring path;
-
-    // wstring -> string converter
-    std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
-
-    while (std::getline(input, path, L':'))
-    {
-        std::stringstream ss1, ss2, ss3;
-        ss1 << converter.to_bytes(path) << "/pycparser";
-        ss2 << converter.to_bytes(path) << "/pycparser/*";
-        ss3 << converter.to_bytes(path) << "/pycparser/__pycache__/*";
-        paths_allowed.push_back(ss1.str());
-        paths_allowed.push_back(ss2.str());
-        paths_allowed.push_back(ss3.str());
-    }
-    return paths_allowed;
-}
-
-/* Debug helper */
-void PythonBackend::printPyObject(PyObject *obj)
-{
-    PyObject *repr = PyObject_Repr(obj);
-    const char *s = PyUnicode_AsUTF8(repr);
-    printf("%p=%s\n", repr, s);
+    return retval;
 }
 
 /* Scan the UDF file for references to HDF5 dataset names */

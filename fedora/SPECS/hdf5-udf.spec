@@ -15,7 +15,7 @@ Source0:        https://github.com/lucasvr/hdf5-udf/archive/v%{version}%{?pre_sl
 Source1:        hdf5.pc
 
 BuildRequires:  make gcc pkg-config
-Requires:       libseccomp-devel luajit-devel hdf5-devel python3-devel gcc-c++
+Requires:       libseccomp-devel pcre-devel pcre-cpp luajit-devel hdf5-devel python3-devel gcc-c++
 ExclusiveArch:  x86_64
 
 %description

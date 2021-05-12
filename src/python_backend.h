@@ -45,7 +45,6 @@ public:
     std::string compoundToStruct(const DatasetInfo &info, bool hardcoded_name);
 
 private:
-    std::vector<std::string> pathsAllowed();
     void printPyObject(PyObject *obj);
     bool executeUDF(
         PyObject *loadlib,

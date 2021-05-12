@@ -8,7 +8,7 @@ RUN dnf makecache -y
 RUN dnf install -y make cmake clang gcc pkg-config git rpm-build
 
 # Runtime dependencies
-RUN dnf install -y libseccomp-devel luajit-devel hdf5-devel python3-devel gcc-c++
+RUN dnf install -y libseccomp-devel pcre-devel pcre-cpp luajit-devel hdf5-devel python3-devel gcc-c++
 
 # Build time!
 RUN mkdir -p /root/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}

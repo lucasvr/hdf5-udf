@@ -247,6 +247,7 @@ bool CppBackend::run(
      * Execute the user-defined-function under a separate process so that
      * seccomp can kill it (if needed) without crashing the entire program
      */
+    bool retval = false;
     pid_t pid = fork();
     if (pid == 0)
     {
@@ -301,7 +302,7 @@ bool CppBackend::run(
         if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
         {
             Sandbox sandbox;
-            ready = sandbox.init(filterpath, std::vector<std::string>(), rules);
+            ready = sandbox.initChild(filterpath, rules);
         }
 #endif
         if (ready)
@@ -318,13 +319,28 @@ bool CppBackend::run(
     }
     else if (pid > 0)
     {
+        bool need_waitpid = true;
+#ifdef ENABLE_SANDBOX
+        if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
+        {
+            Sandbox sandbox;
+            retval = sandbox.initParent(filterpath, rules, pid);
+            need_waitpid = false;
+        }
+#endif
+        if (need_waitpid)
+        {
+            int status;
+            waitpid(pid, &status, 0);
+            retval = WIFEXITED(status) ? WEXITSTATUS(status) == 0 : false;
+        }
+
         /* Update output HDF5 dataset with data from shared memory segment */
-        waitpid(pid, NULL, 0);
         memcpy(output_dataset.data, mm.mm, room_size);
     }
 
     unlink(so_file.c_str());
-    return true;   
+    return retval;
 }
 
 /* Scan the UDF file for references to HDF5 dataset names */

@@ -53,7 +53,8 @@ udf_template_py = custom_target(
 deps += [
   meson.get_compiler('cpp').find_library('dl', required: true),
   dependency('hdf5', language: 'c', required: true),
-  dependency('libsodium', required: true)
+  dependency('libsodium', required: true),
+  dependency('libpcrecpp', required: true)
 ]
 
 ########################

@@ -20,7 +20,6 @@
 #endif
 #include <map>
 #include <string>
-#include <vector>
 #include <iomanip>
 
 #include "user_profile.h"
@@ -97,6 +96,14 @@ const char *globStrError(int errnum)
         return "no matches found";
     else
         return "unknown error";
+}
+
+bool string_in_vector(const std::string &s, const std::vector<std::string> &v)
+{
+    for (auto &entry: v)
+        if (s.compare(entry) == 0)
+            return true;
+    return false;
 }
 
 Blob *SignatureHandler::extractPayload(
@@ -393,6 +400,8 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
     return blob;
 }
 
+#define JSON_OBJ(k,v) json::object({{k, v}})
+
 bool SignatureHandler::getProfileRules(std::string public_key_path, json &rules)
 {
     std::string public_key_dir = filesystem_parentdir(public_key_path);
@@ -400,8 +409,11 @@ bool SignatureHandler::getProfileRules(std::string public_key_path, json &rules)
     {
         // Special case: public key comes from the very same user (and machine)
         // who's running the UDF. Cook a JSON that allows this UDF to run with
-        // no restrictions.
+        // no restrictions. Note that there's no privilege escalation here: the
+        // UDF will run with the same permissions and capabilities the user
+        // already has.
         rules["sandbox"] = false;
+        rules["filesystem"] = json::array({JSON_OBJ("/**", "rw")});
         return true;
     }
 
@@ -442,20 +454,36 @@ bool SignatureHandler::getProfileRules(std::string public_key_path, json &rules)
 
 bool SignatureHandler::validateProfileRules(std::string rulefile, json &rules)
 {
+    if (! validateSandbox(rulefile, rules))
+        return false;
+    else if (! validateSandbox(rulefile, rules))
+        return false;
+    else if ((! validateFilesystem(rulefile, rules)))
+        return false;
+    return true;
+}
+
+bool SignatureHandler::validateSandbox(std::string rulefile, json &rules)
+{
     if (! rules.contains("sandbox"))
     {
-        fprintf(stderr, "%s: missing mandatory 'sandbox' element\n", rulefile.c_str());
-        return false;
+        std::string name = "sandbox";
+        Fail("element is mandatory");
     }
-    else if (! rules.contains("syscalls"))
+    return true;
+}
+
+bool SignatureHandler::validateSyscalls(std::string rulefile, json &rules)
+{
+    if (! rules.contains("syscalls"))
     {
         // syscalls array is optional
         return true;
     }
     else if (! rules["syscalls"].is_array())
     {
-        fprintf(stderr, "%s: 'syscalls' element must be an array\n", rulefile.c_str());
-        return false;
+        std::string name = "syscalls";
+        Fail("must be an array");
     }
 
     for (auto &element: rules["syscalls"].items())
@@ -510,7 +538,38 @@ bool SignatureHandler::validateProfileRules(std::string rulefile, json &rules)
     return true;
 }
 
-#define JSON_OBJ(k,v) json::object({{k, v}})
+bool SignatureHandler::validateFilesystem(std::string rulefile, json &rules)
+{
+    if (! rules.contains("filesystem"))
+    {
+        // filesystem array is optional
+        return true;
+    }
+    else if (! rules["filesystem"].is_array())
+    {
+        std::string name = "filesystem";
+        Fail("must be an array");
+    }
+
+    for (auto &element: rules["filesystem"].items())
+        for (auto &fs_element: element.value().items())
+        {
+            auto name = fs_element.key();
+            auto rule = fs_element.value();
+            if (name.size() && name[0] == '#')
+                continue;
+
+            if (! rule.is_string())
+                Fail("path access mode must be given by a string");
+
+            auto access_mode = rule.get<std::string>();
+            std::vector<std::string> modes = {"ro", "rw"};
+            if (! string_in_vector(access_mode, modes))
+                Fail("invalid access mode '%s'", access_mode.c_str());
+        }
+
+    return true;
+}
 
 bool SignatureHandler::createDirectoryTree()
 {
@@ -535,23 +594,36 @@ bool SignatureHandler::createDirectoryTree()
     // "Allow": don't enforce sandboxing rules
     allow_cfg["#"] = "Run the UDF in a sandbox?";
     allow_cfg["sandbox"] = false;
+    allow_cfg["filesystem"] = json::array({JSON_OBJ("/**", "rw")});
     if (! filesystem_path_exists(configdir + "allow/allow.json"))
         std::ofstream(configdir + "allow/allow.json") << std::setw(4) << allow_cfg << std::endl;
 
-    // "Deny": don't let the UDF run any syscalls, except for munmap and write(stdout/err)
+    // "Deny": only allow fundamental system calls
+    // No filesystem access is permitted.
     deny_cfg["#"] = "Run the UDF in a sandbox?";
     deny_cfg["sandbox"] = true;
     deny_cfg["syscalls"] = json::array({
+        JSON_OBJ("# Memory management", ""),
+        JSON_OBJ("brk", true),
+        JSON_OBJ("futex", true),
+        JSON_OBJ("mprotect", true),
+        JSON_OBJ("mmap", true),
+        JSON_OBJ("mmap2", true),
         JSON_OBJ("munmap", true),
+
+        JSON_OBJ("# Process management", ""),
+        JSON_OBJ("exit_group", true),
+        JSON_OBJ("rt_sigprocmask", true),
+
+        JSON_OBJ("# Write access to stdout/stderr", ""),
         JSON_OBJ("write", json::object({{"arg", 0}, {"op", "equals"}, {"value", 1}})),
-        JSON_OBJ("write", json::object({{"arg", 0}, {"op", "equals"}, {"value", 2}})),
+        JSON_OBJ("write", json::object({{"arg", 0}, {"op", "equals"}, {"value", 2}}))
     });
+    allow_cfg["filesystem"] = json::array();
     if (! filesystem_path_exists(configdir + "deny/deny.json"))
         std::ofstream(configdir + "deny/deny.json") << std::setw(4) << deny_cfg << std::endl;
 
     // "Default": let common-sense system calls execute.
-    // Note that some syscalls are explicitly disabled, even though that's the default,
-    // so that users can easily turn them on if so they wish.
     default_cfg["#"] = "Run the UDF in a sandbox?";
     default_cfg["sandbox"] = true;
     default_cfg["syscalls"] = json::array({
@@ -565,6 +637,7 @@ bool SignatureHandler::createDirectoryTree()
 
         JSON_OBJ("# Process management", ""),
         JSON_OBJ("exit_group", true),
+        JSON_OBJ("rt_sigprocmask", true),
 
         JSON_OBJ("# Terminal-related", ""),
         JSON_OBJ("ioctl", json::object({{"arg", 1}, {"op", "equals"}, {"value", "TCGETS"}})),
@@ -602,6 +675,17 @@ bool SignatureHandler::createDirectoryTree()
         JSON_OBJ("lseek", true),
         JSON_OBJ("_llseek", true)
     });
+
+    default_cfg["filesystem"] = json::array({
+        JSON_OBJ("/**/python*/site-packages/**", "ro"),
+        JSON_OBJ("/**/libm*", "ro"),
+        JSON_OBJ("/**/libdl*", "ro"),
+        JSON_OBJ("/**/ld-linux*", "ro"),
+        JSON_OBJ("/**/libssl*", "ro"),
+        JSON_OBJ("/**/libcrypto*", "ro"),
+        JSON_OBJ("/**/libpthread*", "ro"),
+    });
+
     if (! filesystem_path_exists(configdir + "default/default.json"))
         std::ofstream(configdir + "default/default.json") << std::setw(4) << default_cfg << std::endl;
 

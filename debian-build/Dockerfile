@@ -6,7 +6,7 @@ ARG GIT_URL=https://github.com/lucasvr/hdf5-udf
 # Install any prerequisite packages.
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential libhdf5-dev python3 \
     python3-dev python3-cffi libseccomp-dev luajit libluajit-5.1-dev libsodium-dev meson ninja-build pkg-config \
-    git devscripts debhelper
+    git devscripts debhelper libpcre++-dev
 
 # Clone code
 RUN mkdir -p /root/build-deb
