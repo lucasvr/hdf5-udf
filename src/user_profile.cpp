@@ -592,7 +592,6 @@ bool SignatureHandler::createDirectoryTree()
     json default_cfg, allow_cfg, deny_cfg;
 
     // "Allow": don't enforce sandboxing rules
-    allow_cfg["#"] = "Run the UDF in a sandbox?";
     allow_cfg["sandbox"] = false;
     allow_cfg["filesystem"] = json::array({JSON_OBJ("/**", "rw")});
     if (! filesystem_path_exists(configdir + "allow/allow.json"))
@@ -600,7 +599,6 @@ bool SignatureHandler::createDirectoryTree()
 
     // "Deny": only allow fundamental system calls
     // No filesystem access is permitted.
-    deny_cfg["#"] = "Run the UDF in a sandbox?";
     deny_cfg["sandbox"] = true;
     deny_cfg["syscalls"] = json::array({
         JSON_OBJ("# Memory management", ""),
@@ -619,12 +617,11 @@ bool SignatureHandler::createDirectoryTree()
         JSON_OBJ("write", json::object({{"arg", 0}, {"op", "equals"}, {"value", 1}})),
         JSON_OBJ("write", json::object({{"arg", 0}, {"op", "equals"}, {"value", 2}}))
     });
-    allow_cfg["filesystem"] = json::array();
+    deny_cfg["filesystem"] = json::array();
     if (! filesystem_path_exists(configdir + "deny/deny.json"))
         std::ofstream(configdir + "deny/deny.json") << std::setw(4) << deny_cfg << std::endl;
 
     // "Default": let common-sense system calls execute.
-    default_cfg["#"] = "Run the UDF in a sandbox?";
     default_cfg["sandbox"] = true;
     default_cfg["syscalls"] = json::array({
         JSON_OBJ("# Memory management", ""),
