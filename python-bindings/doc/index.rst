@@ -29,7 +29,7 @@ latest and greatest:
    pip install pyhdf5-udf
 
 Getting started
-===============
+----------------
 
 We begin by writing the function that we will compile and store on HDF5. In the
 example below, the dataset will be named "simple". Note the calls to `lib.getData()`
@@ -110,6 +110,8 @@ JSON schema for HDF5-UDF datasets
 .. jsonschema:: ../hdf5_udf_resources/hdf5_udf-schema.json
 
 .. include:: security.rst
+
+.. include:: settings.rst
 
 
 Indices and tables
