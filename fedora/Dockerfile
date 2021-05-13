@@ -5,10 +5,13 @@ ARG github_tag=2.0
 
 # Build dependencies
 RUN dnf makecache -y
-RUN dnf install -y make cmake clang gcc pkg-config git rpm-build
+RUN dnf install -y make clang gcc meson pkg-config git rpm-build
 
 # Runtime dependencies
-RUN dnf install -y libseccomp-devel pcre-devel pcre-cpp luajit-devel hdf5-devel python3-devel gcc-c++
+RUN dnf install -y libseccomp-devel libsodium-devel pcre-devel pcre-cpp luajit-devel hdf5-devel python3-devel gcc-c++
+
+# Utilities needed by the RPM packing script
+RUN dnf install -y which
 
 # Build time!
 RUN mkdir -p /root/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}

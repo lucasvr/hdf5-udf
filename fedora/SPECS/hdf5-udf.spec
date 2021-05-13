@@ -5,7 +5,7 @@
 %define debug_package %{nil}
 
 Name:           hdf5-udf
-Version:        1.2
+Version:        2.0
 Release:        1%{?pre_dot}%{?dist}
 Summary:        Support for programmable datasets in HDF5 using Lua, Python, and C/C++ 
 
@@ -14,8 +14,8 @@ URL:            https://github.com/lucasvr/hdf5-udf
 Source0:        https://github.com/lucasvr/hdf5-udf/archive/v%{version}%{?pre_slash}/%{name}-%{version}%{?pre_slash}.tar.gz
 Source1:        hdf5.pc
 
-BuildRequires:  make gcc pkg-config
-Requires:       libseccomp-devel pcre-devel pcre-cpp luajit-devel hdf5-devel python3-devel gcc-c++
+BuildRequires:  meson gcc pkg-config
+Requires:       libseccomp-devel libsodium-devel pcre-devel pcre-cpp luajit-devel hdf5-devel python3-devel gcc-c++ meson
 ExclusiveArch:  x86_64
 
 %description
@@ -30,18 +30,22 @@ derivation of other data can be produced.
 %setup -q -n %{name}-%{version}%{?pre_slash}
 
 %build
-export PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:${RPM_SOURCE_DIR}
-make %{?_smp_mflags}
+%meson -Dwith-python=true -Dwith-lua=true -Dwith-cpp=true --libexecdir=local/hdf5/lib/plugin
+%meson_build
 
 %install
-rm -rf $RPM_BUILD_ROOT
-make install DESTDIR="%{?buildroot}" prefix="/usr" PLUGINDIR="%{_usr}/local/hdf5/lib/plugin" INSTALL="/usr/bin/install -p"
+%meson_install
 
 %files
 %{_bindir}/%{name}
-%{_datadir}/%{name}/*
-%{_usr}/local/hdf5/lib/plugin/libhdf5-udf.so
+%{_libdir}/lib%{name}.*
+%{_libdir}/pkgconfig/%{name}.pc
+%{_includedir}/%{name}.h
+%{_usr}/local/hdf5/lib/plugin/libhdf5-udf-iofilter.so
 
 %changelog
+* Wed May 12 2021 Lucas C. Villa Real <lucasvr@gobolinux.org>
+- Update build system
+
 * Thu Oct 08 2020 Lucas C. Villa Real <lucasvr@gobolinux.org>
 - First version
