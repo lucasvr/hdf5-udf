@@ -13,7 +13,7 @@ User-Defined functions for HDF5
 Installing the main library
 ---------------------------
 
-Please refer to the project page on `GitHub <https://github.com/lucasvr/hdf5-udf/blob/master/INSTALL.md>`
+Please refer to the project page on `GitHub <https://github.com/lucasvr/hdf5-udf/blob/master/INSTALL.md>`_
 for up-to-date instructions on how to install the HDF5-UDF library and its
 utilities from binary packages or in source code form.
 
@@ -32,8 +32,8 @@ Getting started
 ----------------
 
 We begin by writing the function that we will compile and store on HDF5. In the
-example below, the dataset will be named "simple". Note the calls to `lib.getData()`
-and `lib.getDims()`: they are part of HDF5-UDF runtime and provide direct access to
+example below, the dataset will be named "simple". Note the calls to ``lib.getData()``
+and ``lib.getDims()``: they are part of HDF5-UDF runtime and provide direct access to
 the dataset buffer and its dimensions, respectively. See
 :ref:`The lib interface available to UDFs` for details on that interface.
 
@@ -48,8 +48,9 @@ the dataset buffer and its dimensions, respectively. See
       for i in range(dims[0]):
          data[i] = sin(i)
 
-Now, we use the `inspect` module to capture the function's source code and save
-it as a file on disk. HDF5-UDF understands files ending on `.py`, `.cpp`, and `.lua`.
+Now, we use the ``inspect`` module to capture the function's source code and save
+it as a file on disk. HDF5-UDF understands files ending on ``.py``, ``.cpp``, and
+``.lua``.
 
 .. code-block::
 
@@ -69,7 +70,7 @@ on the provided HDF5 file.
       udf.store()
 
 At this point the dataset has been created and it's possible to retrieve its data.
-Note that the call to `f['simple'][:]` triggers the execution of the bytecode we
+Note that the call to ``f['simple'][:]`` triggers the execution of the bytecode we
 just compiled. There's more to the picture than meets the eye!
 
 .. code-block::
