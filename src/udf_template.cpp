@@ -15,7 +15,7 @@
 std::vector<void *> hdf5_udf_data;
 std::vector<const char *> hdf5_udf_names;
 std::vector<const char *> hdf5_udf_types;
-std::vector<std::vector<size_t>> hdf5_udf_dims;
+std::vector<std::vector<size_t> > hdf5_udf_dims;
 
 // compound_declarations_placeholder
 

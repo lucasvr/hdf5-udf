@@ -27,6 +27,7 @@
 #include "cpp_backend.h"
 #include "anon_mmap.h"
 #include "dataset.h"
+#include "os.h"
 #ifdef ENABLE_SANDBOX
 #include "sandbox.h"
 #endif
@@ -240,14 +241,16 @@ struct PythonInterpreter {
 
             // Workaround for CFFI import errors due to missing symbols. We force libpython
             // to be loaded and for all symbols to be resolved by dlopen()
-            void *libpython = dlopen("libpython3.so", RTLD_NOW | RTLD_GLOBAL);
+            std::string libpython_path = os::sharedLibraryName("python3");
+            void *libpython = dlopen(libpython_path.c_str(), RTLD_NOW | RTLD_GLOBAL);
             if (! libpython)
             {
                 char libname[64];
-                snprintf(libname, sizeof(libname)-1, "libpython3.%d.so", PY_MINOR_VERSION);
-                libpython = dlopen(libname, RTLD_NOW | RTLD_GLOBAL);
+                snprintf(libname, sizeof(libname)-1, "python3.%d", PY_MINOR_VERSION);
+                libpython_path = os::sharedLibraryName(libname);
+                libpython = dlopen(libpython_path.c_str(), RTLD_NOW | RTLD_GLOBAL);
                 if (! libpython)
-                    fprintf(stderr, "Warning: could not load %s\n", libname);
+                    fprintf(stderr, "Warning: could not load %s\n", libpython_path.c_str());
             }
         }
         return true;

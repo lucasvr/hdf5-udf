@@ -18,6 +18,7 @@
 #include <vector>
 #include <string>
 #include "json.hpp"
+#include "os.h"
 
 using json = nlohmann::json;
 
@@ -46,20 +47,7 @@ class SignatureHandler {
 public:
     SignatureHandler()
     {
-        const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
-        const char *home = getenv("HOME");
-        if (xdg_config_home)
-            configdir = std::string(xdg_config_home) + "/hdf5-udf/";
-        else if (home)
-            configdir = std::string(home) + "/.config/hdf5-udf/";
-        else
-        {
-            auto pwp = getpwuid(getuid());
-            if (pwp)
-                configdir = "/tmp/hdf5-udf." + std::string(pwp->pw_name) + "/";
-            else
-                configdir = "/tmp/hdf5-udf";
-        }
+        configdir = os::configDirectory();
     }
 
     ~SignatureHandler() {}

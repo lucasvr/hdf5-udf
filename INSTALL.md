@@ -55,6 +55,28 @@ Last, please make sure that the `cffi` Python package is installed with:
 $ pip3 install cffi
 ```
 
+## macOS
+
+There is no binary package currently available for macOS. Still, it is possible
+to build HDF5-UDF from the source code. The macOS port has been tested with
+packages provided by [Homebrew](https://brew.sh). The following instructions
+should get you started. Afterwards, please proceed to *Building from the source
+code"* for the remaining steps.
+
+```
+$ brew install hdf5 pcre libsodium luajit-openresty meson pkgconfig
+$ pip install cffi
+```
+
+Next, add these variables to your environment. It is suggested that you
+also incorporate them into your `$HOME/.zshrc` or `$HOME/.bashrc` in case
+you want to use the LuaJIT backend:
+
+```
+$ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/opt/luajit-openresty/lib/pkgconfig
+$ export PATH=$PATH:/usr/local/opt/luajit-openresty/bin
+```
+
 # Building from the source code
 
 ## Requirements
@@ -77,7 +99,6 @@ to limit what the UDF process can do:
 
 Please follow your distribution instructions to install these packages.
 Also, make sure that you install both regular and development packages.
-
 
 ## Building the code
 

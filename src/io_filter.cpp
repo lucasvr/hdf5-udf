@@ -24,6 +24,7 @@
 #include "debug.h"
 #include "user_profile.h"
 #include "json.hpp"
+#include "os.h"
 
 using namespace std;
 using json = nlohmann::json;
@@ -62,11 +63,11 @@ std::string getFilterPath()
     }
     else
     {
-        paths.push_back("/usr/local/hdf5/lib/plugin");
+        paths.push_back(os::defaultPluginPath());
     }
     for (auto &path: paths) {
         struct stat statbuf;
-        auto p = path + "/libhdf5-udf-iofilter.so";
+        auto p = path + "/" + os::sharedLibraryName("hdf5-udf-iofilter");
         if (stat(p.c_str(), &statbuf) == 0)
             return p;
     }
@@ -76,36 +77,7 @@ std::string getFilterPath()
 /* Retrieve the HDF5 file handle associated with a given dataset name */
 hid_t getDatasetHandle(std::string dataset, bool *handle_from_procfs)
 {
-    /*
-     * Get a list of open files from /proc. This is a workaround for the
-     * lack of an HDF5 Filter API to access the underlying file descriptor.
-     */
-    auto getProcCandidates = [&]()
-    {
-        const char *proc = "/proc/self/fd";
-        std::vector<std::string> out;
-        DIR *d = opendir(proc);
-        if (!d)
-            return out;
-
-        struct dirent *e;
-        while ((e = readdir(d)) != NULL)
-        {
-            struct stat s;
-            auto fname = std::string(proc) + "/" + std::string(e->d_name);
-            if (stat(fname.c_str(), &s) == 0 && S_ISREG(s.st_mode))
-            {
-                char target[PATH_MAX];
-                memset(target, 0, sizeof(target));
-                if (readlink(fname.c_str(), target, sizeof(target)-1) > 0)
-                    out.push_back(target);
-            }
-        }
-        closedir(d);
-        return out;
-    };
-
-    for (auto &fname: getProcCandidates())
+    for (auto &fname: os::openedH5Files())
     {
         // Disable error messages while we probe the candidate file
         H5E_auto2_t old_func;

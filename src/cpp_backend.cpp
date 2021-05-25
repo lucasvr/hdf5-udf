@@ -28,6 +28,7 @@
 #include "anon_mmap.h"
 #include "dataset.h"
 #include "miniz.h"
+#include "os.h"
 #ifdef ENABLE_SANDBOX
 #include "sandbox.h"
 #endif
@@ -92,7 +93,9 @@ std::string CppBackend::compile(
         return "";
     }
 
-    std::string output = udf_file + ".so";
+    std::string sharedlib = os::sharedLibraryName("dummy");
+    std::string ext = sharedlib.substr(sharedlib.find_last_of("."));
+    std::string output = udf_file + ext;
     pid_t pid = fork();
     if (pid == 0)
     {
@@ -109,11 +112,12 @@ std::string CppBackend::compile(
             (char *) "-flto",
             (char *) "-Os",
             (char *) "-C",
+            (char *) "-s",
 #endif
             (char *) "-rdynamic",
             (char *) "-shared",
             (char *) "-fPIC",
-            (char *) "-s",
+            (char *) "-std=c++14",
             (char *) "-o",
             (char *) output.c_str(),
             (char *) cpp_file.c_str(),
@@ -166,8 +170,10 @@ std::string CppBackend::compressBuffer(const char *data, size_t usize)
     compressed.resize(csize);
 
     auto status = mz_compress(
-        (uint8_t *) compressed.data(), &csize,
-        (const uint8_t *) data, usize);
+        (uint8_t *) compressed.data(),
+        (mz_ulong *) &csize,
+        (const uint8_t *) data,
+        usize);
     if (status != Z_OK)
     {
         fprintf(stderr, "Failed to compress input buffer\n");
@@ -190,8 +196,10 @@ std::string CppBackend::decompressBuffer(const char *data, size_t csize)
     uncompressed.resize(usize);
 
     auto status = mz_uncompress(
-        (uint8_t *) uncompressed.data(), &usize,
-        (const uint8_t *) data, csize);
+        (uint8_t *) uncompressed.data(),
+        (mz_ulong *) &usize,
+        (const uint8_t *) data,
+        csize);
     if (status != Z_OK)
     {
         fprintf(stderr, "Failed to uncompress shared library object: %d\n", status);
@@ -222,7 +230,9 @@ bool CppBackend::run(
      * Unfortunately we have to make a trip to disk so we can dlopen()
      * and dlsym() the function we are looking for in a portable way.
      */
-    auto so_file = Backend::writeToDisk(decompressed_shlib.data(), decompressed_shlib.size(), ".so");
+    std::string sharedlib = os::sharedLibraryName("dummy");
+    std::string ext = sharedlib.substr(sharedlib.find_last_of("."));
+    auto so_file = Backend::writeToDisk(decompressed_shlib.data(), decompressed_shlib.size(), ext);
     if (so_file.size() == 0)
     {
         fprintf(stderr, "Will not be able to load the UDF function\n");

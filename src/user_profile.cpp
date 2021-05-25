@@ -19,6 +19,7 @@
 #include <seccomp.h>
 #endif
 #include <map>
+#include <sstream>
 #include <string>
 #include <iomanip>
 

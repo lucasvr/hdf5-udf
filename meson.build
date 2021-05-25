@@ -4,7 +4,7 @@
 
 project('HDF5-UDF', ['c', 'cpp'],
   version: '2.0',
-  meson_version: '>= 0.40.1',
+  meson_version: '>= 0.46.0',
   default_options: [
     'warning_level=1',
     'cpp_std=c++14',
@@ -16,7 +16,9 @@ sources = [
   'src/backend.cpp',
   'src/dataset.cpp',
   'src/libudf.cpp',
-  'src/user_profile.cpp'
+  'src/user_profile.cpp',
+  'src/os_linux.cpp',
+  'src/os_macos.cpp'
 ]
 seccomp_dep = ''
 deps = []
@@ -50,9 +52,10 @@ udf_template_py = custom_target(
 # Required dependencies
 ########################
 
+hdf5_lib = dependency('hdf5', language: 'c', required: true)
 deps += [
+  hdf5_lib,
   meson.get_compiler('cpp').find_library('dl', required: true),
-  dependency('hdf5', language: 'c', required: true),
   dependency('libsodium', required: true),
   dependency('libpcrecpp', required: true)
 ]
@@ -148,3 +151,18 @@ pkg.generate(
 install_headers(
   'src/hdf5-udf.h'
 )
+
+###################
+# Output utilities
+###################
+executable(
+  'createh5',
+  ['examples/createh5.cpp'],
+  dependencies: [hdf5_lib],
+  install: false)
+
+executable(
+  'readh5',
+  ['examples/readh5.cpp'],
+  dependencies: [hdf5_lib],
+  install: false)
