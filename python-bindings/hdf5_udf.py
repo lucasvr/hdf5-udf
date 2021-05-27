@@ -14,10 +14,16 @@ import json
 import hdf5_udf_resources
 
 from os import path
+from sys import platform
 from jsonschema import validate
 from _hdf5_udf import ffi
 
-lib = ffi.dlopen("libhdf5-udf.so")
+if platform == "linux":
+    lib = ffi.dlopen("libhdf5-udf.so")
+elif platform == "darwin":
+    lib = ffi.dlopen("libhdf5-udf.dylib")
+else:
+    raise NotImplementedError(f"{platform} is not currently supported by PyHDF5-UDF")
 
 class UserDefinedFunction:
     """Store a user-defined function on a HDF5 file.
