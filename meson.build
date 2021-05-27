@@ -86,8 +86,12 @@ if get_option('with-lua')
 endif
 
 if get_option('with-sandbox')
-  sources += ['src/sandbox.cpp']
-  deps += [dependency('libseccomp', required: true)]
+  if build_machine.system() == 'linux'
+    sources += ['src/sandbox_linux.cpp']
+    deps += [dependency('libseccomp', required: true)]
+  elif build_machine.system() == 'darwin'
+    sources += ['src/sandbox_macos.cpp']
+  endif
   add_global_arguments('-DENABLE_SANDBOX', language: 'cpp')
 endif
 

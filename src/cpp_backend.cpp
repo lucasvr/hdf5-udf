@@ -29,9 +29,6 @@
 #include "dataset.h"
 #include "miniz.h"
 #include "os.h"
-#ifdef ENABLE_SANDBOX
-#include "sandbox.h"
-#endif
 
 /* This backend's name */
 std::string CppBackend::name()
@@ -310,10 +307,7 @@ bool CppBackend::run(
         bool ready = true;
 #ifdef ENABLE_SANDBOX
         if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
-        {
-            Sandbox sandbox;
-            ready = sandbox.initChild(filterpath, rules);
-        }
+            ready = os::initChildSandbox(filterpath, rules);
 #endif
         if (ready)
         {
@@ -333,8 +327,7 @@ bool CppBackend::run(
 #ifdef ENABLE_SANDBOX
         if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
         {
-            Sandbox sandbox;
-            retval = sandbox.initParent(filterpath, rules, pid);
+            retval = os::initParentSandbox(filterpath, rules, pid);
             need_waitpid = false;
         }
 #endif

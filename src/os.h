@@ -8,8 +8,10 @@
 #ifndef __os_h
 #define __os_h
 
+#include <sys/types.h>
 #include <vector>
 #include <string>
+#include "json.hpp"
 
 namespace os {
 
@@ -26,6 +28,15 @@ namespace os {
 
     // Config directory under the currently logged in user's home
     std::string configDirectory();
+
+    // Convert a system call name to its number. Return -1 on error.
+    int syscallNameToNumber(std::string name);
+
+    // Configure the sandbox at the UDF (child) process
+    bool initChildSandbox(std::string filterpath, const nlohmann::json &rules);
+
+    // Configure the sandbox at the parent process
+    bool initParentSandbox(std::string filterpath, const nlohmann::json &rules, pid_t tracee_pid);
 }
 
 #endif

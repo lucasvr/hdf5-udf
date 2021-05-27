@@ -13,6 +13,9 @@
 #include <string.h>
 #include <pwd.h>
 #include "os.h"
+#ifdef ENABLE_SANDBOX
+#include "sandbox_macos.h"
+#endif
 
 std::vector<std::string> os::openedH5Files()
 {
@@ -58,5 +61,23 @@ std::string os::configDirectory()
             return "/tmp/hdf5-udf";
     }
 }
+
+#ifdef ENABLE_SANDBOX
+int os::syscallNameToNumber(std::string name)
+{
+    // TODO
+    return 0;
+}
+
+bool os::initChildSandbox(std::string filterpath, const nlohmann::json &rules)
+{
+    return MacOSSandbox().initChild(filterpath, rules);
+}
+
+bool os::initParentSandbox(std::string filterpath, const nlohmann::json &rules, pid_t tracee_pid)
+{
+    return MacOSSandbox().initParent(filterpath, rules, tracee_pid);
+}
+#endif // ENABLE_SANDBOX
 
 #endif // __APPLE__

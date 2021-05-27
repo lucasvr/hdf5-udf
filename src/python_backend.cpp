@@ -28,9 +28,6 @@
 #include "anon_mmap.h"
 #include "dataset.h"
 #include "os.h"
-#ifdef ENABLE_SANDBOX
-#include "sandbox.h"
-#endif
 
 // Dataset names, sizes, and types
 static std::vector<DatasetInfo> dataset_info;
@@ -472,10 +469,7 @@ bool PythonBackend::executeUDF(
         bool ready = true;
 #ifdef ENABLE_SANDBOX
         if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
-        {
-            Sandbox sandbox;
-            ready = sandbox.initChild(filterpath, rules);
-        }
+            ready = os::initChildSandbox(filterpath, rules);
 #endif
         if (ready)
         {
@@ -510,8 +504,7 @@ bool PythonBackend::executeUDF(
 #ifdef ENABLE_SANDBOX
         if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
         {
-            Sandbox sandbox;
-            retval = sandbox.initParent(filterpath, rules, pid);
+            retval = os::initParentSandbox(filterpath, rules, pid);
             need_waitpid = false;
         }
 #endif

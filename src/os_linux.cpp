@@ -6,6 +6,7 @@
  * Linux-specific routines
  */
 #ifdef __linux__
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <seccomp.h>
@@ -14,6 +15,9 @@
 #include <string.h>
 #include <pwd.h>
 #include "os.h"
+#ifdef ENABLE_SANDBOX
+#include "sandbox_linux.h"
+#endif
 
 #ifndef SYS_SECCOMP
 #define SYS_SECCOMP 1
@@ -71,5 +75,25 @@ std::string os::configDirectory()
             return "/tmp/hdf5-udf/";
     }
 }
+
+#ifdef ENABLE_SANDBOX
+int os::syscallNameToNumber(std::string name)
+{
+    int ret = seccomp_syscall_resolve_name(name.c_str());
+    if (ret == __NR_SCMP_ERROR)
+        return -1;
+    return ret;
+}
+
+bool os::initChildSandbox(std::string filterpath, const nlohmann::json &rules)
+{
+    return LinuxSandbox().initChild(filterpath, rules);
+}
+
+bool os::initParentSandbox(std::string filterpath, const nlohmann::json &rules, pid_t tracee_pid)
+{
+    return LinuxSandbox().initParent(filterpath, rules, tracee_pid);
+}
+#endif // ENABLE_SANDBOX
 
 #endif // __linux__

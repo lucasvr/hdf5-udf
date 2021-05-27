@@ -1,13 +1,11 @@
 /*
  * HDF5-UDF: User-Defined Functions for HDF5
  *
- * File: sandbox.cpp
+ * File: sandbox_linux.cpp
  *
- * High-level interfaces to seccomp and system call interception for
- * path-based filtering.
+ * High-level interfaces for system call interception on Linux.
  */
 #include <stdio.h>
-#include <stdbool.h>
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
@@ -21,12 +19,10 @@
 #include <limits.h>
 #include <syscall.h>
 #include <signal.h>
-#include <algorithm>
 #include <sstream>
-#include <string>
 #include "sandbox.h"
 #include "sysdefs.h"
-#include "json.hpp"
+#include "sandbox_linux.h"
 
 #ifndef SYS_SECCOMP
 #define SYS_SECCOMP 1
@@ -38,7 +34,7 @@ using json = nlohmann::json;
 // Tracer (parent) process
 ////////////////////////////
 
-bool Sandbox::initParent(std::string filterpath, const json &rules, pid_t tracee_pid)
+bool LinuxSandbox::initParent(std::string filterpath, const json &rules, pid_t tracee_pid)
 {
     if (rules.contains("filesystem"))
     {
@@ -62,7 +58,7 @@ bool Sandbox::initParent(std::string filterpath, const json &rules, pid_t tracee
     return true;
 }
 
-bool Sandbox::parseFilesystemRules(const json &rules)
+bool LinuxSandbox::parseFilesystemRules(const json &rules)
 {
     for (auto &element: rules["filesystem"].items())
         for (auto &fs_element: element.value().items())
@@ -118,7 +114,7 @@ bool Sandbox::parseFilesystemRules(const json &rules)
     return true;
 }
 
-bool Sandbox::monitorSystemCalls(pid_t pid, bool &fatal)
+bool LinuxSandbox::monitorSystemCalls(pid_t pid, bool &fatal)
 {
     int ret, status;
 
@@ -205,7 +201,7 @@ bool Sandbox::monitorSystemCalls(pid_t pid, bool &fatal)
 #define SYSCALL_ARG4(reg) regs.r8
 #define SYSCALL_ARG5(reg) regs.r9
 
-bool Sandbox::allowedFilesystemAccess(
+bool LinuxSandbox::allowedFilesystemAccess(
     pid_t pid,
     const struct user_regs_struct &regs,
     std::string &path)
@@ -281,7 +277,7 @@ bool Sandbox::allowedFilesystemAccess(
     }
 }
 
-std::string Sandbox::syscallPathArgument(pid_t pid, long arg0)
+std::string LinuxSandbox::syscallPathArgument(pid_t pid, long arg0)
 {
     // arg0 = memory address (pid space) of the path
     std::string path;
@@ -345,7 +341,7 @@ std::string Sandbox::syscallPathArgument(pid_t pid, long arg0)
     return "";
 }
 
-std::string Sandbox::syscallPathArgument(pid_t pid, int at_fd, long arg1)
+std::string LinuxSandbox::syscallPathArgument(pid_t pid, int at_fd, long arg1)
 {
     // at_fd = "at" file descriptor
     // arg1 = memory address (pid space) of the path (potentially relative to arg0)
@@ -370,7 +366,7 @@ std::string Sandbox::syscallPathArgument(pid_t pid, int at_fd, long arg1)
     return path1 + "/" + path2;
 }
 
-bool Sandbox::havePermission(std::string path, bool rw_wanted)
+bool LinuxSandbox::havePermission(std::string path, bool rw_wanted)
 {
     // Test the path against the regular expressions loaded from the
     // configuration file.
@@ -406,7 +402,7 @@ static void unallowed_syscall_handler(int signum, siginfo_t *info, void *ucontex
     }
 }
 
-bool Sandbox::initChild(std::string filterpath, const json &rules)
+bool LinuxSandbox::initChild(std::string filterpath, const json &rules)
 {
     // Do not grant new privileges on execve()
     if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) < 0)
@@ -467,7 +463,7 @@ bool Sandbox::initChild(std::string filterpath, const json &rules)
     } \
 } while (0)
 
-bool Sandbox::parseSyscallRules(const json &rules, scmp_filter_ctx &ctx)
+bool LinuxSandbox::parseSyscallRules(const json &rules, scmp_filter_ctx &ctx)
 {
     for (auto &element: rules["syscalls"].items())
         for (auto &syscall_element: element.value().items())

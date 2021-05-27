@@ -15,9 +15,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pwd.h>
-#ifdef ENABLE_SANDBOX
-#include <seccomp.h>
-#endif
 #include <map>
 #include <sstream>
 #include <string>
@@ -26,6 +23,7 @@
 #include "user_profile.h"
 #include "sysdefs.h"
 #include "base64.h"
+#include "os.h"
 
 using namespace std;
 
@@ -497,7 +495,7 @@ bool SignatureHandler::validateSyscalls(std::string rulefile, json &rules)
 
 #ifdef ENABLE_SANDBOX
             // Validate syscall name
-            if (seccomp_syscall_resolve_name(name.c_str()) == __NR_SCMP_ERROR)
+            if (os::syscallNameToNumber(name.c_str()) < 0)
                 Fail("failed to resolve syscall name '%s'", name.c_str());
 #endif
 

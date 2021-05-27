@@ -23,9 +23,7 @@
 #include "lua_backend.h"
 #include "anon_mmap.h"
 #include "dataset.h"
-#ifdef ENABLE_SANDBOX
-#include "sandbox.h"
-#endif
+#include "os.h"
 
 /* Lua context */
 static lua_State *State;
@@ -320,10 +318,7 @@ bool LuaBackend::run(
         bool ready = true;
 #ifdef ENABLE_SANDBOX
         if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
-        {
-            Sandbox sandbox;
-            ready = sandbox.initChild(filterpath, rules);
-        }
+            ready = os::initChildSandbox(filterpath, rules);
 #endif
         if (ready)
         {
@@ -357,8 +352,7 @@ bool LuaBackend::run(
 #ifdef ENABLE_SANDBOX
         if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
         {
-            Sandbox sandbox;
-            ret = sandbox.initParent(filterpath, rules, pid);
+            ret = os::initParentSandbox(filterpath, rules, pid);
             need_waitpid = false;
         }
 #endif
