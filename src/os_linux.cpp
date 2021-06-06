@@ -6,9 +6,10 @@
  * Linux-specific routines
  */
 #ifdef __linux__
+#include <sys/utsname.h>
 #include <sys/syscall.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <stdlib.h>
 #include <seccomp.h>
 #include <unistd.h>
 #include <dirent.h>
@@ -68,6 +69,7 @@ std::string os::configDirectory()
         return std::string(home) + "/.config/hdf5-udf/";
     else
     {
+        fprintf(stderr, "Error: $HOME is not set, falling back to /tmp\n");
         auto pwp = getpwuid(getuid());
         if (pwp)
             return "/tmp/hdf5-udf." + std::string(pwp->pw_name) + "/";
@@ -75,6 +77,12 @@ std::string os::configDirectory()
             return "/tmp/hdf5-udf/";
     }
 }
+
+// os::makeTemporaryFile() implemented on os_posix.cpp
+// os::setEnvironmentVariable() implemented on os_posix.cpp
+// os::clearEnvironmentVariable() implemented on os_posix.cpp
+// os::getUserInformation() implemented on os_posix.cpp
+// os::createDirectory() implemented on os_posix.cpp
 
 #ifdef ENABLE_SANDBOX
 int os::syscallNameToNumber(std::string name)

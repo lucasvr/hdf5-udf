@@ -18,7 +18,9 @@ sources = [
   'src/libudf.cpp',
   'src/user_profile.cpp',
   'src/os_linux.cpp',
-  'src/os_macos.cpp'
+  'src/os_macos.cpp',
+  'src/os_posix.cpp',
+  'src/os_windows.cpp'
 ]
 seccomp_dep = ''
 deps = []

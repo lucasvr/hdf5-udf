@@ -29,6 +29,21 @@ namespace os {
     // Config directory under the currently logged in user's home
     std::string configDirectory();
 
+    // Create a temporary file according to the given template and extension
+    std::string makeTemporaryFile(std::string template_name, std::string extension);
+
+    // Define an environment variable, setenv() style
+    bool setEnvironmentVariable(std::string name, std::string value);
+
+    // Clear an environment variable, unsetenv() style
+    bool clearEnvironmentVariable(std::string name);
+
+    // Get user name, login, and hostname information
+    bool getUserInformation(std::string &name, std::string &login, std::string &host);
+
+    // Create a directory
+    bool createDirectory(std::string name, int mode);
+
     // Convert a system call name to its number. Return -1 on error.
     int syscallNameToNumber(std::string name);
 

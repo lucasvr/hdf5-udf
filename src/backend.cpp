@@ -5,6 +5,7 @@
  *
  * Interfaces with supported code parsers and generators.
  */
+#include <stdlib.h>
 #include <algorithm>
 #include <fstream>
 #include "backend.h"
@@ -17,6 +18,7 @@
 #ifdef ENABLE_PYTHON
 #include "python_backend.h"
 #endif
+#include "os.h"
 
 static std::string textReplace(
     std::string input,
@@ -86,14 +88,13 @@ std::string Backend::assembleUDF(const AssembleData &data)
 
 std::string Backend::writeToDisk(const char *data, size_t size, std::string extension)
 {
-    char *tmp = getenv("TMPDIR") ? : (char *) "/tmp";
-    char path[PATH_MAX];
-    std::ofstream tmpfile;
-    snprintf(path, sizeof(path)-1, "%s/hdf5-udf-XXXXXX%s", tmp, extension.c_str());
-    if (mkstemps(path, extension.size()) < 0){
+    std::string path = os::makeTemporaryFile("hdf5-udf-XXXXXX", extension);
+    if (path.size() == 0)
+    {
         fprintf(stderr, "Error creating temporary file.\n");
         return std::string("");
     }
+    std::ofstream tmpfile;
     tmpfile.open(path);
     tmpfile.write(data, size);
     tmpfile.flush();

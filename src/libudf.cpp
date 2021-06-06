@@ -25,6 +25,7 @@
 #include "dataset.h"
 #include "backend.h"
 #include "json.hpp"
+#include "os.h"
 
 using json = nlohmann::json;
 
@@ -347,9 +348,9 @@ bool HDF5_Handler::extractUDFMetadata(std::string &json_payload)
     // the standard read operation executes. Not an ideal solution, but it works.
 
     char *rdata = new char[1024*1024];
-    setenv("IOFILTER_READ_METADATA", "1", 1);
+    os::setEnvironmentVariable("IOFILTER_READ_METADATA", "1");
     herr_t ret = H5Dread(dset_id, hdf5_datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata);
-    unsetenv("IOFILTER_READ_METADATA");
+    os::clearEnvironmentVariable("IOFILTER_READ_METADATA");
     if (ret < 0)
     {
         delete[] rdata;

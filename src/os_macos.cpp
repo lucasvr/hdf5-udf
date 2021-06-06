@@ -6,8 +6,9 @@
  * macOS-specific routines
  */
 #ifdef __APPLE__
-#include <sys/types.h>
+#include <sys/utsname.h>
 #include <sys/stat.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <dirent.h>
 #include <string.h>
@@ -54,6 +55,7 @@ std::string os::configDirectory()
         return std::string(home) + "/Library/HDF5-UDF/";
     else
     {
+        fprintf(stderr, "Error: $HOME is not set, falling back to /tmp\n");
         auto pwp = getpwuid(getuid());
         if (pwp)
             return "/tmp/hdf5-udf." + std::string(pwp->pw_name) + "/";
@@ -61,6 +63,12 @@ std::string os::configDirectory()
             return "/tmp/hdf5-udf";
     }
 }
+
+// os::makeTemporaryFile() implemented on os_posix.cpp
+// os::setEnvironmentVariable() implemented on os_posix.cpp
+// os::clearEnvironmentVariable() implemented on os_posix.cpp
+// os::getUserInformation() implemented on os_posix.cpp
+// os::createDirectory() implemented on os_posix.cpp
 
 #ifdef ENABLE_SANDBOX
 int os::syscallNameToNumber(std::string name)
