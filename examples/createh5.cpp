@@ -236,7 +236,7 @@ int create_native_varstring(hid_t file_id, int count)
 
     auto _callback = [&](int dim, const char *word)
     {
-        asprintf(&data[dim], "%s", word);
+        data[dim] = strdup(word);
     };
 
     int ret = __create_string_dataset(NATIVE_DIM0, current_dim, _callback);
@@ -384,9 +384,11 @@ int create_compound_dataset_varstring(hid_t file_id, bool simple_layout, int cou
     compound_varstring_t data[COMPOUND_DIM0];
     memset(data, 0, sizeof(data));
     for (int i=0; i<COMPOUND_DIM0; ++i) {
+        char loc[64];
+        snprintf(loc, sizeof(loc)-1, "Location_%d", i);
         data[i].serial_no = i;
         // This is a short-lived program. Just let this one leak.
-        asprintf(&data[i].location, "Location_%d", i);
+        data[i].location = strdup(loc);
         data[i].temperature = COMPOUND_DIM0/(i+1.0);
         data[i].pressure = COMPOUND_DIM0/((i+1)*2.0);
     }
