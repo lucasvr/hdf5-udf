@@ -11,8 +11,6 @@
 #include <sys/types.h>
 #include <pcrecpp.h>
 #include <dirent.h>
-#include <glob.h>
-#include <pwd.h>
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -75,7 +73,7 @@ private:
     Blob *findPublicKey(
         const uint8_t *in,
         unsigned long long size_in,
-        glob_t &globbuf);
+        const std::vector<std::string> &candidates);
 
     // Import a given public key and its metadata and save both to disk
     bool importPublicKey(json &signature);

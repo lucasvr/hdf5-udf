@@ -11,10 +11,8 @@
 #include <sodium.h>
 #include <hdf5.h>
 #include <libgen.h>
-#include <sys/utsname.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <pwd.h>
 #include <map>
 #include <sstream>
 #include <string>
@@ -55,6 +53,12 @@ std::string filesystem_basename(std::string path)
     return basename(tmp);
 }
 
+bool string_ends_with(std::string input, std::string suffix)
+{
+    return input.size() >= suffix.size() &&
+        input.compare(input.size()-suffix.size(), suffix.size(), suffix) == 0;
+}
+
 bool get_raw_key(const json &pk, std::string &raw_key)
 {
     macaron::Base64 base64;
@@ -74,27 +78,38 @@ bool get_base64_key(uint8_t *raw_key, size_t size, std::string &base64_key)
     return true;
 }
 
-int globError(const char *epath, int eerrno)
+bool find_files(std::string dir, std::string ext, std::vector<std::string> &out, bool subdirs=true)
 {
-    if (eerrno != ENOENT)
+    DIR *dp = opendir(dir.c_str());
+    if (! dp)
     {
-        // Report error and stop trying to glob remaining files
-        fprintf(stderr, "Error reading file %s: %s\n", epath, strerror(eerrno));
-        return -1;
+        fprintf(stderr, "Error opening directory %s: %s\n", dir.c_str(), strerror(errno));
+        return false;
     }
-    return 0;
-}
 
-const char *globStrError(int errnum)
-{
-    if (errnum == GLOB_NOSPACE)
-        return "out of memory";
-    else if (errnum == GLOB_ABORTED)
-        return "read error";
-    else if (errnum == GLOB_NOMATCH)
-        return "no matches found";
-    else
-        return "unknown error";
+    struct dirent *entry;
+    while ((entry = readdir(dp)))
+    {
+        if (string_ends_with(entry->d_name, ext))
+        {
+            // Found a match
+            std::string match = dir + "/" + std::string(entry->d_name);
+            out.push_back(match);
+            continue;
+        }
+        // Sadly, MINGW doesn't provide a d_type member on struct dirent, so we have to
+        // stat() the file to tell its type. We could place an ifdef here and save a trip
+        // to the kernel on Linux and MacOS, but it's best to keep the code clean.
+        struct stat statbuf;
+        if (subdirs == true && stat(entry->d_name, &statbuf) == 0 && S_ISDIR(statbuf.st_mode))
+        {
+            // Search one level down
+            std::string subdir = dir + "/" + std::string(entry->d_name);
+            find_files(subdir, ext, out, false);
+        }
+    }
+    closedir(dp);
+    return true;
 }
 
 bool string_in_vector(const std::string &s, const std::vector<std::string> &v)
@@ -125,24 +140,18 @@ Blob *SignatureHandler::extractPayload(
     // User's own public key is stored as $configdir/*.pub
     // Public keys from other users imported into the system
     // are stored as $configdir/{default,allow,deny,...}/*.pub
-    glob_t globbuf;
-    string public_keys = configdir + "{*.pub,*/*.pub}";
-    int ret = glob(public_keys.c_str(), GLOB_BRACE, globError, &globbuf);
-    if (first_call && ret == GLOB_NOMATCH)
+    std::vector<std::string> candidates;
+    if (find_files(configdir, ".pub", candidates) == false)
+        return NULL;
+    else if (candidates.size() == 0)
     {
         // This is a brand new installation: no keys have been imported yet.
         if (importPublicKey(signature) == false)
             return NULL;
         return extractPayload(in, size_in, signature, false);
     }
-    else if (ret != 0)
-    {
-        fprintf(stderr, "Error scanning %s: %s\n", public_keys.c_str(), globStrError(ret));
-        return NULL;
-    }
 
-    Blob *blob = findPublicKey(in, size_in, globbuf);
-    globfree(&globbuf);
+    Blob *blob = findPublicKey(in, size_in, candidates);
     if (first_call && blob == NULL)
     {
         // We have never seen this key before. Import it and retry.
@@ -157,16 +166,15 @@ Blob *SignatureHandler::extractPayload(
 Blob *SignatureHandler::findPublicKey(
     const uint8_t *in,
     unsigned long long size_in,
-    glob_t &globbuf)
+    const std::vector<std::string> &candidates)
 {
-    for (size_t i=0; i<globbuf.gl_pathc; ++i)
+    for (auto &path: candidates)
     {
         // Read public key
-        auto path = globbuf.gl_pathv[i];
         ifstream file(path);
         if (! file.is_open())
         {
-            fprintf(stderr, "Error opening %s: %s\n", path, strerror(errno));
+            fprintf(stderr, "Error opening %s: %s\n", path.c_str(), strerror(errno));
             continue;
         }
         json candidate;
@@ -177,20 +185,20 @@ Blob *SignatureHandler::findPublicKey(
         }
         catch (nlohmann::detail::parse_error& e)
         {
-            fprintf(stderr, "Error parsing %s:\n%s\n", path, e.what());
+            fprintf(stderr, "Error parsing %s:\n%s\n", path.c_str(), e.what());
             continue;
         }
 
         if (! candidate.contains("public_key"))
         {
-            fprintf(stderr, "Error: %s does not contain a public_key entry\n", path);
+            fprintf(stderr, "Error: %s does not contain a public_key entry\n", path.c_str());
             continue;
         }
 
         std::string public_key;
         if (get_raw_key(candidate["public_key"], public_key) == false)
         {
-            fprintf(stderr, "Error: failed to parse public key from file %s\n", path);
+            fprintf(stderr, "Error: failed to parse public key from file %s\n", path.c_str());
             continue;
         }
 
@@ -259,14 +267,13 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
     json public_json;
 
     // User's own private key is stored as $configdir/*.priv
-    // Note that we pick the first one returned by glob().
-    glob_t globbuf;
-    string private_keys = configdir + "*.priv";
-    int ret = glob(private_keys.c_str(), GLOB_BRACE, globError, &globbuf);
-    if (ret == 0)
+    // Note that we pick the first one returned by the scan.
+    std::vector<std::string> candidates;
+    if (find_files(configdir, ".priv", candidates, false) == false)
+        return NULL;
+    else if (candidates.size() > 0)
     {
-        path = globbuf.gl_pathv[0];
-        globfree(&globbuf);
+        path = candidates[0];
 
         // Read private key from the file
         ifstream file(path);
@@ -332,7 +339,7 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
             return NULL;
         }
     }
-    else if (ret == GLOB_NOMATCH)
+    else if (candidates.size() == 0)
     {
         // Create new public and private keys
         if (crypto_sign_keypair(public_key, secret_key))
@@ -360,28 +367,21 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
         }
 
         // Create metadata
-        struct utsname uts;
-        memset(&uts, 0, sizeof(uts));
-        uname(&uts);
-        auto pw = getpwuid(getuid());
         json private_json;
+	std::string username, login, host;
+	os::getUserInformation(username, login, host);
 
         private_json["private_key"] = base64_private_key;
-        public_json["name"] = pw ? (strlen(pw->pw_gecos) ? pw->pw_gecos : pw->pw_name) : "Unknown";
-        public_json["email"] = pw ? std::string(pw->pw_name) + "@" + std::string(uts.nodename) : "user@email";
+        public_json["name"] = username;
+        public_json["email"] = login + "@" + host;
         public_json["public_key"] = base64_public_key;
 
         // Save both keys to disk
-        std::string private_path = configdir + (pw ? pw->pw_name : "my") + ".priv";
-        std::string public_path = configdir + (pw ? pw->pw_name : "my") + ".pub";
+        std::string private_path = configdir + login + ".priv";
+        std::string public_path = configdir + login + ".pub";
 
         saveFile(private_json, private_path);
         saveFile(public_json, public_path);
-    }
-    else if (ret != 0)
-    {
-        fprintf(stderr, "Error scanning %s: %s\n", private_keys.c_str(), globStrError(ret));
-        return NULL;
     }
 
     // Sign the payload
@@ -581,7 +581,7 @@ bool SignatureHandler::createDirectoryTree()
 
     for (auto &dir: dirs)
         if (! filesystem_path_exists(dir))
-            if (mkdir(dir.c_str(), 0755) < 0)
+            if (os::createDirectory(dir, 0755) == false)
             {
                 fprintf(stderr, "Error creating directory %s: %s\n", dir.c_str(), strerror(errno));
                 return false;
