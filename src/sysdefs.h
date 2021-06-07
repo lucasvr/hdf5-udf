@@ -49,6 +49,7 @@ static std::map<std::string, unsigned long> sysdefs = {
 #ifdef O_ACCMODE
     {"O_ACCMODE", O_ACCMODE},
 #endif
+};
 
 #else // !__MINGW64__
 
