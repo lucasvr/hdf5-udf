@@ -27,7 +27,7 @@ std::vector<std::string> os::openedH5Files()
 
 std::string os::sharedLibraryName(std::string name)
 {
-    return "lib" + name + ".so";
+    return "lib" + name + ".dll";
 }
 
 std::string os::defaultPluginPath()
