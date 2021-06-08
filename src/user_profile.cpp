@@ -83,29 +83,34 @@ bool find_files(std::string dir, std::string ext, std::vector<std::string> &out,
     DIR *dp = opendir(dir.c_str());
     if (! dp)
     {
-        fprintf(stderr, "Error opening directory %s: %s\n", dir.c_str(), strerror(errno));
-        return false;
+        // The only error we care about is EPERM. The caller creates the given directory
+	// and retries the operation otherwise.
+        return errno == EPERM ? false : true;
     }
 
     struct dirent *entry;
     while ((entry = readdir(dp)))
     {
+        if (entry->d_name[0] == '.')
+        {
+            // Ignore hidden directories, dot, and dot-dot.
+            continue;
+        }
+        std::string path = dir + "/" + std::string(entry->d_name);
         if (string_ends_with(entry->d_name, ext))
         {
             // Found a match
-            std::string match = dir + "/" + std::string(entry->d_name);
-            out.push_back(match);
+            out.push_back(path);
             continue;
         }
         // Sadly, MINGW doesn't provide a d_type member on struct dirent, so we have to
         // stat() the file to tell its type. We could place an ifdef here and save a trip
         // to the kernel on Linux and MacOS, but it's best to keep the code clean.
         struct stat statbuf;
-        if (subdirs == true && stat(entry->d_name, &statbuf) == 0 && S_ISDIR(statbuf.st_mode))
+        if (subdirs == true && stat(path.c_str(), &statbuf) == 0 && S_ISDIR(statbuf.st_mode))
         {
             // Search one level down
-            std::string subdir = dir + "/" + std::string(entry->d_name);
-            find_files(subdir, ext, out, false);
+            find_files(path, ext, out, false);
         }
     }
     closedir(dp);
