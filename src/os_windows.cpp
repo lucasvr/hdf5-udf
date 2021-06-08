@@ -109,6 +109,16 @@ bool os::createDirectory(std::string name, int mode)
     return ret == 0;
 }
 
+bool os::execCommand(char *program, char *args[])
+{
+    if (_spawnvp(_P_WAIT, program, args) < 0)
+    {
+        fprintf(stderr, "Failed to execute %s: %s\n", program, strerror(errno));
+        return false;
+    }
+    return true;
+}
+
 #ifdef ENABLE_SANDBOX
 int os::syscallNameToNumber(std::string name)
 {

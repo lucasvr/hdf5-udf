@@ -8,9 +8,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/resource.h>
 #include <sys/time.h>
-#include <sys/wait.h>
 #include <unistd.h>
 #include <limits.h>
 #include <string.h>
@@ -24,6 +22,18 @@
 #include "anon_mmap.h"
 #include "dataset.h"
 #include "os.h"
+
+#ifdef __MINGW64__
+#   define fork() 0
+#   define waitpid(p,s,f) do { } while(0)
+#   define WIFEXITED(s) 1
+#   define WEXITSTATUS(s) 0
+    static bool is_windows_os = true;
+#else
+#   include <sys/resource.h>
+#   include <sys/wait.h>
+    static bool is_windows_os = false;
+#endif
 
 /* Lua context */
 static lua_State *State;
@@ -169,46 +179,37 @@ std::string LuaBackend::compile(
     }
 
     std::string output = udf_file + ".bytecode";
-    pid_t pid = fork();
-    if (pid == 0)
+    char *cmd[] = {
+        (char *) "luajit",
+        (char *) "-O3",
+        (char *) "-b",
+        (char *) lua_file.c_str(),
+        (char *) output.c_str(),
+        (char *) NULL
+    };
+    if (os::execCommand(cmd[0], cmd) == false)
     {
-        // Child process
-        char *cmd[] = {
-            (char *) "luajit",
-            (char *) "-O3",
-            (char *) "-b",
-            (char *) lua_file.c_str(),
-            (char *) output.c_str(),
-            (char *) NULL
-        };
-        execvp(cmd[0], cmd);
+        fprintf(stderr, "Failed to build UDF\n");
+        return "";
     }
-    else if (pid > 0)
-    {
-        // Parent
-        int exit_status;
-        wait4(pid, &exit_status, 0, NULL);
 
-        struct stat statbuf;
-        std::string bytecode;
-        if (stat(output.c_str(), &statbuf) == 0) {
-            std::ifstream data(output, std::ifstream::binary);
-            std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(data), {});
-            bytecode.assign(buffer.begin(), buffer.end());
+    struct stat statbuf;
+    std::string bytecode;
+    if (stat(output.c_str(), &statbuf) == 0) {
+        std::ifstream data(output, std::ifstream::binary);
+        std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(data), {});
+        bytecode.assign(buffer.begin(), buffer.end());
 
-            unlink(output.c_str());
-        }
-
-        // Read source file
-        std::ifstream ifs(lua_file.c_str());
-        source_code = std::string((std::istreambuf_iterator<char>(ifs)),
-            (std::istreambuf_iterator<char>()));
-
-        unlink(lua_file.c_str());
-        return bytecode;
+        unlink(output.c_str());
     }
-    fprintf(stderr, "Failed to execute luajit\n");
-    return "";
+
+    // Read source file
+    std::ifstream ifs(lua_file.c_str());
+    source_code = std::string((std::istreambuf_iterator<char>(ifs)),
+        (std::istreambuf_iterator<char>()));
+
+    unlink(lua_file.c_str());
+    return bytecode;
 }
 
 /* Execute the user-defined-function embedded in the given bytecode */
@@ -310,7 +311,13 @@ bool LuaBackend::run(
     }
 
     // Execute the user-defined-function under a separate process so that
-    // seccomp can kill it (if needed) without crashing the entire program
+    // seccomp can kill it (if needed) without crashing the entire program.
+    //
+    // Support for Windows is still experimental; there is no sandboxing as of
+    // yet, and the OS doesn't provide a fork()-like API with similar semantics.
+    // In that case we just let the UDF run in the same process space as the parent.
+    // Note that we define fork() as a no-op that returns 0 so we can reduce the
+    // amount of #ifdef blocks in the body of this function.
     bool ret = false;
     pid_t pid = fork();
     if (pid == 0)
@@ -329,7 +336,7 @@ bool LuaBackend::run(
             {
                 fprintf(stderr, "Failed to invoke the init callback: %s\n", lua_tostring(L, -1));
                 lua_close(L);
-                _exit(1);
+                if (is_windows_os) { ready = false; } else { _exit(1); }
             }
 
             // Call the UDF entry point
@@ -338,13 +345,13 @@ bool LuaBackend::run(
             {
                 fprintf(stderr, "Failed to invoke the dynamic_dataset callback: %s\n", lua_tostring(L, -1));
                 lua_close(L);
-                _exit(1);
+                if (is_windows_os) { ready = false; } else { _exit(1); }
             }
 
             // Flush stdout buffer so we don't miss any messages echoed by the UDF
             fflush(stdout);
         }
-        _exit(0);
+        if (is_windows_os) { ret = ready; } else { _exit(0); }
     }
     else if (pid > 0)
     {

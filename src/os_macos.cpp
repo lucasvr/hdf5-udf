@@ -69,6 +69,7 @@ std::string os::configDirectory()
 // os::clearEnvironmentVariable() implemented on os_posix.cpp
 // os::getUserInformation() implemented on os_posix.cpp
 // os::createDirectory() implemented on os_posix.cpp
+// os::execCommand() implemented on os_posix.cpp
 
 #ifdef ENABLE_SANDBOX
 int os::syscallNameToNumber(std::string name)

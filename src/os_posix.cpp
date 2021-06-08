@@ -68,4 +68,22 @@ bool os::createDirectory(std::string name, int mode)
     return ret == 0;
 }
 
+bool os::execCommand(char *program, char *args[])
+{
+    pid_t pid = fork();
+    if (pid == 0)
+        execvp(program, args);
+    else if (pid > 0)
+    {
+        int exit_status;
+        wait4(pid, &exit_status, 0, NULL);
+    }
+    else if (pid < 0)
+    {
+        fprintf(stderr, "Failed to execute '%s': %s\n", program, strerror(errno));
+        return false;
+    }
+    return true;
+}
+
 #endif // __linux__ or __APPLE__

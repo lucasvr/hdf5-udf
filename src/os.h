@@ -44,6 +44,9 @@ namespace os {
     // Create a directory
     bool createDirectory(std::string name, int mode);
 
+    // Execute a command
+    bool execCommand(char *program, char *args[]);
+
     // Convert a system call name to its number. Return -1 on error.
     int syscallNameToNumber(std::string name);
 
