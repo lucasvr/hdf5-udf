@@ -62,7 +62,10 @@ bool os::getUserInformation(std::string &name, std::string &login, std::string &
 
 bool os::createDirectory(std::string name, int mode)
 {
-    return mkdir(name.c_str(), mode);
+    int ret = mkdir(name.c_str(), mode);
+    if (ret < 0)
+        return errno == EEXIST ? true : false;
+    return ret == 0;
 }
 
 #endif // __linux__ or __APPLE__

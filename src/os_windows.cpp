@@ -103,7 +103,10 @@ bool os::getUserInformation(std::string &name, std::string &login, std::string &
 
 bool os::createDirectory(std::string name, int mode)
 {
-    return _mkdir(name.c_str());
+    int ret = _mkdir(name.c_str());
+    if (ret < 0)
+        return errno == EEXIST ? true : false;
+    return ret == 0;
 }
 
 #ifdef ENABLE_SANDBOX
