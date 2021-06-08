@@ -62,7 +62,7 @@ std::string os::makeTemporaryFile(std::string template_name, std::string extensi
     for (int i=0; i<0x0fffffff; ++i)
     {
         for (int j=0; j<6; ++j)
-            xxxxxx[j] = rand() % strlen(letters);
+            xxxxxx[j] = letters[rand() % strlen(letters)];
         int fd = _sopen(fname, _O_RDWR | _O_CREAT | _O_EXCL, _SH_DENYRW);
         if (fd < 0 && errno == EEXIST)
         {
