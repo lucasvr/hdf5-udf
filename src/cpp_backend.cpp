@@ -244,7 +244,7 @@ bool CppBackend::run(
      */
     size_t room_size = output_dataset.getGridSize() * output_dataset.getStorageSize();
     AnonymousMemoryMap mm(room_size);
-    if (! mm.create())
+    if (! mm.createMapFor(output_dataset.data))
     {
         unlink(so_file.c_str());
         return false;
