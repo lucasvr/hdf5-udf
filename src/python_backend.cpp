@@ -288,7 +288,7 @@ struct PythonInterpreter {
 
 /* Execute the user-defined-function embedded in the given buffer */
 bool PythonBackend::run(
-    const std::string filterpath,
+    const std::string libpath,
     const std::vector<DatasetInfo> &input_datasets,
     const DatasetInfo &output_dataset,
     const char *output_cast_datatype,
@@ -425,16 +425,16 @@ bool PythonBackend::run(
             return false;
         }
 
-        // lib.filterlib = lib.ffi.dlopen(filterpath)
+        // lib.udflib = lib.ffi.dlopen(libpath)
         PyObject *pyargs = PyTuple_New(1);
-        PyObject *pypath = Py_BuildValue("s", filterpath.c_str());
+        PyObject *pypath = Py_BuildValue("s", libpath.c_str());
         PyTuple_SetItem(pyargs, 0, pypath);
         PyObject *dlopen_ret = PyObject_CallObject(ffi_dlopen, pyargs);
         python.decref.push_back(pyargs);
         if (dlopen_ret)
         {
             python.decref.push_back(dlopen_ret);
-            if (PyObject_SetAttrString(lib, "filterlib", dlopen_ret) < 0)
+            if (PyObject_SetAttrString(lib, "udflib", dlopen_ret) < 0)
             {
                 fprintf(stderr, "Failed to initialize lib.ffi\n");
                 return false;
@@ -442,7 +442,7 @@ bool PythonBackend::run(
         }
 
         // Execute the user-defined function
-        retval = executeUDF(loadlib, udf, filterpath, rules);
+        retval = executeUDF(loadlib, udf, libpath, rules);
         if (retval == true)
         {
             // Update output HDF5 dataset with data from shared memory segment
@@ -457,7 +457,7 @@ bool PythonBackend::run(
 bool PythonBackend::executeUDF(
     PyObject *loadlib,
     PyObject *udf,
-    std::string filterpath,
+    std::string libpath,
     const json &rules)
 {
     /*
@@ -471,13 +471,13 @@ bool PythonBackend::executeUDF(
         bool ready = true;
 #ifdef ENABLE_SANDBOX
         if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
-            ready = os::initChildSandbox(filterpath, rules);
+            ready = os::initChildSandbox(libpath, rules);
 #endif
         if (ready)
         {
-            // Run 'lib.load(filterpath)' from udf_template_py
+            // Run 'lib.load(libpath)' from udf_template_py
             PyObject *pyargs = PyTuple_New(1);
-            PyObject *pypath = Py_BuildValue("s", filterpath.c_str());
+            PyObject *pypath = Py_BuildValue("s", libpath.c_str());
             PyTuple_SetItem(pyargs, 0, pypath);
             PyObject *loadret = PyObject_CallObject(loadlib, pyargs);
 
@@ -506,7 +506,7 @@ bool PythonBackend::executeUDF(
 #ifdef ENABLE_SANDBOX
         if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
         {
-            retval = os::initParentSandbox(filterpath, rules, pid);
+            retval = os::initParentSandbox(libpath, rules, pid);
             need_waitpid = false;
         }
 #endif

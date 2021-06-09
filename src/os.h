@@ -51,10 +51,10 @@ namespace os {
     int syscallNameToNumber(std::string name);
 
     // Configure the sandbox at the UDF (child) process
-    bool initChildSandbox(std::string filterpath, const nlohmann::json &rules);
+    bool initChildSandbox(std::string libpath, const nlohmann::json &rules);
 
     // Configure the sandbox at the parent process
-    bool initParentSandbox(std::string filterpath, const nlohmann::json &rules, pid_t tracee_pid);
+    bool initParentSandbox(std::string libpath, const nlohmann::json &rules, pid_t tracee_pid);
 }
 
 #endif

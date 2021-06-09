@@ -14,7 +14,7 @@ using json = nlohmann::json;
 // Tracer (parent) process
 ////////////////////////////
 
-bool MacOSSandbox::initParent(std::string filterpath, const json &rules, pid_t tracee_pid)
+bool MacOSSandbox::initParent(std::string libpath, const json &rules, pid_t tracee_pid)
 {
     // TODO
     return true;
@@ -24,7 +24,7 @@ bool MacOSSandbox::initParent(std::string filterpath, const json &rules, pid_t t
 // Tracee (child) process
 ///////////////////////////
 
-bool MacOSSandbox::initChild(std::string filterpath, const json &rules)
+bool MacOSSandbox::initChild(std::string libpath, const json &rules)
 {
     // TODO
     return true;

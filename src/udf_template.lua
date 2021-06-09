@@ -8,9 +8,9 @@
 
 local lib = {}
 
-function init(filterpath)
+function init(libpath)
     local ffi = require("ffi")
-    local filterlib = ffi.load(filterpath)
+    local udflib = ffi.load(libpath)
     ffi.cdef[[
         void       *luaGetData(const char *);
         const char *luaGetType(const char *);
@@ -48,13 +48,13 @@ function init(filterpath)
     end
 
     lib.getData = function(name)
-        local cast = filterlib.luaGetCast(name)
-        local data = ffi.cast("char*", filterlib.luaGetData(name))
+        local cast = udflib.luaGetCast(name)
+        local data = ffi.cast("char*", udflib.luaGetData(name))
 
         -- To allow 1-based indexing of HDF5 datasets we return a shifted data
         -- container to the Lua application. In case of compounds or structures
         -- the shift size is determined by ffi.sizeof().
-        local elementsize = filterlib.luaGetElementSize(name)
+        local elementsize = udflib.luaGetElementSize(name)
         if elementsize == -1 then
             local datatype = ffi.string(cast):gsub("*", "")
             elementsize = ffi.sizeof(ffi.typeof(datatype))
@@ -64,11 +64,11 @@ function init(filterpath)
     end
 
     lib.getType = function(name)
-        return ffi.string(filterlib.luaGetType(name))
+        return ffi.string(udflib.luaGetType(name))
     end
 
     lib.getDims = function(name)
-        local dims = ffi.string(filterlib.luaGetDims(name))
+        local dims = ffi.string(udflib.luaGetDims(name))
         local t = {}
         for dim in string.gmatch(dims, "([^x]+)") do
             table.insert(t, tonumber(dim))

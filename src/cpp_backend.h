@@ -27,7 +27,7 @@ public:
 
     // Execute a user-defined-function
     bool run(
-        const std::string filterpath,
+        const std::string libpath,
         const std::vector<DatasetInfo> &input_datasets,
         const DatasetInfo &output_dataset,
         const char *output_cast_datatype,

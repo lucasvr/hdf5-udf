@@ -94,14 +94,14 @@ int os::syscallNameToNumber(std::string name)
     return ret;
 }
 
-bool os::initChildSandbox(std::string filterpath, const nlohmann::json &rules)
+bool os::initChildSandbox(std::string libpath, const nlohmann::json &rules)
 {
-    return LinuxSandbox().initChild(filterpath, rules);
+    return LinuxSandbox().initChild(libpath, rules);
 }
 
-bool os::initParentSandbox(std::string filterpath, const nlohmann::json &rules, pid_t tracee_pid)
+bool os::initParentSandbox(std::string libpath, const nlohmann::json &rules, pid_t tracee_pid)
 {
-    return LinuxSandbox().initParent(filterpath, rules, tracee_pid);
+    return LinuxSandbox().initParent(libpath, rules, tracee_pid);
 }
 #endif // ENABLE_SANDBOX
 

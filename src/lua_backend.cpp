@@ -216,7 +216,7 @@ std::string LuaBackend::compile(
 
 /* Execute the user-defined-function embedded in the given bytecode */
 bool LuaBackend::run(
-    const std::string filterpath,
+    const std::string libpath,
     const std::vector<DatasetInfo> &input_datasets,
     const DatasetInfo &output_dataset,
     const char *output_cast_datatype,
@@ -327,13 +327,13 @@ bool LuaBackend::run(
         bool ready = true;
 #ifdef ENABLE_SANDBOX
         if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
-            ready = os::initChildSandbox(filterpath, rules);
+            ready = os::initChildSandbox(libpath, rules);
 #endif
         if (ready)
         {
             // Initialize the UDF library
             lua_getglobal(L, "init");
-            lua_pushstring(L, filterpath.c_str());
+            lua_pushstring(L, libpath.c_str());
             if (lua_pcall(L, 1, 0, 0) != 0)
             {
                 fprintf(stderr, "Failed to invoke the init callback: %s\n", lua_tostring(L, -1));
@@ -361,7 +361,7 @@ bool LuaBackend::run(
 #ifdef ENABLE_SANDBOX
         if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
         {
-            ret = os::initParentSandbox(filterpath, rules, pid);
+            ret = os::initParentSandbox(libpath, rules, pid);
             need_waitpid = false;
         }
 #endif

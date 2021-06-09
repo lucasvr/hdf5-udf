@@ -11,7 +11,7 @@
 # requires access to the filesystem (i.e., readdir, stat, open, etc)
 
 class PythonLib:
-    def load(self, filterpath):
+    def load(self, libpath):
         # self.cffi is initialized from C code
         # self.ffi = cffi.FFI()
 
@@ -23,8 +23,8 @@ class PythonLib:
             // compound_declarations_placeholder
             """, packed=True)
 
-        # self.filterlib is initialized from C code
-        # self.filterlib = self.ffi.dlopen(filterpath)
+        # self.udflib is initialized from C code
+        # self.udflib = self.ffi.dlopen(libpath)
 
     def string(self, structure):
         # Strings are embedded in a structure with a single
@@ -45,18 +45,18 @@ class PythonLib:
 
     def getData(self, name):
         name = self.ffi.new("char[]", name.encode("utf-8"))
-        cast = self.filterlib.pythonGetCast(name)
-        data = self.filterlib.pythonGetData(name)
+        cast = self.udflib.pythonGetCast(name)
+        data = self.udflib.pythonGetData(name)
         ctype = self.ffi.string(cast).decode("utf-8")
         return self.ffi.cast(ctype, data)
 
     def getType(self, name):
         name = self.ffi.new("char[]", name.encode("utf-8"))
-        return self.ffi.string(self.filterlib.pythonGetType(name))
+        return self.ffi.string(self.udflib.pythonGetType(name))
 
     def getDims(self, name):
         name = self.ffi.new("char[]", name.encode("utf-8"))
-        dims = self.filterlib.pythonGetDims(name)
+        dims = self.udflib.pythonGetDims(name)
         dims = self.ffi.string(dims).decode("utf-8")
         return tuple([int(dim) for dim in dims.split("x")])
 

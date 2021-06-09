@@ -225,13 +225,13 @@ int os::syscallNameToNumber(std::string name)
     return 0;
 }
 
-bool os::initChildSandbox(std::string filterpath, const nlohmann::json &rules)
+bool os::initChildSandbox(std::string libpath, const nlohmann::json &rules)
 {
     // TODO
     return true;
 }
 
-bool os::initParentSandbox(std::string filterpath, const nlohmann::json &rules, pid_t tracee_pid)
+bool os::initParentSandbox(std::string libpath, const nlohmann::json &rules, pid_t tracee_pid)
 {
     // TODO
     return true;

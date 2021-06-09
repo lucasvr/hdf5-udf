@@ -48,29 +48,13 @@ struct DatasetHandle {
 void releaseHdf5Datasets(
     std::vector<DatasetHandle *> &handles, std::vector<DatasetInfo> &info);
 
-std::string getFilterPath()
+std::string getLibraryPath()
 {
-    std::vector<std::string> paths;
-
-    const char *env = getenv("HDF5_PLUGIN_PATH");
-    if (env)
-    {
-        std::istringstream ss(env);
-        std::copy(std::istream_iterator<std::string>(ss),
-            std::istream_iterator<std::string>(),
-            std::back_inserter(paths));
-    }
-    else
-    {
-        paths.push_back(os::defaultPluginPath());
-    }
-    for (auto &path: paths) {
-        struct stat statbuf;
-        auto p = path + "/" + os::sharedLibraryName("hdf5-udf-iofilter");
-        if (stat(p.c_str(), &statbuf) == 0)
-            return p;
-    }
-    return "";
+#ifdef __MINGW64__
+    return os::sharedLibraryName("hdf5-udf-0");
+#else
+    return os::sharedLibraryName("hdf5-udf");
+#endif
 }
 
 /* Retrieve the HDF5 file handle associated with a given dataset name */
@@ -260,8 +244,8 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
             return 0;
         }
 
-        auto filterpath = getFilterPath();
-        if (filterpath.size() == 0)
+        auto libpath = getLibraryPath();
+        if (libpath.size() == 0)
         {
             fprintf(stderr, "Failed to identify path to HDF5-UDF filter\n");
             delete blob;
@@ -346,7 +330,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         Benchmark benchmark;
         auto dtype = output_dataset.getCastDatatype();
         if (! backend->run(
-            filterpath, input_info, output_dataset, dtype, bytecode, bytecode_size, rules))
+            libpath, input_info, output_dataset, dtype, bytecode, bytecode_size, rules))
         {
             nbytes = 0;
         } 

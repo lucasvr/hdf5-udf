@@ -17,10 +17,10 @@ public:
     ~MacOSSandbox() {}
 
     // Entry point called by the child process (i.e., the one that runs the UDF).
-    bool initChild(std::string filterpath, const nlohmann::json &rules);
+    bool initChild(std::string libpath, const nlohmann::json &rules);
 
     // Entry point called by the parent process.
-    bool initParent(std::string filterpath, const nlohmann::json &rules, pid_t tracee_pid);
+    bool initParent(std::string libpath, const nlohmann::json &rules, pid_t tracee_pid);
 };
 
 #endif

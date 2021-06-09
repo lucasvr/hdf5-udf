@@ -121,6 +121,7 @@ function Run_Test() {
 }
 
 # Operation
+export LD_LIBRARY_PATH=../build:$LD_LIBRARY_PATH
 export HDF5_PLUGIN_PATH=../build
 export PATH=../build:$PATH
 RESULT_STDOUT=stdout.txt

@@ -20,13 +20,13 @@ public:
     // Entry point called by the child process (i.e., the one that runs the UDF).
     // This method loads Seccomp rules and configures the process so it waits
     // to be controlled by the parent with Ptrace.
-    bool initChild(std::string filterpath, const nlohmann::json &rules);
+    bool initChild(std::string libpath, const nlohmann::json &rules);
 
     // Entry point called by the parent process. This method scans the config
     // file to retrieve the filesystem paths allowed to be accessed by the child
     // process (i.e., the UDF) and monitors the system calls it executes with
     // Ptrace. Filesystem path violations are punished with SIGKILL.
-    bool initParent(std::string filterpath, const nlohmann::json &rules, pid_t tracee_pid);
+    bool initParent(std::string libpath, const nlohmann::json &rules, pid_t tracee_pid);
 
 private:
     bool parseFilesystemRules(const nlohmann::json &rules);

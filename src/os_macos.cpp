@@ -78,14 +78,14 @@ int os::syscallNameToNumber(std::string name)
     return 0;
 }
 
-bool os::initChildSandbox(std::string filterpath, const nlohmann::json &rules)
+bool os::initChildSandbox(std::string libpath, const nlohmann::json &rules)
 {
-    return MacOSSandbox().initChild(filterpath, rules);
+    return MacOSSandbox().initChild(libpath, rules);
 }
 
-bool os::initParentSandbox(std::string filterpath, const nlohmann::json &rules, pid_t tracee_pid)
+bool os::initParentSandbox(std::string libpath, const nlohmann::json &rules, pid_t tracee_pid)
 {
-    return MacOSSandbox().initParent(filterpath, rules, tracee_pid);
+    return MacOSSandbox().initParent(libpath, rules, tracee_pid);
 }
 #endif // ENABLE_SANDBOX
 

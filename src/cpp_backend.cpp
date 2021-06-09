@@ -209,7 +209,7 @@ std::string CppBackend::decompressBuffer(const char *data, size_t csize)
 
 /* Execute the user-defined-function embedded in the given buffer */
 bool CppBackend::run(
-    const std::string filterpath,
+    const std::string libpath,
     const std::vector<DatasetInfo> &input_datasets,
     const DatasetInfo &output_dataset,
     const char *output_cast_datatype,
@@ -309,7 +309,7 @@ bool CppBackend::run(
         bool ready = true;
 #ifdef ENABLE_SANDBOX
         if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
-            ready = os::initChildSandbox(filterpath, rules);
+            ready = os::initChildSandbox(libpath, rules);
 #endif
         if (ready)
         {
@@ -329,7 +329,7 @@ bool CppBackend::run(
 #ifdef ENABLE_SANDBOX
         if (rules.contains("sandbox") && rules["sandbox"].get<bool>() == true)
         {
-            retval = os::initParentSandbox(filterpath, rules, pid);
+            retval = os::initParentSandbox(libpath, rules, pid);
             need_waitpid = false;
         }
 #endif

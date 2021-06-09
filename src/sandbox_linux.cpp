@@ -34,7 +34,7 @@ using json = nlohmann::json;
 // Tracer (parent) process
 ////////////////////////////
 
-bool LinuxSandbox::initParent(std::string filterpath, const json &rules, pid_t tracee_pid)
+bool LinuxSandbox::initParent(std::string libpath, const json &rules, pid_t tracee_pid)
 {
     if (rules.contains("filesystem"))
     {
@@ -402,7 +402,7 @@ static void unallowed_syscall_handler(int signum, siginfo_t *info, void *ucontex
     }
 }
 
-bool LinuxSandbox::initChild(std::string filterpath, const json &rules)
+bool LinuxSandbox::initChild(std::string libpath, const json &rules)
 {
     // Do not grant new privileges on execve()
     if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) < 0)
