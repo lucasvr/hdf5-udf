@@ -199,7 +199,7 @@ std::string LuaBackend::compile(
         std::ifstream data(output, std::ifstream::binary);
         std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(data), {});
         bytecode.assign(buffer.begin(), buffer.end());
-	data.close();
+        data.close();
 
         unlink(output.c_str());
     }
