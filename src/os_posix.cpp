@@ -8,6 +8,7 @@
 #if defined(__linux__) or defined(__APPLE__)
 #include <sys/utsname.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <stdlib.h>
 #include <seccomp.h>
 #include <unistd.h>
