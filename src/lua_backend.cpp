@@ -25,7 +25,7 @@
 
 #ifdef __MINGW64__
 #   define fork() 0
-#   define waitpid(p,s,f) do { } while(0)
+#   define waitpid(p,s,f) do { *s=0; } while(0)
 #   define WIFEXITED(s) 1
 #   define WEXITSTATUS(s) 0
     static bool is_windows_os = true;
@@ -336,7 +336,7 @@ bool LuaBackend::run(
             {
                 fprintf(stderr, "Failed to invoke the init callback: %s\n", lua_tostring(L, -1));
                 lua_close(L);
-                if (is_windows_os) { ready = false; } else { _exit(1); }
+                if (is_windows_os) { return false; } else { _exit(1); }
             }
 
             // Call the UDF entry point
@@ -345,7 +345,7 @@ bool LuaBackend::run(
             {
                 fprintf(stderr, "Failed to invoke the dynamic_dataset callback: %s\n", lua_tostring(L, -1));
                 lua_close(L);
-                if (is_windows_os) { ready = false; } else { _exit(1); }
+                if (is_windows_os) { return false; } else { _exit(1); }
             }
 
             // Flush stdout buffer so we don't miss any messages echoed by the UDF
