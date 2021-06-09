@@ -14,14 +14,113 @@
 #include <direct.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <processthreadsapi.h> // GetCurrentProcess()
+#include <libloaderapi.h>      // GetModuleHandleA()
+#include <handleapi.h>         // CloseHandle()
+#include <fileapi.h>           // GetFinalPathNameByHandleA()
+#include <winternl.h>          // NtQueryObject()
+#include <windows.h>           // VOLUME_NAME_NONE
 #include <share.h>
 #include <io.h>
+#include <regex>
+#include <set>
 #include "os.h"
+
+// Windows protocols: NTSTATUS values
+#define STATUS_INFO_LENGTH_MISMATCH 0xc0000004L
+
+typedef DWORD (WINAPI *NtQueryObject_t)(HANDLE, DWORD, VOID *, DWORD, VOID *);
+typedef DWORD (WINAPI *NtQuerySystemInformation_t)(ULONG, VOID *, ULONG, ULONG *);
+
+
+static bool isFileHandle(const HANDLE obj)
+{
+    // NtQueryObject() needs to be retrieved dlsym()-style
+    HMODULE ntdll = GetModuleHandleA("ntdll.dll");
+    NtQueryObject_t NtQueryObject;
+    NtQueryObject = (NtQueryObject_t) GetProcAddress(ntdll, "NtQueryObject");
+
+    ULONG info_len = 8192;
+    PUBLIC_OBJECT_TYPE_INFORMATION *info = (PUBLIC_OBJECT_TYPE_INFORMATION *) malloc(info_len);
+    if (! NT_SUCCESS(NtQueryObject(obj, ObjectTypeInformation, info, info_len, NULL)))
+    {
+        fprintf(stderr, "Failed to query object type information\n");
+        free(info);
+        return false;
+    }
+
+    bool ret = wcscmp(info->TypeName.Buffer, L"File") == 0;
+    free(info);
+    return ret;
+}
 
 std::vector<std::string> os::openedH5Files()
 {
-    // TODO
     std::vector<std::string> out;
+    std::set<std::string> seen;
+    DWORD status;
+
+    // NtQuerySystemInformation() needs to be retrieved dlsym()-style
+    HMODULE ntdll = GetModuleHandleA("ntdll.dll");
+    NtQuerySystemInformation_t NtQuerySysInfo;
+    NtQuerySysInfo = (NtQuerySystemInformation_t) GetProcAddress(ntdll, "NtQuerySystemInformation");
+
+    // Call NtQuerySystemInformation() until we have figured the minimum required buffer size
+    SYSTEM_INFORMATION_CLASS handleinfo_class = SystemHandleInformation;
+    ULONG handleinfo_len = 1024*1024;
+    SYSTEM_HANDLE_INFORMATION *handleinfo = (SYSTEM_HANDLE_INFORMATION *) malloc(handleinfo_len);
+    while ((status = NtQuerySysInfo(handleinfo_class, handleinfo, handleinfo_len, NULL)) == STATUS_INFO_LENGTH_MISMATCH)
+    {
+        handleinfo_len *= 2;
+        handleinfo = (SYSTEM_HANDLE_INFORMATION *) realloc(handleinfo, handleinfo_len);
+    }
+    if (! NT_SUCCESS(status))
+    {
+        fprintf(stderr, "Failed to query system handles\n");
+        free(handleinfo);
+        return out;
+    }
+
+    // We now have system information at our disposal, so we can start looping over
+    // the handles currently open on the system. We are only considered in handles
+    // of the current process.
+    HANDLE self = GetCurrentProcess();
+    DWORD pid = GetCurrentProcessId();
+    for (ULONG i=0; i<handleinfo->Count; ++i)
+    {
+        SYSTEM_HANDLE_ENTRY handle = handleinfo->Handle[i];
+        if (handle.OwnerPid == pid && isFileHandle((HANDLE) handle.HandleValue))
+        {
+            TCHAR path[MAX_PATH];
+            memset(path, 0, sizeof(path));
+            DWORD flags = VOLUME_NAME_NONE | FILE_NAME_OPENED;
+            if (GetFinalPathNameByHandleA((HANDLE) handle.HandleValue, path, MAX_PATH, flags) >= MAX_PATH)
+            {
+                // Buffer is not large enough to hold the resolved file name
+                continue;
+            }
+            if (seen.find(path) != seen.end() || strlen(path) == 0)
+            {
+                // We have seen this file before or the file name is not valid
+                continue;
+            }
+
+            DWORD attrib = GetFileAttributesA(path);
+            if (attrib == 0xffffffff)
+            {
+                // Not a real file name
+                continue;
+            }
+            else if (attrib & FILE_ATTRIBUTE_NORMAL || attrib & FILE_ATTRIBUTE_ARCHIVE)
+            {
+                // At last!
+                out.push_back(std::string(path));
+            }
+            seen.insert(path);
+        }
+    }
+
+    CloseHandle(self);
     return out;
 }
 
