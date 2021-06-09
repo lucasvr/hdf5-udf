@@ -162,7 +162,7 @@ std::string os::makeTemporaryFile(std::string template_name, std::string extensi
     {
         for (int j=0; j<6; ++j)
             xxxxxx[j] = letters[rand() % strlen(letters)];
-        int fd = _sopen(fname, _O_RDWR | _O_CREAT | _O_EXCL, _SH_DENYRW);
+        int fd = _sopen(fname, _O_RDWR | _O_CREAT | _O_EXCL, _SH_DENYNO, _S_IREAD | _S_IWRITE);
         if (fd < 0 && errno == EEXIST)
         {
             // Name collision. Keep trying! 
