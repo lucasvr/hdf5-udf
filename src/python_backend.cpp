@@ -190,11 +190,13 @@ std::string PythonBackend::compile(
         std::ifstream data(pyc_file, std::ifstream::binary);
         std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(data), {});
         bytecode.assign(buffer.begin(), buffer.end());
+	data.close();
 
         // Read source file
         std::ifstream ifs(py_file.c_str());
         source_code = std::string((std::istreambuf_iterator<char>(ifs)),
             (std::istreambuf_iterator<char>()));
+	ifs.close();
 
         unlink(py_file.c_str());
         unlink(pyc_file.c_str());

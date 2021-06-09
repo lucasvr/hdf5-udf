@@ -199,6 +199,7 @@ std::string LuaBackend::compile(
         std::ifstream data(output, std::ifstream::binary);
         std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(data), {});
         bytecode.assign(buffer.begin(), buffer.end());
+	data.close();
 
         unlink(output.c_str());
     }
@@ -207,6 +208,7 @@ std::string LuaBackend::compile(
     std::ifstream ifs(lua_file.c_str());
     source_code = std::string((std::istreambuf_iterator<char>(ifs)),
         (std::istreambuf_iterator<char>()));
+    ifs.close();
 
     unlink(lua_file.c_str());
     return bytecode;
