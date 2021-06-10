@@ -9,10 +9,7 @@
 #include <dlfcn.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/resource.h>
 #include <sys/time.h>
-#include <sys/wait.h>
-#include <sys/mman.h>
 #include <unistd.h>
 #include <limits.h>
 #include <string.h>
@@ -93,72 +90,61 @@ std::string CppBackend::compile(
     std::string sharedlib = os::sharedLibraryName("dummy");
     std::string ext = sharedlib.substr(sharedlib.find_last_of("."));
     std::string output = udf_file + ext;
-    pid_t pid = fork();
-    if (pid == 0)
-    {
-        // Child process. Note that, when building with Clang, we disable
-        // -flto. That's because Travis CI, at the very least, ships without
-        // Clang's Gold Linker, leading to compile-time failures. We're taking
-        // a more safe path here to avoid having to workaround Travis' limitations.
-        char *cmd[] = {
+
+    // Build the UDF. Note that, when building with Clang, we disable
+    // -flto. That's because Travis CI, at the very least, ships without
+    // Clang's Gold Linker, leading to compile-time failures. We're taking
+    // a more safe path here to avoid having to workaround Travis' limitations.
+    char *cmd[] = {
 #ifdef __clang__
-            (char *) "clang++",
-            (char *) "-O3",
+        (char *) "clang++",
+        (char *) "-O3",
 #else
-            (char *) "g++",
-            (char *) "-flto",
-            (char *) "-Os",
-            (char *) "-C",
-            (char *) "-s",
+        (char *) "g++",
+        (char *) "-flto",
+        (char *) "-Os",
+        (char *) "-C",
+        (char *) "-s",
 #endif
-            (char *) "-rdynamic",
-            (char *) "-shared",
-            (char *) "-fPIC",
-            (char *) "-std=c++14",
-            (char *) "-o",
-            (char *) output.c_str(),
-            (char *) cpp_file.c_str(),
-            (char *) "-lm",
-            NULL
-        };
-        execvp(cmd[0], cmd);
-    }
-    else if (pid > 0)
+#ifndef __MINGW64__
+        (char *) "-rdynamic",
+        (char *) "-fPIC",
+#endif
+        (char *) "-shared",
+        (char *) "-std=c++14",
+        (char *) "-o",
+        (char *) output.c_str(),
+        (char *) cpp_file.c_str(),
+        (char *) "-lm",
+        NULL
+    };
+    if (os::execCommand(cmd[0], cmd, NULL) == false)
     {
-        // Parent
-        int exit_status;
-        wait4(pid, &exit_status, 0, NULL);
-        if (exit_status != 0)
-        {
-            fprintf(stderr, "Failed to compile the UDF\n");
-            unlink(cpp_file.c_str());
-            return "";
-        }
-
-        // Read generated shared library
-        struct stat statbuf;
-        std::string bytecode;
-        if (stat(output.c_str(), &statbuf) == 0) {
-            std::ifstream data(output, std::ifstream::binary);
-            std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(data), {});
-            bytecode.assign(buffer.begin(), buffer.end());
-            data.close();
-            unlink(output.c_str());
-        }
-
-        // Read source file
-        std::ifstream ifs(cpp_file.c_str());
-        source_code = std::string((std::istreambuf_iterator<char>(ifs)),
-            (std::istreambuf_iterator<char>()));
-        ifs.close();
-        
+        fprintf(stderr, "Failed to build UDF\n");
         unlink(cpp_file.c_str());
-
-        // Compress the data
-        return compressBuffer(bytecode.data(), bytecode.size());
+        return "";
     }
-    fprintf(stderr, "Failed to execute the C++ compiler\n");
-    return "";
+
+    // Read generated shared library
+    struct stat statbuf;
+    std::string bytecode;
+    if (stat(output.c_str(), &statbuf) == 0) {
+        std::ifstream data(output, std::ifstream::binary);
+        std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(data), {});
+        bytecode.assign(buffer.begin(), buffer.end());
+        data.close();
+        unlink(output.c_str());
+    }
+
+    // Read source file
+    std::ifstream ifs(cpp_file.c_str());
+    source_code = std::string((std::istreambuf_iterator<char>(ifs)),
+            (std::istreambuf_iterator<char>()));
+    ifs.close();
+    unlink(cpp_file.c_str());
+
+    // Compress the data
+    return compressBuffer(bytecode.data(), bytecode.size());
 }
 
 /* Compress the shared library object and return the result as a string */
@@ -252,10 +238,14 @@ bool CppBackend::run(
         return false;
     }
 
-    /*
-     * Execute the user-defined-function under a separate process so that
-     * seccomp can kill it (if needed) without crashing the entire program
-     */
+    // Execute the user-defined-function under a separate process so that
+    // seccomp can kill it (if needed) without crashing the entire program
+    //
+    // Support for Windows is still experimental; there is no sandboxing as of
+    // yet, and the OS doesn't provide a fork()-like API with similar semantics.
+    // In that case we just let the UDF run in the same process space as the parent.
+    // Note that we define fork() as a no-op that returns 0 so we can reduce the
+    // amount of #ifdef blocks in the body of this function.
     bool retval = false;
     pid_t pid = fork();
     if (pid == 0)
@@ -320,8 +310,8 @@ bool CppBackend::run(
             fflush(stdout);
         }
 
-        /* Exit the process without invoking any callbacks registered with atexit() */
-        _exit(ready ? 0 : 1);
+        // Exit the process without invoking any callbacks registered with atexit()
+        if (os::isWindows()) { retval = ready; } else { _exit(ready ? 0  : 1); }
     }
     else if (pid > 0)
     {
@@ -352,82 +342,41 @@ bool CppBackend::run(
 std::vector<std::string> CppBackend::udfDatasetNames(std::string udf_file)
 {
     std::vector<std::string> output;
+    std::string input;
 
     // We already rely on GCC to build the code, so just invoke its
     // preprocessor to get rid of comments and identify calls to our API
-    int pipefd[2];
-    if (pipe(pipefd) < 0)
+    char *cmd[] = {
+#ifdef __clang__
+        (char *) "clang++",
+#else
+        (char *) "g++",
+        (char *) "-fpreprocessed",
+        (char *) "-dD",
+#endif
+        (char *) "-E",
+        (char *) udf_file.c_str(),
+        (char *) NULL
+    };
+    if (os::execCommand(cmd[0], cmd, &input) == false)
     {
-        fprintf(stderr, "Failed to create pipe\n");
+        fprintf(stderr, "Failed to run the C++ preprocessor\n");
         return output;
     }
 
-    pid_t pid = fork();
-    if (pid == 0)
+    // Go through the output of the preprocessor one line at a time
+    std::string line;
+    std::istringstream iss(input);
+    while (std::getline(iss, line))
     {
-        // Child: runs proprocessor, outputs to pipe
-        dup2(pipefd[1], STDOUT_FILENO);
-        close(pipefd[0]);
-        close(pipefd[1]);
-        char *cmd[] = {
-#ifdef __clang__
-            (char *) "clang++",
-#else
-            (char *) "g++",
-            (char *) "-fpreprocessed",
-            (char *) "-dD",
-#endif
-            (char *) "-E",
-            (char *) udf_file.c_str(),
-            (char *) NULL
-        };
-        execvp(cmd[0], cmd);
-    }
-    else if (pid > 0)
-    {
-        // Parent: reads from pipe, concatenating to 'input' string
-        std::string input;
-        fcntl(pipefd[0], F_SETFL, O_NONBLOCK);
-        while (true)
+        size_t n = line.find("lib.getData");
+        if (n != std::string::npos)
         {
-            char buf[8192];
-            ssize_t n = read(pipefd[0], buf, sizeof(buf));
-            if (n < 0 && errno == EWOULDBLOCK)
-            {
-                int exit_status = 0;
-                if (waitpid(pid, &exit_status, WNOHANG) == pid)
-                {
-                    if (exit_status != 0)
-                    {
-                        fprintf(stderr, "Failed to run the C++ preprocessor\n");
-                        return output;
-                    }
-                    break;
-                }
-                continue;
-            }
-            else if (n <= 0)
-                break;
-            input.append(buf, n);
+            auto start = line.substr(n).find_first_of("\"");
+            auto end = line.substr(n+start+1).find_first_of("\"");
+            auto name = line.substr(n).substr(start+1, end);
+            output.push_back(name);
         }
-
-        // Go through the output of the preprocessor one line at a time
-        std::string line;
-        std::istringstream iss(input);
-        while (std::getline(iss, line))
-        {
-            size_t n = line.find("lib.getData");
-            if (n != std::string::npos)
-            {
-                auto start = line.substr(n).find_first_of("\"");
-                auto end = line.substr(n+start+1).find_first_of("\"");
-                auto name = line.substr(n).substr(start+1, end);
-                output.push_back(name);
-            }
-        }
-
-        close(pipefd[0]);
-        close(pipefd[1]);
     }
     return output;
 }
