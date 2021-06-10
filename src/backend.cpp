@@ -95,7 +95,7 @@ std::string Backend::writeToDisk(const char *data, size_t size, std::string exte
         return std::string("");
     }
     std::ofstream tmpfile;
-    tmpfile.open(path);
+    tmpfile.open(path, std::ofstream::binary);
     tmpfile.write(data, size);
     tmpfile.flush();
     tmpfile.close();
