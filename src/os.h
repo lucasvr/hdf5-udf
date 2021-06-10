@@ -13,6 +13,16 @@
 #include <string>
 #include "json.hpp"
 
+#ifdef __MINGW64__
+# define fork() 0
+# define waitpid(p,s,f) do { *s=0; } while(0)
+# define WIFEXITED(s) 1
+# define WEXITSTATUS(s) 0
+#else
+# include <sys/resource.h>
+# include <sys/wait.h>
+#endif
+
 namespace os {
 
     // Get a list of open files from /proc. This is a workaround for the
@@ -44,8 +54,11 @@ namespace os {
     // Create a directory
     bool createDirectory(std::string name, int mode);
 
-    // Execute a command
-    bool execCommand(char *program, char *args[]);
+    // Execute a command, optionally capturing its stdout to 'out'
+    bool execCommand(char *program, char *args[], std::string *out);
+
+    // Is this a Windows OS?
+    bool isWindows();
 
     // Convert a system call name to its number. Return -1 on error.
     int syscallNameToNumber(std::string name);

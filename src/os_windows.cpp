@@ -89,12 +89,13 @@ std::vector<std::string> os::openedH5Files()
     for (ULONG i=0; i<handleinfo->Count; ++i)
     {
         SYSTEM_HANDLE_ENTRY handle = handleinfo->Handle[i];
-        if (handle.OwnerPid == pid && isFileHandle((HANDLE) handle.HandleValue))
+        HANDLE hval = (HANDLE) (intptr_t) handle.HandleValue;
+        if (handle.OwnerPid == pid && isFileHandle(hval))
         {
             TCHAR path[MAX_PATH];
             memset(path, 0, sizeof(path));
             DWORD flags = VOLUME_NAME_NONE | FILE_NAME_OPENED;
-            if (GetFinalPathNameByHandleA((HANDLE) handle.HandleValue, path, MAX_PATH, flags) >= MAX_PATH)
+            if (GetFinalPathNameByHandleA(hval, path, MAX_PATH, flags) >= MAX_PATH)
             {
                 // Buffer is not large enough to hold the resolved file name
                 continue;
@@ -149,8 +150,8 @@ std::string os::configDirectory()
 
 std::string os::makeTemporaryFile(std::string template_name, std::string extension)
 {
-    char fname[template_name.size()+1];
-    sprintf(fname, "%s", template_name.c_str());
+    char fname[template_name.size()+extension.size()+1];
+    sprintf(fname, "%s%s", template_name.c_str(), extension.c_str());
     char *xxxxxx = strstr(fname, "XXXXXX");
     if (! xxxxxx)
     {
@@ -174,7 +175,12 @@ std::string os::makeTemporaryFile(std::string template_name, std::string extensi
             return "";
         }
         close(fd);
-        return std::string(fname);
+
+        // Always produce absolute paths on Windows
+        char abspath[MAX_PATH];
+        memset(abspath, 0, sizeof(abspath));
+        _fullpath(abspath, fname, sizeof(abspath)-1);
+        return std::string(abspath);
     }
     return "";
 }
@@ -208,14 +214,43 @@ bool os::createDirectory(std::string name, int mode)
     return ret == 0;
 }
 
-bool os::execCommand(char *program, char *args[])
+bool os::execCommand(char *program, char *args[], std::string *out)
 {
-    if (_spawnvp(_P_WAIT, program, args) < 0)
+    if (out)
     {
-        fprintf(stderr, "Failed to execute %s: %s\n", program, strerror(errno));
-        return false;
+        // Flatten args[]
+        std::string flat_args = "";
+        for (int i=0; args[i]; ++i)
+            flat_args += std::string(args[i]) + (args[i+1] ? " " : "");
+
+        // Create a pipe that executes the program
+        char buf[256];
+        FILE *fp = _popen(flat_args.c_str(), "rt");
+        if (! fp)
+        {
+            fprintf(stderr, "Failed to execute '%s': %s\n", program, strerror(errno));
+            return false;
+        }
+
+        // Save stdout to '*out' string
+        while (fgets(buf, sizeof(buf), fp))
+            out->append(std::string(buf));
+        _pclose(fp);
+    }
+    else
+    {
+        if (_spawnvp(_P_WAIT, program, args) < 0)
+        {
+            fprintf(stderr, "Failed to execute %s: %s\n", program, strerror(errno));
+            return false;
+        }
     }
     return true;
+}
+
+bool os::isWindows()
+{
+   return true;
 }
 
 #ifdef ENABLE_SANDBOX

@@ -8,7 +8,6 @@
 #if defined(__linux__) or defined(__APPLE__)
 #include <sys/utsname.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 #include <stdlib.h>
 #include <seccomp.h>
 #include <unistd.h>
@@ -69,22 +68,85 @@ bool os::createDirectory(std::string name, int mode)
     return ret == 0;
 }
 
-bool os::execCommand(char *program, char *args[])
+bool os::execCommand(char *program, char *args[], std::string *out)
 {
-    pid_t pid = fork();
-    if (pid == 0)
-        execvp(program, args);
-    else if (pid > 0)
+    if (out)
     {
-        int exit_status;
-        wait4(pid, &exit_status, 0, NULL);
+        int pipefd[2];
+        if (pipe(pipefd) < 0)
+        {
+            fprintf(stderr, "Failed to create pipe\n");
+            return false;
+        }
+
+        pid_t pid = fork();
+        if (pid == 0)
+        {
+            // Child: runs command, outputs to pipe
+            dup2(pipefd[1], STDOUT_FILENO);
+            close(pipefd[0]);
+            close(pipefd[1]);
+            execvp(program, args);
+        }
+        else if (pid < 0)
+        {
+            fprintf(stderr, "Failed to execute '%s': %s\n", program, strerror(errno));
+            return false;
+        }
+        else if (pid > 0)
+        {
+            // Parent: reads from pipe, concatenates data to 'out' string
+            fcntl(pipefd[0], F_SETFL, O_NONBLOCK);
+            while (true)
+            {
+                char buf[8192];
+                ssize_t n = read(pipefd[0], buf, sizeof(buf));
+                if (n < 0 && errno == EWOULDBLOCK)
+                {
+                    int exit_status = 0;
+                    if (waitpid(pid, &exit_status, WNOHANG) == pid)
+                    {
+                        if (exit_status != 0)
+                        {
+                            fprintf(stderr, "Failed to run the C++ preprocessor\n");
+                            close(pipefd[0]);
+                            close(pipefd[1]);
+                            return false;
+                        }
+                        break;
+                    }
+                    continue;
+                }
+                else if (n <= 0)
+                    break;
+                out->append(buf, n);
+            }
+            close(pipefd[0]);
+            close(pipefd[1]);
+        }
     }
-    else if (pid < 0)
+    else
     {
-        fprintf(stderr, "Failed to execute '%s': %s\n", program, strerror(errno));
-        return false;
+        pid_t pid = fork();
+        if (pid == 0)
+            execvp(program, args);
+        else if (pid > 0)
+        {
+            int exit_status;
+            wait4(pid, &exit_status, 0, NULL);
+        }
+        else if (pid < 0)
+        {
+            fprintf(stderr, "Failed to execute '%s': %s\n", program, strerror(errno));
+            return false;
+        }
     }
     return true;
+}
+
+bool os::isWindows()
+{
+    return false;
 }
 
 #endif // __linux__ or __APPLE__
