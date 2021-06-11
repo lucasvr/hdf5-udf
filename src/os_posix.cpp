@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <string.h>
+#include <fcntl.h>
 #include <pwd.h>
 #include "os.h"
 
