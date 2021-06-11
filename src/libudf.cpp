@@ -63,7 +63,12 @@ typedef struct udf_context {
         hdf5_file(hdf5_file_path),
         udf_file(udf_file_path),
         backend(NULL),
-        needs_overwriting(false) { }
+        needs_overwriting(false)
+    {
+        // Use forward-slash path separator
+        std::replace(hdf5_file.begin(), hdf5_file.end(), '\\', '/');
+        std::replace(udf_file.begin(), udf_file.end(), '\\', '/');
+    }
 
     ~udf_context() {
         delete backend;
