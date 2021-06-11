@@ -83,6 +83,8 @@ std::string Backend::assembleUDF(const AssembleData &data)
         return "";
     }
 
+    // Use forward-slash path separator
+    std::replace(out_file.begin(), out_file.end(), '\\', '/');
     return out_file;
 }
 
@@ -99,6 +101,9 @@ std::string Backend::writeToDisk(const char *data, size_t size, std::string exte
     tmpfile.write(data, size);
     tmpfile.flush();
     tmpfile.close();
+
+    // Use forward-slash path separator
+    std::replace(path.begin(), path.end(), '\\', '/');
     return std::string(path);
 }
 

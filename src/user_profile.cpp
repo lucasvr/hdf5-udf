@@ -19,6 +19,7 @@
 #include <iomanip>
 
 #include "user_profile.h"
+#include "file_search.h"
 #include "sysdefs.h"
 #include "base64.h"
 #include "os.h"
@@ -53,12 +54,6 @@ std::string filesystem_basename(std::string path)
     return basename(tmp);
 }
 
-bool string_ends_with(std::string input, std::string suffix)
-{
-    return input.size() >= suffix.size() &&
-        input.compare(input.size()-suffix.size(), suffix.size(), suffix) == 0;
-}
-
 bool get_raw_key(const json &pk, std::string &raw_key)
 {
     macaron::Base64 base64;
@@ -75,45 +70,6 @@ bool get_base64_key(uint8_t *raw_key, size_t size, std::string &base64_key)
 {
     macaron::Base64 base64;
     base64_key = base64.Encode(raw_key, size);
-    return true;
-}
-
-bool find_files(std::string dir, std::string ext, std::vector<std::string> &out, bool subdirs=true)
-{
-    DIR *dp = opendir(dir.c_str());
-    if (! dp)
-    {
-        // The only error we care about is EPERM. The caller creates the given directory
-	// and retries the operation otherwise.
-        return errno == EPERM ? false : true;
-    }
-
-    struct dirent *entry;
-    while ((entry = readdir(dp)))
-    {
-        if (entry->d_name[0] == '.')
-        {
-            // Ignore hidden directories, dot, and dot-dot.
-            continue;
-        }
-        std::string path = dir + "/" + std::string(entry->d_name);
-        if (string_ends_with(entry->d_name, ext))
-        {
-            // Found a match
-            out.push_back(path);
-            continue;
-        }
-        // Sadly, MINGW doesn't provide a d_type member on struct dirent, so we have to
-        // stat() the file to tell its type. We could place an ifdef here and save a trip
-        // to the kernel on Linux and MacOS, but it's best to keep the code clean.
-        struct stat statbuf;
-        if (subdirs == true && stat(path.c_str(), &statbuf) == 0 && S_ISDIR(statbuf.st_mode))
-        {
-            // Search one level down
-            find_files(path, ext, out, false);
-        }
-    }
-    closedir(dp);
     return true;
 }
 
@@ -146,7 +102,7 @@ Blob *SignatureHandler::extractPayload(
     // Public keys from other users imported into the system
     // are stored as $configdir/{default,allow,deny,...}/*.pub
     std::vector<std::string> candidates;
-    if (find_files(configdir, ".pub", candidates) == false)
+    if (findByExtension(configdir, ".pub", candidates) == false)
         return NULL;
     else if (candidates.size() == 0)
     {
@@ -274,7 +230,7 @@ Blob *SignatureHandler::signPayload(const uint8_t *in, unsigned long long size_i
     // User's own private key is stored as $configdir/*.priv
     // Note that we pick the first one returned by the scan.
     std::vector<std::string> candidates;
-    if (find_files(configdir, ".priv", candidates, false) == false)
+    if (findByExtension(configdir, ".priv", candidates, false) == false)
         return NULL;
     else if (candidates.size() > 0)
     {

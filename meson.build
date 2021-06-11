@@ -16,6 +16,7 @@ sources = [
   'src/backend.cpp',
   'src/dataset.cpp',
   'src/libudf.cpp',
+  'src/file_search.cpp',
   'src/user_profile.cpp',
   'src/os_linux.cpp',
   'src/os_macos.cpp',
