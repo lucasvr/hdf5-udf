@@ -21,6 +21,8 @@
 #include <winternl.h>          // NtQueryObject()
 #include <windows.h>           // VOLUME_NAME_NONE
 #include <share.h>
+#define SECURITY_WIN32
+#include <secext.h>            // GetUserNameExA()
 #include <io.h>
 #include <regex>
 #include <set>
@@ -202,7 +204,35 @@ bool os::clearEnvironmentVariable(std::string name)
 
 bool os::getUserInformation(std::string &name, std::string &login, std::string &host)
 {
-    // TODO
+    // Fallback values for login and hostname, used to compose the user's email address
+    const char *env_login = getenv("USERNAME");
+    if (env_login)
+        login = env_login;
+
+    const char *env_hostname = getenv("HOSTNAME");
+    if (env_hostname)
+        host = env_hostname;
+
+    // Retrieve user's email address
+    DWORD email_len = 127;
+    TCHAR email_buf[email_len+1];
+    if (GetUserNameExA(NameUserPrincipal, email_buf, &email_len))
+    {
+        std::string email(email_buf);
+        size_t pos = email.find_first_of('@');
+        if (pos != std::string::npos)
+        {
+            login = email.substr(0, pos);
+            host = email.substr(pos+1);
+        }
+    }
+
+    // Retrieve user's full name
+    DWORD name_len = 127;
+    TCHAR name_buf[name_len+1];
+    if (GetUserNameExA(NameDisplay, name_buf, &name_len))
+        name = name_buf;
+
     return true;
 }
 

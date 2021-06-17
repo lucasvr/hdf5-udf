@@ -26,6 +26,10 @@ sources = [
 seccomp_dep = ''
 deps = []
 
+if host_machine.system() == 'windows'
+  deps += meson.get_compiler('cpp').find_library('secur32', required: true)
+endif
+
 
 #######################################
 # Automatically generated dependencies
