@@ -1,7 +1,7 @@
 FROM fedora:32
 LABEL maintainer="lucasvr@gobolinux.org"
 
-ARG github_tag=2.0
+ARG github_tag=2.1
 
 # Build dependencies
 RUN dnf makecache -y

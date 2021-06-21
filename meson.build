@@ -3,7 +3,7 @@
 #######################
 
 project('HDF5-UDF', ['c', 'cpp'],
-  version: '2.0',
+  version: '2.1',
   meson_version: '>= 0.46.0',
   default_options: [
     'warning_level=1',
@@ -118,7 +118,7 @@ message('\n' +
 hdf5_udf_lib = shared_library(
   'hdf5-udf',
   sources + [udf_template_cpp, udf_template_lua, udf_template_py],
-  version: '2.0',
+  version: '2.1',
   soversion: '0',
   dependencies: deps,
   install: true)
@@ -154,7 +154,7 @@ pkg.generate(
   libraries: [seccomp_dep, hdf5_udf_lib],
   libraries_private: [],
   name: 'HDF5-UDF',
-  version: '2.0',
+  version: '2.1',
   filebase: 'hdf5-udf',
   description: 'User-defined functions for HDF5'
 )

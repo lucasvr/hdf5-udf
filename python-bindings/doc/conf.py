@@ -21,7 +21,7 @@ copyright = '2021, Lucas C. Villa Real'
 author = 'Lucas C. Villa Real'
 
 # The full version, including alpha/beta/rc tags
-release = '2.0'
+release = '2.1'
 
 
 # -- General configuration ---------------------------------------------------

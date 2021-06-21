@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="PyHDF5-UDF",
-    version="1.2",
+    version="1.3",
     description="User-defined functions for HDF5 - Python bindings",
     description_content_type="text/x-rst",
     long_description=open("README.txt").read(),
