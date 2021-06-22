@@ -2,7 +2,7 @@
 
 $instdir = $args[0]
 $pluginsdir = $args[1]
-. .\install_helpers.ps1
+. $pluginsdir\install_helpers.ps1
 
 Write-Host "=> instdir=$instdir"
 Write-Host "=> pluginsdir=$pluginsdir"
@@ -21,7 +21,7 @@ Write-Host "Testing if $xz exists"
 $env:PATH += ";$instdir\xz-utils\bin_x86-64"
 if (-Not (Test-Path -Path $xz)) {
     Write-Host "=> Creating $instdir/xz-utils"
-    mkdir "$instdir\xz-utils"
+    mkdir "$instdir\xz-utils" > $null
     Expand-Archive -Path "$archive" -DestinationPath "$instdir\xz-utils"
     Remove-Item -Path $archive -Force
 }

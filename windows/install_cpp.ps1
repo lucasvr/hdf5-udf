@@ -2,7 +2,7 @@
 
 $instdir = $args[0]
 $pluginsdir = $args[1]
-. .\install_helpers.ps1
+. $pluginsdir\install_helpers.ps1
 
 $env:PATH += ";$instdir\msys64\mingw64\bin;$instdir\msys64\usr\bin"
 

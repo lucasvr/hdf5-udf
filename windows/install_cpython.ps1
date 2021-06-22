@@ -2,7 +2,7 @@
 
 $instdir = $args[0]
 $pluginsdir = $args[1]
-. .\install_helpers.ps1
+. $pluginsdir\install_helpers.ps1
 
 $env:PATH += ";$instdir\msys64\mingw64\bin;$instdir\msys64\usr\bin"
 
@@ -12,3 +12,5 @@ $env:PATH += ";$instdir\msys64\mingw64\bin;$instdir\msys64\usr\bin"
 
 pacman --noconfirm -r "$instdir\msys64" -S mingw-w64-x86_64-python3
 pacman --noconfirm -r "$instdir\msys64" -S mingw-w64-x86_64-python-cffi
+pacman --noconfirm -r "$instdir\msys64" -S mingw-w64-x86_64-python-pip
+bash -c "pip --no-input install pyhdf5-udf"

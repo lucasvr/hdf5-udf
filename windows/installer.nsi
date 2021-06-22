@@ -4,6 +4,7 @@
 !define MUI_PRODUCT "HDF5-UDF"
 !define MUI_VERSION "2.1"
 !define MUI_BRANDINGTEXT "User-Defined Functions for HDF5"
+!define MUI_FINISHPAGE_NOAUTOCLOSE
 !define ROOT ".."
 CRCCheck on
 
@@ -82,7 +83,7 @@ Section "LuaJIT runtime" SectionLuaJITRuntime
 SectionEnd
 
 Section "CPython runtime" SectionCPythonRuntime
-    AddSize 400000 ; kb
+    AddSize 420000 ; kb
     nsExec::ExecToLog 'powershell -InputFormat none -NoProfile -ExecutionPolicy Bypass -File $PLUGINSDIR\PowerShell\install_cpython.ps1 "$INSTDIR" "$PLUGINSDIR\PowerShell"'
     Pop $0
 SectionEnd
@@ -117,7 +118,8 @@ FunctionEnd
 
 Section "Uninstall"
     RMDir /r "$INSTDIR\*.*"
-    RMDir "$INSTDIR"
+    RMDir "$PROGRAMFILES\${MUI_PRODUCT}\${MUI_VERSION}"
+    RMDir "$PROGRAMFILES\${MUI_PRODUCT}"
 
     DeleteRegKey HKLM "Software\${MUI_PRODUCT}"
     DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${MUI_PRODUCT}"
