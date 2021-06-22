@@ -74,7 +74,6 @@ bool findByPattern(std::string dir, std::string pattern, std::vector<std::string
 {
     std::string start = pattern.substr(0, pattern.find("*"));
     std::string end = pattern.substr(pattern.find("*")+1, pattern.npos);
-    printf("findByPattern: start=%s, end=%s\n", start.c_str(), end.c_str());
 
     auto string_starts_with = [](std::string input, std::string prefix) {
         return input.size() >= prefix.size() &&
