@@ -22,6 +22,8 @@ if platform == "linux":
     lib = ffi.dlopen("libhdf5-udf.so")
 elif platform == "darwin":
     lib = ffi.dlopen("libhdf5-udf.dylib")
+elif platform == "win32":
+    lib = ffi.dlopen("libhdf5-udf-0.dll")
 else:
     raise NotImplementedError(f"{platform} is not currently supported by PyHDF5-UDF")
 
