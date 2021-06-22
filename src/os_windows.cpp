@@ -132,20 +132,11 @@ std::string os::sharedLibraryName(std::string name)
     return "lib" + name + ".dll";
 }
 
-std::string os::defaultPluginPath()
-{
-    const char *profile_dir = getenv("ALLUSERSPROFILE");
-    if (profile_dir)
-        return std::string(profile_dir) + "/hdf5/lib/plugin";
-    fprintf(stderr, "Error: %%ALLUSERSPROFILE%% is not set\n");
-    return "";
-}
-
 std::string os::configDirectory()
 {
     const char *home = getenv("USERPROFILE");
     if (home)
-        return std::string(home) + "/AppData/Local/HDF5-UDF/";
+        return std::string(home) + "\\AppData\\Local\\HDF5-UDF\\";
     fprintf(stderr, "Error: %%USERPROFILE%% is not set, falling back to %%PWD%%\n");
     return ".hdf5-udf/";
 }

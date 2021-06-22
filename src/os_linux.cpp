@@ -54,11 +54,6 @@ std::string os::sharedLibraryName(std::string name)
     return "lib" + name + ".so";
 }
 
-std::string os::defaultPluginPath()
-{
-    return "/usr/local/hdf5/lib/plugin/";
-}
-
 std::string os::configDirectory()
 {
     const char *xdg_config_home = getenv("XDG_CONFIG_HOME");

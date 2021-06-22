@@ -43,11 +43,6 @@ std::string os::sharedLibraryName(std::string name)
     return "lib" + name + ".dylib";
 }
 
-std::string os::defaultPluginPath()
-{
-    return "/usr/local/hdf5/lib/plugin/";
-}
-
 std::string os::configDirectory()
 {
     const char *home = getenv("HOME");

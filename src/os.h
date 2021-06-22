@@ -33,9 +33,6 @@ namespace os {
     // Example: foo -> libfoo.so
     std::string sharedLibraryName(std::string name);
 
-    // Default HDF5 plugin path
-    std::string defaultPluginPath();
-
     // Config directory under the currently logged in user's home
     std::string configDirectory();
 
