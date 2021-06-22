@@ -35,6 +35,12 @@ bool filesystem_path_exists(std::string path)
 bool filesystem_paths_equal(std::string a, std::string b)
 {
     struct stat info_a, info_b;
+    // MINGW64 doesn't seem to succeed calls to stat() if the given directory
+    // ends on a backslash (neither on a regular slash). Sigh..
+    if (a.size() && a.compare(a.size()-1, 1, "\\") == 0)
+        a = a.substr(0, a.size()-1);
+    if (b.size() && b.compare(b.size()-1, 1, "\\") == 0)
+        b = b.substr(0, b.size()-1);
     if (stat(a.c_str(), &info_a) < 0 || stat(b.c_str(), &info_b) < 0)
         return false;
     return info_a.st_dev == info_b.st_dev && info_a.st_ino == info_b.st_ino;
