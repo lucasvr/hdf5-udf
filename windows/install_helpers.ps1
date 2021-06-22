@@ -169,6 +169,9 @@ function Start-DownloadWithRetry
     }
 
     $filePath = Join-Path -Path $DownloadPath -ChildPath $Name
+    if (Test-Path -Path $filePath) {
+	return $filePath
+    }
 
     #Default retry logic for the package.
     while ($Retries -gt 0)
