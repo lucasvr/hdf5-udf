@@ -77,6 +77,29 @@ $ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/opt/luajit-openresty/lib/pk
 $ export PATH=$PATH:/usr/local/opt/luajit-openresty/bin
 ```
 
+## Windows
+
+Please use the provided installer to have HDF5-UDF installed on your machine.
+All backends are supported at this time, and choosing which of them to deploy to
+your platform is a matter of clicking on the corresponding checkboxes.
+
+The runtime engines are supported by MSYS2, which is automatically downloaded from
+the project's repository and uncompressed on `C:\Program Files\HDF5-UDF\<version>\msys64`.
+Hence, installation may take a little while depending on your Internet bandwidth.
+
+The installer **appends** HDF5-UDF's installation path to the current user's `%PATH%`
+so that the main utility and its libraries are automatically found. Still, depending
+on your Windows version, you may need to manually **prepend** the installation path
+so that the Python interpreter can be found. If you see an error message that reads
+like this: `Python could not be found`, then please change `%PATH%` so that the
+HDF5-UDF components come first in the list.
+
+If you wish to embed Lua scripts on HDF5 files, you may also need to change your
+`%LUA_PATH%` or to (1) create a new directory named `msys64/mingw64/bin/lua` and
+then (2) copy the contents of `msys64/mingw64/share/luajit-2.1.0-beta/jit` to that
+directory.
+
+
 # Building from the source code
 
 ## Requirements
