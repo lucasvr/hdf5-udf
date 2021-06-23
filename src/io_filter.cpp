@@ -68,7 +68,11 @@ hid_t getDatasetHandle(std::string dataset, bool *handle_from_procfs)
         H5Eget_auto2(H5E_DEFAULT, &old_func, &old_client_data);
         H5Eset_auto2(H5E_DEFAULT, NULL, NULL);
 
+        std::string old_env = getenv("HDF5_USE_FILE_LOCKING") ? : "";
+        os::setEnvironmentVariable("HDF5_USE_FILE_LOCKING", "FALSE");
         hid_t file_id = H5Fopen(fname.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+        if (old_env.size())
+            os::setEnvironmentVariable("HDF5_USE_FILE_LOCKING", old_env);
 
         // Enable error messages again
         H5Eset_auto(H5E_DEFAULT, old_func, old_client_data);
