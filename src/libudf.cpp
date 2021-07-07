@@ -101,9 +101,9 @@ static bool libudf_validate_udf_datasets(udf_context *ctx);
 
 static int getUserStringSize(std::string user_type, udf_context *ctx)
 {
-     // UDF strings can be defined as 'string' or as 'string(N)'.
-     // In the first case the string size is determined by the
-     // constant DEFAULT_UDF_STRING_SIZE.
+    // UDF strings can be defined as 'string' or as 'string(N)'.
+    // In the first case the string size is determined by the
+    // constant DEFAULT_UDF_STRING_SIZE.
     auto start = user_type.find("(");
     auto end = user_type.find(")");
     if (start == std::string::npos && end == std::string::npos)
@@ -554,7 +554,7 @@ EXPORT udf_context *libudf_init(const char *hdf5_file, const char *udf_file)
             "Make sure to set $HDF5_PLUGIN_PATH prior to running this tool\n");
         return NULL;
     }
-    return new udf_context(hdf5_file, udf_file);
+    return new udf_context(hdf5_file ? : "", udf_file ? : "");
 }
 
 EXPORT void libudf_destroy(udf_context *ctx)
