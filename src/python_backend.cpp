@@ -390,8 +390,12 @@ bool PythonBackend::run(
     PyObject *loadlib = lib ? PyObject_GetAttrString(lib, "load") : NULL;
     PyObject *udf = dict ? PyDict_GetItemString(dict, "dynamic_dataset") : NULL;
 
-    if (! lib || ! loadlib || ! udf)
-        fprintf(stderr, "Failed to load required symbols from code object\n");
+    if (! lib)
+        fprintf(stderr, "Failed to find symbol 'lib' in code object\n");
+    else if (! loadlib)
+        fprintf(stderr, "Failed to find symbol 'lib.load()' in code object\n");
+    else if (! udf)
+        fprintf(stderr, "Failed to find entry point 'dynamic_dataset()' in code object\n");
     else if (! PyCallable_Check(loadlib))
         fprintf(stderr, "Error: lib.load is not a callable function\n");
     else if (! PyCallable_Check(udf))
