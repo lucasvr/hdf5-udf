@@ -60,10 +60,16 @@ int main(int argc, char **argv)
     H5Sget_simple_extent_dims(space_id, dims, NULL);
 
     uint8_t *rdata = new uint8_t[dims[0] * dims[1] * datatype_size];
+    bool is_float = false;
     if (H5Tequal(type_id, H5T_NATIVE_INT))
         H5Dread(dataset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata);
     else if (H5Tequal(type_id, H5T_NATIVE_UINT8))
         H5Dread(dataset_id, H5T_NATIVE_UINT8, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata);
+    else if (H5Tequal(type_id, H5T_NATIVE_FLOAT))
+    {
+        H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata);
+        is_float = true;
+    }
     else
     {
         fprintf(stderr, "We're only ready to deal with INT/UINT8 data types, sorry!\n");
@@ -133,7 +139,12 @@ int main(int argc, char **argv)
                 cur += snprintf(cur, end-cur, "%c%c", data, data);
         }
         else
-            cur += snprintf(cur, end-cur, "%d", (int) rdata[i]);
+        {
+            if (is_float)
+                cur += snprintf(cur, end-cur, "%.1f ", (float) rdata[i]);
+            else
+                cur += snprintf(cur, end-cur, "%d", (int) rdata[i]);
+        }
     }
     printf("%s\n", line);
 
