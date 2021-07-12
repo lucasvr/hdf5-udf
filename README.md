@@ -1,20 +1,86 @@
 # HDF5-UDF
 
-HDF5-UDF is a mechanism to dynamically generate HDF5 datasets through
-user-defined functions (UDFs) written in Lua, Python, or C/C++.
+HDF5-UDF is a mechanism to generate HDF5 dataset values on-the-fly using
+user-defined functions (UDFs). The platform supports UDFs written in Python,
+C++, and Lua under Linux, macOS, and Windows.
+[Python bindings](https://hdf5-udf.readthedocs.io/en/latest) are provided
+for those wishing to skip the command-line utility and programmatically embed
+UDFs on their datasets.
 
-User-defined functions are compiled into executable form and the result
-is embedded into HDF5. A supporting library gives access to existing datasets
-from user code so that data analysis and derivation of other data can be produced.
+# Table of Contents
 
-Access to HDF5 is made through Foreign Function Interfaces (FFIs) in Python and
-Lua, meaning that there is no measurable overhead when accessing input and output
-datasets from such languages. UDFs written in C/C++ are compiled into shared libraries,
-compressed, and embedded into HDF5 just like in the Python and Lua backends. The
-difference is that, unlike a LuaJIT bytecode, for instance, shared libraries are
-compiled to the target architecture, hence are not as portable.
+1. [Overview](#overview)
+    - [CPython backend](#cpython-backend)
+    - [C++ backend](#c++-backend)
+    - [LuaJIT backend](#luajit-backend)
+2. [User-Defined Functions API](#user-defined-functions-api)
+    - [Supported datatypes](#supported-datatypes)
+    - [HDF5 groups](#hdf5-groups)
+    - [Strings and compounds](#strings-and-compounds)
+3. [Examples](#examples)
+    - [A User-Defined Function in Python](#python-api)
+    - [A User-Defined Function in C++](#c++-api)
+    - [A User-Defined Function in Lua](#lua-api)
+3. [Configuration notes](#configuration-notes)
 
-The Lua, C/C++, and Python APIs are identical and provide the following simple
+# Overview
+
+HDF5-UDF provides an interface that takes a piece of code provided by the user
+and compiles it into a bytecode (or shared library) form. The resulting object
+is saved into HDF5 as a binary blob. Each time that dataset is read by an
+application, the HDF5-UDF I/O filter retrieves that blob from the dataset,
+loads it into memory and executes the user-defined function -- which populates
+the dataset values on-the-fly. There is no difference between accessing a dataset
+whose values have been dynamically generated and a regular one. Both are retrieved
+using the existing HDF5 API.
+
+![](images/hdf5-udf.png)
+
+The blob data saved into the dataset is accompanied by a piece of
+[metadata](https://hdf5-udf.readthedocs.io/en/latest/#json-schema-for-hdf5-udf-datasets)
+that helps HDF5-UDF parse the bytecode. That metadata includes the data type to
+be produced, the output dataset name, its dimensions, dependencies, and the UDF
+creator's digital signature (which allow users to [restrict the system resources
+an UDF can access](https://hdf5-udf.readthedocs.io/en/latest/#trust-profiles)):
+
+```
+metadata = {
+  "backend": "CPython",
+  "bytecode_size": 879,
+  "input_datasets": ["A", "B"],
+  "output_dataset": "C",
+  "output_datatype": "float",
+  "output_resolution": [1024, 768],
+  "signature": {
+    "email": "lucasvr@Pagefault",
+    "name": "Lucas C. Villa Real",
+    "public_key": "17ryiejfF2SNlT+MCIaPLb7bKqo2FTX/PIiCDrh45Fc="
+  }
+}
+```
+
+## CPython backend
+
+UDFs written in Python are compiled into bytecode form by the CPython interpreter.
+All I/O between HDF5 and HDF5-UDF goes through Foreign Function Interfaces (FFIs),
+meaning that there is no measurable overhead when accessing input and output datasets.
+This backend requires Python 3.
+
+## C++ backend
+
+The C++ backend compiles the provided UDF using GCC (`g++`) or, if available,
+Clang (`clang++`), into a shared library. The result is compressed and embedded
+into HDF5.
+
+## LuaJIT backend
+
+UDFs written in Lua are processed by the LuaJIT interpreter. The output bytecode
+is saved into HDF5 and interpreted by LuaJIT's just-in-time compiler when the
+dataset is read by the application.
+
+# User-Defined Functions API
+
+The Lua, C++, and Python APIs are identical and provide the following simple
 functions to interface with HDF5 datasets:
 
 - `lib.getData("DatasetName")`: fetches DatasetName from the HDF5
@@ -33,42 +99,84 @@ performed by reading from and writing to the datasets retrieved
 by the API above. See the next section for examples on how to
 get started with UDF scripts.
 
-There is no difference between accessing a dataset that has been
-dynamically generated and a regular one. As shown in the image
-below, both are retrieved using the existing HDF5 API. Note that
-differently from a regular HDF5 dataset (where the actual grid is
-stored on disk), HDF5-UDF datasets require only the bytecode (or
-compressed shared library) to persist on disk.
+## Supported datatypes
 
-![](images/hdf5-udf.png)
+The following data types are supported by UDF datasets:
+
+- `int8`, `uint8` (`H5T_STD_I8LE`, `H5T_STD_U8LE`)
+- `int16`, `uint16` (`H5T_STD_I16LE`, `H5T_STD_U16LE`)
+- `int32`, `uint32` (`H5T_STD_I32LE`, `H5T_STD_U32LE`)
+- `int64`, `uint64` (`H5T_STD_I64LE`, `H5T_STD_U64LE`)
+- `float`, `double` (`H5T_IEEE_F32LE`, `H5T_IEEE_F64LE`)
+- `string` (`H5T_C_S1`)
+- `compound` (`H5T_COMPOUND`)
+
+## HDF5 groups
+
+HDF5-UDF also supports datasets stored in a non-flat hierarchy. The API accepts
+dataset names that are prefixed by existing group names, as in
+`lib.getData("/group/name/dataset")`. It is also possible to store a UDF dataset
+on a given group by using the same syntax on the command line, such as 
+`/group/name/dataset:resolution:datatype`.
+
+## Strings and compounds
+
+It is possible to write UDFs that take input from compounds and from strings (both
+fixed- and variable-sized ones). `hdf5-udf` will print the name and layout of the
+generated structure that you can use to iterate over the input data members. Please
+refer to the [examples](https://github.com/lucasvr/hdf5-udf/tree/master/examples)
+directory for a guidance on how to access such datatypes from Python, C/C++ and Lua.
+
+Also, one can write UDFs that output such datatypes. Strings have a default fixed
+size of 32 characters; that value can be changed by the user using the `(N)` modifier.
+For instance, to output strings with at most 8 characters one can declare a dataset
+like `dataset_name:resolution:string(8)`.
+
+The syntax for outputting compounds is slightly different, as members may have
+distinct datatypes: `dataset_name:{member:type[,member:type...]}:resolution`.
+A sample compound named "placemark" with a single "location" member can be entered
+as `placemark:{location:string}:1000` to `hdf5-udf`.
+
+Multiple compound members must be
+separated by a comma within the curly braces delimiters. Note that it is possible
+to use the `(N)` modifier with string members that belong to a compound too. In the
+previous example, one could write `placemark:{location:string(48)}:1000` to limit
+location strings to 48 characters.
 
 # Examples
 
-When `hdf5-udf` is executed with the user-provided Lua file as input, it
-scans the code for calls to `lib.getData()` to identify dataset names.
-Names that map to existing datasets in the input file will cause the
-corresponding datasets to be opened in read-only mode. Names that don't
-relate to existing datasets will be dynamically generated by executing
-the provided Lua file (in bytecode form) each time the dataset is read.
+The following simple examples should get you started into HDF5-UDF. A more
+comprehensive set of examples is provided at the
+[user-defined functions repository](https://github.com/lucasvr/user-defined-functions).
 
-The following are simple examples that should get you started into writing
-your own functions. More examples are given in the "examples" directory of
-this project.
+Also, make sure to read the template files for
+[Lua](https://github.com/lucasvr/hdf5-udf/blob/master/src/udf_template.lua),
+[Python](https://github.com/lucasvr/hdf5-udf/blob/master/src/udf_template.py), and
+[C++](https://github.com/lucasvr/hdf5-udf/blob/master/src/udf_template.cpp)
+to learn more about the APIs behind the HDF5-UDF `lib` interface.
 
-## Declare a dynamic dataset "C" as the sum of datasets "A" and "B", in Lua
+## Python API
+
+In this example, dataset values for "C" are computed on-the-fly as the sum
+of compound dataset members "A.foo" and "B.bar".
+
 ```
-function dynamic_dataset()
-    local a_data = lib.getData("A")
-    local b_data = lib.getData("B")
-    local c_data = lib.getData("C")
-    local n = lib.getDims("C")[1] * lib.getDims("C")[2]
-    for i=1, n do
-        c_data[i] = a_data[i] + b_data[i]
-    end
-end
+def dynamic_dataset():
+    a_data = lib.getData("A")
+    b_data = lib.getData("B")
+    c_data = lib.getData("C")
+    n = lib.getDims("C")[0] * lib.getDims("C")[1]
+
+    for i in range(n):
+        c_data[i] = a_data[i].foo + b_data[i].bar
 ```
 
-## Same UDF as before, but written in C++
+## C++ API
+
+This example shows dataset values for "C" being generated on-the-fly as the sum
+of datasets "B" and "C". Note that the entry point is marked `extern "C"` and that
+calls to `lib.getData()` explicitly state the storage data type.
+
 ```
 extern "C" void dynamic_dataset()
 {
@@ -82,49 +190,24 @@ extern "C" void dynamic_dataset()
 }
 ```
 
+## Lua API
 
-## Same UDF as before, but adding up the "foo" and "bar" members from Compound datasets "A" and "B", in Python
-```
-def dynamic_dataset():
-    a_data = lib.getData("A")
-    b_data = lib.getData("B")
-    c_data = lib.getData("C")
-    n = lib.getDims("C")[0] * lib.getDims("C")[1]
+In this example, dataset values for "C" are computed on-the-fly as the sum
+of datasets "A" and "B". The UDF is written in Lua.
 
-    for i in range(n):
-        c_data[i] = a_data[i].foo + b_data[i].bar
-```
-
-## Declare dynamic datasets "B" and "C" as variations of dataset "A", in Lua
 ```
 function dynamic_dataset()
     local a_data = lib.getData("A")
     local b_data = lib.getData("B")
     local c_data = lib.getData("C")
-    local x = lib.getDims("A")[1]
-    local y = lib.getDims("A")[2]
-    for i=1, x do
-        for j=1, y do
-            b_data[i*y+j] = a_data[i*y+j] * 2
-            c_data[i*y+j] = a_data[i*y+j] * 3
-        end
+    local n = lib.getDims("C")[1] * lib.getDims("C")[2]
+    for i=1, n do
+        c_data[i] = a_data[i] + b_data[i]
     end
 end
 ```
 
-## Other examples
-
-The [examples](https://github.com/lucasvr/hdf5-udf/tree/master/examples)
-directory holds a collection of scripts that can be readily compiled and tested.
-Please refer to their source code for build instructions and further details.
-
-Also, make sure to read the template files for
-[Lua](https://github.com/lucasvr/hdf5-udf/blob/master/src/udf_template.lua),
-[Python](https://github.com/lucasvr/hdf5-udf/blob/master/src/udf_template.py), and
-[C/C++](https://github.com/lucasvr/hdf5-udf/blob/master/src/udf_template.cpp)
-to learn more about the APIs behind the `lib` interface.
-
-# Configuration and execution
+# Configuration notes
 
 If the program has been installed to a directory other than `/usr/local`, then
 make sure to configure the HDF5 filter search path accordingly:
@@ -165,48 +248,3 @@ It is also possible to have more than one dataset produced by a single script.
 In that case, information regarding each output variable can be provided in the
 command line as extra arguments to the main program. Alternatively, their names,
 resolution and data types can be guessed from the UDF script as mentioned before.
-
-# Supported datatypes
-
-The following dataset types can be output by `hdf5-udf`:
-
-- `int8`, `uint8` (`H5T_STD_I8LE`, `H5T_STD_U8LE`)
-- `int16`, `uint16` (`H5T_STD_I16LE`, `H5T_STD_U16LE`)
-- `int32`, `uint32` (`H5T_STD_I32LE`, `H5T_STD_U32LE`)
-- `int64`, `uint64` (`H5T_STD_I64LE`, `H5T_STD_U64LE`)
-- `float`, `double` (`H5T_IEEE_F32LE`, `H5T_IEEE_F64LE`)
-- `string` (`H5T_C_S1`)
-- `compound` (`H5T_COMPOUND`)
-
-# Support for HDF5 groups
-
-HDF5-UDF also supports datasets stored in a non-flat hierarchy. The API accepts
-dataset names that are prefixed by their group names, as in
-`lib.getData("/group/name/dataset")`. It is also possible to store a UDF dataset
-on a given group by using the same syntax on the command line, such as 
-`/group/name/dataset:resolution:datatype`. Note that the given group must already
-exist: `hdf5-udf` will not attempt to create them for you.
-
-# Support for strings and compounds
-
-It is possible to write UDFs that take input from compounds and from strings (both
-fixed- and variable-sized ones). `hdf5-udf` will print the name and layout of the
-generated structure that you can use to iterate over the input data members. Please
-refer to the [examples](https://github.com/lucasvr/hdf5-udf/tree/master/examples)
-directory for a guidance on how to access such datatypes from Python, C/C++ and Lua.
-
-Also, one can write UDFs that output such datatypes. Strings have a default fixed
-size of 32 characters; that value can be changed by the user using the `(N)` modifier.
-For instance, to output strings with at most 8 characters one can declare a dataset
-like `dataset_name:resolution:string(8)`.
-
-The syntax for outputting compounds is slightly different, as members may have
-distinct datatypes: `dataset_name:{member:type[,member:type...]}:resolution`.
-A sample compound named "placemark" with a single "location" member can be entered
-as `placemark:{location:string}:1000` to `hdf5-udf`.
-
-Multiple compound members must be
-separated by a comma within the curly braces delimiters. Note that it is possible
-to use the `(N)` modifier with string members that belong to a compound too. In the
-previous example, one could write `placemark:{location:string(48)}:1000` to limit
-location strings to 48 characters.
