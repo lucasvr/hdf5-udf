@@ -11,16 +11,15 @@ surface of components that execute code from external parties.
 Because users cannot tell in advance what a certain user-defined function is about to
 do, HDF5-UDF uses a few mechanisms to limit what system calls the UDF can execute.
 
-Seccomp
--------
+Sandboxing
+----------
 
-We use the Linux ``Seccomp`` interface to determine which system calls UDFs are allowed
-to invoke -- the UDF process is terminated if it tries to run a function that does not
-belong to the allow-list. The following image shows the overall architecture of our
-seccomp-based sandboxing.
+The Linux implementation uses the ``Seccomp`` interface to determine which system
+calls UDFs are allowed to invoke -- the UDF process is terminated if it tries to
+run a function that does not belong to the allow-list. The following image shows
+the overall architecture of our seccomp-based sandboxing.
 
 .. image:: https://raw.githubusercontent.com/lucasvr/hdf5-udf/master/images/hdf5-udf-seccomp.png
-
 
 Note that even though one could use a static list of system calls allowed to execute,
 that does not reflect real-world scenarios in which few people are trusted (and thus
