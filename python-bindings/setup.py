@@ -2,6 +2,9 @@
 
 from setuptools import setup, find_packages
 
+with open('requirements.txt') as f:
+    requires = f.read().splitlines()
+
 setup(
     name="PyHDF5-UDF",
     version="1.3",
@@ -19,10 +22,7 @@ setup(
         "wheel",
         "cffi>=1.0.0"
     ],
-    install_requires=[
-        "cffi>=1.0.0",
-        "jsonschema>=3.2.0"
-    ],
+    install_requires=requires,
     packages=find_packages(),
     include_package_data=True,
 
