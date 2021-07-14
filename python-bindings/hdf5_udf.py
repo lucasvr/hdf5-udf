@@ -13,19 +13,27 @@ on this project.
 import json
 import hdf5_udf_resources
 
-from os import path
+from os import path, getenv
 from sys import platform
 from jsonschema import validate
 from _hdf5_udf import ffi
 
-if platform == "linux":
-    lib = ffi.dlopen("libhdf5-udf.so")
-elif platform == "darwin":
-    lib = ffi.dlopen("libhdf5-udf.dylib")
-elif platform == "win32":
-    lib = ffi.dlopen("libhdf5-udf-0.dll")
-else:
-    raise NotImplementedError(f"{platform} is not currently supported by PyHDF5-UDF")
+
+# Sphinx needs to load this module in order to extract its documentation.
+# However, especially in cloud-based environments, we don't want to have
+# a complete installation of libhdf5-udf solely to satisfy the automated
+# compilation of the project docs. The workaround we adopt is to introduce
+# an environment variable $_DOC_BUILDER_MODE which, if set, causes the call
+# to dlopen() to be skipped.
+if getenv("_DOC_BUILDER_MODE") == None:
+    if platform == "linux":
+        lib = ffi.dlopen("libhdf5-udf.so")
+    elif platform == "darwin":
+        lib = ffi.dlopen("libhdf5-udf.dylib")
+    elif platform == "win32":
+        lib = ffi.dlopen("libhdf5-udf-0.dll")
+    else:
+        raise NotImplementedError(f"{platform} is not currently supported by PyHDF5-UDF")
 
 class UserDefinedFunction:
     """Store a user-defined function on a HDF5 file.
