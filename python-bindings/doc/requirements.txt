@@ -1,1 +1,2 @@
 sphinx-jsonschema
+jsonschema>=3.2.0
