@@ -6,7 +6,7 @@
  * Sandboxing routines to prevent certain system calls
  * from being executed by the user-defined-functions.
  */
-#ifndef __sandbox_linux_
+#ifndef __sandbox_linux_h
 #define __sandbox_linux_h
 
 #include <seccomp.h>
