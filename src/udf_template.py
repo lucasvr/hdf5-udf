@@ -13,6 +13,9 @@
 class PythonLib:
     """Interfaces between User-Defined Functions and the HDF5 API."""
 
+    def __init__(self):
+        pass
+
     def load(self, libpath):
         # self.cffi is initialized from C code
         # self.ffi = cffi.FFI()
