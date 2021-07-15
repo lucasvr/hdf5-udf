@@ -3,7 +3,7 @@
 --
 -- To embed it in an existing HDF5 file, run:
 -- $ make files
--- $ hdf5-udf example-string.h5 test-string-output.lua RollingStone.lua:405:string(5)
+-- $ hdf5-udf example-string.h5 test-string-output.lua RollingStone.lua:405:string(15)
 --
 
 function dynamic_dataset()

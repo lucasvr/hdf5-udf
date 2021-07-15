@@ -148,7 +148,7 @@ Log_Normal "****************************"
 Log_Normal
 tests=(
     # HDF5 file             UDF file       Dynamic dataset
-    "example-simple_vector  simple_vector  Simple:1500:float"
+    "example-simple_vector  simple_vector  Simple:2000:float"
     "example-sine_wave      sine_wave      SineWave:100x100:int32"
 )
 for entry in "${tests[@]}"; do Run_Test "$entry"; done
@@ -175,7 +175,7 @@ tests=(
     "example-varstring     test-string          Temperature:1000:double"
     "example-multistring   test-multistring     Temperature:1000:double"
     "example-string2       test-string-output   RollingStone:405:string"
-    "example-string3       test-stringN-output  RollingStone:1205:string(5)"
+    "example-string3       test-stringN-output  RollingStone:1205:string(15)"
 )
 # Create a copy of example-string.h5, as the file gets removed after the
 # first test finishes its execution. The copy is used for test-string-output.
