@@ -17,6 +17,7 @@ C++, and Lua under Linux, macOS, and Windows.
 This page provides documentation for UDF writers and for those wishing to
 programmatically compile and store UDFs through HDF5-UDF's C and Python APIs.
 
+.. image:: https://raw.githubusercontent.com/lucasvr/hdf5-udf/master/images/hdf5-udf.png
 
 Installation
 ============
