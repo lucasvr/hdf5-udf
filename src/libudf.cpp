@@ -723,8 +723,17 @@ EXPORT bool libudf_store(char *metadata, size_t *size, udf_context *ctx)
         delete blob;
     }
 
-    if (metadata != NULL && size  != NULL && *size > 0)
-        *size = snprintf(metadata, (*size)-1, "%s", metadata_array.dump().c_str());
+    if (metadata != NULL && size != NULL && *size > 0)
+    {
+        size_t n = snprintf(metadata, (*size)-1, "%s", metadata_array.dump().c_str());
+        if (n >= (*size)-1)
+        {
+            // Output truncated
+            metadata[(*size)-1] = '\0';
+            retval = false;
+        }
+        *size = n;
+    }
 
     return retval;
 }

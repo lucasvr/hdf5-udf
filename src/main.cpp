@@ -118,7 +118,6 @@ int main(int argc, char **argv)
     buf.reserve(bufsize);
     CHECK(libudf_compile(ctx));
     CHECK(libudf_store(&buf[0], &bufsize, ctx));
-    buf[bufsize] = '\0';
 
     // The buffer is serialized and may include the source-code fragment
     // which is too large to be printed. Here we deserialize it and chop
