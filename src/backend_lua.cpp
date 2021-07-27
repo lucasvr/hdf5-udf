@@ -1,7 +1,7 @@
 /*
  * HDF5-UDF: User-Defined Functions for HDF5
  *
- * File: lua_backend.cpp
+ * File: backend_lua.cpp
  *
  * Lua code parser and bytecode generation/execution.
  */
@@ -18,7 +18,7 @@
 #include <algorithm>
 #include <lua.hpp>
 #include "udf_template_lua.h"
-#include "lua_backend.h"
+#include "backend_lua.h"
 #include "anon_mmap.h"
 #include "dataset.h"
 #include "os.h"

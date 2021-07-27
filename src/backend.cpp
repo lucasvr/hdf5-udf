@@ -10,13 +10,13 @@
 #include <fstream>
 #include "backend.h"
 #ifdef ENABLE_CPP
-#include "cpp_backend.h"
+#include "backend_cpp.h"
 #endif
 #ifdef ENABLE_LUA
-#include "lua_backend.h"
+#include "backend_lua.h"
 #endif
 #ifdef ENABLE_PYTHON
-#include "python_backend.h"
+#include "backend_python.h"
 #endif
 #include "os.h"
 

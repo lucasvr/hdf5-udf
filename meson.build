@@ -72,7 +72,7 @@ deps += [
 ########################
 
 if get_option('with-python')
-  sources += ['src/python_backend.cpp']
+  sources += ['src/backend_python.cpp']
   deps += [
     dependency('python3', required: true),
     dependency('python3-embed', required: false)
@@ -81,13 +81,13 @@ if get_option('with-python')
 endif
 
 if get_option('with-cpp')
-  sources += ['src/cpp_backend.cpp', 'src/miniz.cpp']
+  sources += ['src/backend_cpp.cpp', 'src/miniz.cpp']
   deps += [meson.get_compiler('cpp').find_library('m', required: true)]
   add_global_arguments('-DENABLE_CPP', language: 'cpp')
 endif
 
 if get_option('with-lua')
-  sources += ['src/lua_backend.cpp']
+  sources += ['src/backend_lua.cpp']
   deps += [dependency('luajit', required: true)]
   add_global_arguments('-DENABLE_LUA', language: 'cpp')
 endif

@@ -1,7 +1,7 @@
 /*
  * HDF5-UDF: User-Defined Functions for HDF5
  *
- * File: cpp_backend.cpp
+ * File: backend_cpp.cpp
  *
  * C++ code parser and shared library generation/execution.
  */
@@ -21,7 +21,7 @@
 #include <algorithm>
 #include "sharedlib_manager.h"
 #include "udf_template_cpp.h"
-#include "cpp_backend.h"
+#include "backend_cpp.h"
 #include "anon_mmap.h"
 #include "dataset.h"
 #include "miniz.h"

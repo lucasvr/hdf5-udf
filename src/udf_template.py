@@ -6,7 +6,7 @@
 # HDF5 filter callbacks and main interface with the Python API.
 #
 
-# Note: python_backend.cpp loads the "cffi" module for us. By delegating that
+# Note: backend_python.cpp loads the "cffi" module for us. By delegating that
 # task to the C code we can keep strict sandboxing rules, as the import process
 # requires access to the filesystem (i.e., readdir, stat, open, etc)
 

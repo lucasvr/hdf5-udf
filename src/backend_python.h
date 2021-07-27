@@ -1,16 +1,18 @@
 /*
  * HDF5-UDF: User-Defined Functions for HDF5
  *
- * File: lua_backend.h
+ * File: backend_python.h
  *
- * Interfaces for Lua code parser and bytecode generation/execution.
+ * Interfaces for Python code parser and bytecode generation/execution.
  */
-#ifndef __lua_backend_h
-#define __lua_backend_h
+#ifndef __backend_python_h
+#define __backend_python_h
 
+#include <Python.h>
+#include <marshal.h>
 #include "backend.h"
 
-class LuaBackend : public Backend {
+class PythonBackend : public Backend {
 public:
     // Backend name
     std::string name();
@@ -43,7 +45,12 @@ public:
     std::string compoundToStruct(const DatasetInfo &info, bool hardcoded_name);
 
 private:
-    std::string bytecode;
+    void printPyObject(PyObject *obj);
+    bool executeUDF(
+        PyObject *loadlib,
+        PyObject *udf,
+        std::string libpath,
+        const json &rules);
 };
 
-#endif /* __lua_backend_h */
+#endif /* __backend_python_h */

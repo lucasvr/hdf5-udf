@@ -1,16 +1,16 @@
 /*
  * HDF5-UDF: User-Defined Functions for HDF5
  *
- * File: cpp_backend.h
+ * File: backend_lua.h
  *
- * Interfaces for C++ code parser and shared library generation/execution.
+ * Interfaces for Lua code parser and bytecode generation/execution.
  */
-#ifndef __cpp_backend_h
-#define __cpp_backend_h
+#ifndef __backend_lua_h
+#define __backend_lua_h
 
 #include "backend.h"
 
-class CppBackend : public Backend {
+class LuaBackend : public Backend {
 public:
     // Backend name
     std::string name();
@@ -43,11 +43,7 @@ public:
     std::string compoundToStruct(const DatasetInfo &info, bool hardcoded_name);
 
 private:
-    // Compress a data buffer
-    std::string compressBuffer(const char *data, size_t usize);
-
-    // Decompress a data buffer
-    std::string decompressBuffer(const char *data, size_t csize);
+    std::string bytecode;
 };
 
-#endif /* __cpp_backend_h */
+#endif /* __backend_lua_h */

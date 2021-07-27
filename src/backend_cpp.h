@@ -1,18 +1,16 @@
 /*
  * HDF5-UDF: User-Defined Functions for HDF5
  *
- * File: PythonBackend.h
+ * File: backend_cpp.h
  *
- * Interfaces for Python code parser and bytecode generation/execution.
+ * Interfaces for C++ code parser and shared library generation/execution.
  */
-#ifndef __python_backend_h
-#define __python_backend_h
+#ifndef __backend_cpp_h
+#define __backend_cpp_h
 
-#include <Python.h>
-#include <marshal.h>
 #include "backend.h"
 
-class PythonBackend : public Backend {
+class CppBackend : public Backend {
 public:
     // Backend name
     std::string name();
@@ -45,12 +43,11 @@ public:
     std::string compoundToStruct(const DatasetInfo &info, bool hardcoded_name);
 
 private:
-    void printPyObject(PyObject *obj);
-    bool executeUDF(
-        PyObject *loadlib,
-        PyObject *udf,
-        std::string libpath,
-        const json &rules);
+    // Compress a data buffer
+    std::string compressBuffer(const char *data, size_t usize);
+
+    // Decompress a data buffer
+    std::string decompressBuffer(const char *data, size_t csize);
 };
 
-#endif /* __python_backend_h */
+#endif /* __backend_cpp_h */
