@@ -139,9 +139,9 @@ $ mkdir -p build
 $ meson -Dwith-python=true -Dwith-lua=true -Dwith-cpp=true . build
 ```
 
-At least one of `-Dwith-python=true`, `-Dwith-lua=true`, or `-Dwith-cpp=true` options
-must be set. It's still possible to build HDF5-UDF without any of these backends, but
-that would be a useless outcome!
+At least one of `-Dwith-python=true`, `-Dwith-lua=true`, `-Dwith-cpp=true`, or
+`-Dwith-gds=true` options must be set. It's still possible to build HDF5-UDF
+without any of these backends, but that would be a useless outcome!
 
 Support for sandboxing is strongly encouraged to be set, so it's enabled by default.
 If you are conducting local tests and do not plan on reading datasets provided by

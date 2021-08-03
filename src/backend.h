@@ -85,6 +85,27 @@ public:
         return std::string("");
     }
 
+    // Allocate memory for an input or scratch dataset
+    virtual void *alloc(size_t size) {
+        return malloc(size);
+    }
+
+    // Free memory previously allocated for an input or scratch dataset
+    virtual void free(void *dev_mem) {
+        ::free(dev_mem);
+    }
+
+    // Zeroes out a range of memory previously allocated for an input or scratch dataset
+    void clear(void *dev_mem, size_t size) {
+        memset(dev_mem, 0, size);
+    }
+
+    // Copy data from device memory to a newly allocated memory chunk in the host
+    virtual void *deviceToHost(void *dev_mem, size_t size)
+    {
+        return dev_mem;
+    }
+
     // Helper function: combine the UDF template string and the user-defined-function,
     // saving the result to a temporary file on disk that ends on the on the provided
     // extension. The user-defined-function is injected in the template string right

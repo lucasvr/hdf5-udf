@@ -92,6 +92,17 @@ if get_option('with-lua')
   add_global_arguments('-DENABLE_LUA', language: 'cpp')
 endif
 
+if get_option('with-gds')
+  sources += ['src/backend_gds.cpp', 'src/backend_gds_mm.cpp']
+  cuda_libdir = '/usr/local/cuda/targets/x86_64-linux/lib'
+  deps += [
+    meson.get_compiler('cpp').find_library('cufile', dirs: cuda_libdir, required: true),
+    meson.get_compiler('cpp').find_library('cudart', dirs: cuda_libdir, required: true)
+  ]
+  add_global_arguments('-DENABLE_GDS', language: 'cpp')
+  add_global_arguments('-I/usr/local/cuda/targets/x86_64-linux/include', language: 'cpp')
+endif
+
 if get_option('with-sandbox')
   if build_machine.system() == 'linux'
     sources += ['src/sandbox_linux.cpp']
@@ -105,10 +116,11 @@ endif
 message('\n' +
 '\n  HDF5-UDF: User-Defined Functions for HDF5\n' +
 '\n  Configuration' +
-'\n    Python support : ' + get_option('with-python').to_string() +
-'\n    C/C++ support  : ' + get_option('with-cpp').to_string() +
-'\n    Lua support    : ' + get_option('with-lua').to_string() +
-'\n    Sandbox support: ' + get_option('with-sandbox').to_string() +
+'\n    Python support:     ' + get_option('with-python').to_string() +
+'\n    C/C++ support:      ' + get_option('with-cpp').to_string() +
+'\n    Lua support:        ' + get_option('with-lua').to_string() +
+'\n    NVIDIA GDS support: ' + get_option('with-gds').to_string() +
+'\n    Sandbox support:    ' + get_option('with-sandbox').to_string() +
 '\n')
 
 ######################

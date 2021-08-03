@@ -20,6 +20,9 @@
 #include "io_filter.h"
 #include "dataset.h"
 #include "backend.h"
+#ifdef ENABLE_GDS
+#include "backend_gds.h"
+#endif
 #include "debug.h"
 #include "user_profile.h"
 #include "json.hpp"
@@ -46,7 +49,7 @@ struct DatasetHandle {
 };
 
 void releaseHdf5Datasets(
-    std::vector<DatasetHandle *> &handles, std::vector<DatasetInfo> &info);
+    std::vector<DatasetHandle *> &handles, std::vector<DatasetInfo> &info, Backend *backend);
 
 std::string getLibraryPath()
 {
@@ -57,8 +60,28 @@ std::string getLibraryPath()
 #endif
 }
 
+hid_t _getFileHandle(std::string filename, void *dfile_ptr)
+{
+#ifdef ENABLE_CPP
+    DirectFile *directfile = (DirectFile *) dfile_ptr;
+    return directfile->open(filename.c_str()) ? directfile->file_id : -1;
+#else
+    return H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+#endif
+}
+
+void _putFileHandle(hid_t file_id, void *dfile_ptr)
+{
+#ifdef ENABLE_GDS
+    DirectFile *directfile = (DirectFile *) dfile_ptr;
+    directfile->close();
+#else
+    H5Fclose(file_id);
+#endif
+}
+
 /* Retrieve the HDF5 file handle associated with a given dataset name */
-hid_t getDatasetHandle(std::string dataset, bool *handle_from_procfs)
+hid_t getDatasetHandle(std::string dataset, bool *handle_from_procfs, void *dfile_ptr)
 {
     for (auto &fname: os::openedH5Files())
     {
@@ -70,7 +93,7 @@ hid_t getDatasetHandle(std::string dataset, bool *handle_from_procfs)
 
         std::string old_env = getenv("HDF5_USE_FILE_LOCKING") ? : "";
         os::setEnvironmentVariable("HDF5_USE_FILE_LOCKING", "FALSE");
-        hid_t file_id = H5Fopen(fname.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+        hid_t file_id = _getFileHandle(fname, dfile_ptr);
         if (old_env.size())
             os::setEnvironmentVariable("HDF5_USE_FILE_LOCKING", old_env);
 
@@ -82,7 +105,7 @@ hid_t getDatasetHandle(std::string dataset, bool *handle_from_procfs)
             return file_id;
         }
         if (file_id >= 0)
-            H5Fclose(file_id);
+            _putFileHandle(file_id, dfile_ptr);
     }
     fprintf(stderr, "Failed to identify underlying HDF5 file\n");
     return (hid_t) -1;
@@ -93,7 +116,9 @@ bool readHdf5Datasets(
     std::vector<std::string> &input_names,
     std::vector<std::string> &scratch_names,
     std::vector<DatasetHandle *> &out_handles,
-    std::vector<DatasetInfo> &out_info)
+    std::vector<DatasetInfo> &out_info,
+    Backend *backend,
+    void *dfile_ptr)
 {
     auto readHdf5Dataset = [&](hid_t file_id, std::string dname, bool read_data)
     {
@@ -123,7 +148,8 @@ bool readHdf5Datasets(
         DatasetInfo info(dname, dims, datatype_name, hdf5_datatype);
 
         /* Allocate enough memory so we can read this dataset */
-        void *rdata = (void *) malloc(n_elements * H5Tget_size(info.hdf5_datatype));
+        size_t dataset_size = n_elements * H5Tget_size(info.hdf5_datatype);
+        void *rdata = backend->alloc(dataset_size);
         if (! rdata)
         {
             fprintf(stderr, "Not enough memory while allocating room for dataset\n");
@@ -136,17 +162,27 @@ bool readHdf5Datasets(
         /* Read the dataset */
         if (read_data)
         {
-            if (H5Dread(handle->dset_id, info.hdf5_datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata) < 0)
+            bool read_ok;
+#ifdef ENABLE_GDS
+            DirectFile *directfile = (DirectFile *) dfile_ptr;
+            GDSBackend *gds_backend = dynamic_cast<GDSBackend *>(backend);
+            assert(gds_backend);
+            DeviceMemory *devicememory = gds_backend->memoryHandler(rdata);
+            read_ok = DirectDataset::read(dset_id, directfile->gds_handle, *devicememory);
+#else
+            read_ok = H5Dread(dset_id, info.hdf5_datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata) >= 0;
+#endif
+            if (! read_ok)
             {
                 fprintf(stderr, "Failed to read HDF5 dataset\n");
-                free(rdata);
+                backend->free(rdata);
                 delete handle;
                 return false;
             }
             benchmark.print("Time to read dataset from disk");
         }
         else
-            memset(rdata, 0, n_elements * H5Tget_size(info.hdf5_datatype));
+            backend->clear(rdata, n_elements * H5Tget_size(info.hdf5_datatype));
 
         info.data = rdata;
         out_info.push_back(std::move(info));
@@ -159,25 +195,28 @@ bool readHdf5Datasets(
         if (readHdf5Dataset(file_id, name, true) == false)
         {
             fprintf(stderr, "Failed to read input dataset %s from HDF5 file\n", name.c_str());
-            releaseHdf5Datasets(out_handles, out_info);
+            releaseHdf5Datasets(out_handles, out_info, backend);
             return false;
         }
     for (auto name: scratch_names)
         if (readHdf5Dataset(file_id, name, false) == false)
         {
             fprintf(stderr, "Failed to allocate scratch dataset for %s\n", name.c_str());
-            releaseHdf5Datasets(out_handles, out_info);
+            releaseHdf5Datasets(out_handles, out_info, backend);
             return false;
         }
     return true;
 }
 
-void releaseHdf5Datasets(std::vector<DatasetHandle *> &handles, std::vector<DatasetInfo> &info)
+void releaseHdf5Datasets(
+    std::vector<DatasetHandle *> &handles,
+    std::vector<DatasetInfo> &info,
+    Backend *backend)
 {
     for (auto &entry: handles)
         delete entry;
     for (auto &entry: info)
-        free(entry.data);
+        backend->free(entry.data);
     handles.clear();
     info.clear();
 }
@@ -256,9 +295,18 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
             return 0;
         }
 
+#ifdef ENABLE_GDS
+        // Register the GPUDirect driver
+        DirectStorage directstorage;
+        DirectFile directfile;
+        void *dfile_ptr = (void *) &directfile;
+#else
+        void *dfile_ptr = NULL;
+#endif
+
         /* Workaround for lack of API to retrieve the HDF5 file handle from the filter callback */
         bool handle_from_procfs = false;
-        hid_t file_id = getDatasetHandle(output_name, &handle_from_procfs);
+        hid_t file_id = getDatasetHandle(output_name, &handle_from_procfs, dfile_ptr);
         if (file_id == -1)
         {
             delete blob;
@@ -269,12 +317,12 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         std::vector<DatasetHandle *> input_handles;
         std::vector<DatasetInfo> input_info;
         auto ok = readHdf5Datasets(
-            file_id, input_names, scratch_names, input_handles, input_info);
+            file_id, input_names, scratch_names, input_handles, input_info, backend, dfile_ptr);
         if (! ok)
         {
             fprintf(stderr, "Failed to process input/scratch datasets\n");
             if (handle_from_procfs)
-                H5Fclose(file_id);
+                _putFileHandle(file_id, dfile_ptr);
             delete blob;
             return 0;
         }
@@ -312,20 +360,20 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
                 fprintf(stderr, "Failed to set dataset %#lx size\n",
                     static_cast<unsigned long>(output_dataset.hdf5_datatype));
                 if (handle_from_procfs)
-                    H5Fclose(file_id);
+                    _putFileHandle(file_id, dfile_ptr);
                 delete blob;
                 return 0;
             }
         }
 
-        output_dataset.data = (void *) malloc(
-            output_dataset.getStorageSize() * output_dataset.getGridSize());
+        size_t alloc_size = output_dataset.getStorageSize() * output_dataset.getGridSize();
+        output_dataset.data = backend->alloc(alloc_size);
         if (! output_dataset.data)
         {
             fprintf(stderr, "Not enough memory allocating output grid\n");
-            releaseHdf5Datasets(input_handles, input_info);
+            releaseHdf5Datasets(input_handles, input_info, backend);
             if (handle_from_procfs)
-                H5Fclose(file_id);
+                _putFileHandle(file_id, dfile_ptr);
             delete blob;
             return 0;
         }
@@ -337,23 +385,35 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
             libpath, input_info, output_dataset, dtype, bytecode, bytecode_size, rules))
         {
             nbytes = 0;
+            backend->free(output_dataset.data);
         } 
         else 
         {
-            auto n_elements = output_dataset.getGridSize();
-            auto storage_size = output_dataset.getStorageSize();
-
-            free(*buf);
-            *buf = (void *) output_dataset.data;
-            *buf_size = n_elements * storage_size;
-            nbytes = n_elements * storage_size;
+            // On NVIDIA GPUDirect Storage backend, memcpyDeviceToHost() allocates a
+            // chunk of memory in host memory and performs a memcpy() from device to
+            // host; the return value is a pointer to the newly allocated memory chunk.
+            // On regular backends, this call simply returns the first argument; no
+            // memory allocation nor data copies happen. Because of this difference,
+            // `output_dataset.data` can only be freed if the backend is GDS -- we end
+            // up providing invalid data on `*buf = host_mem` otherwise.
+            void *host_mem = backend->deviceToHost(output_dataset.data, alloc_size);
+            if (! host_mem)
+                nbytes = 0;
+            else
+            {
+                free(*buf);
+                *buf = host_mem;
+                *buf_size = nbytes = alloc_size;
+            }
+            if (backend->name().compare("NVIDIA-GDS") == 0)
+                backend->free(output_dataset.data);
             benchmark.print("Call to user-defined function");
         }
 
         /* Release memory used by auxiliary datasets */
-        releaseHdf5Datasets(input_handles, input_info);
+        releaseHdf5Datasets(input_handles, input_info, backend);
         if (handle_from_procfs)
-            H5Fclose(file_id);
+            _putFileHandle(file_id, dfile_ptr);
         delete blob;
     }
     else

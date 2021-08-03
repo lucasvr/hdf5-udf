@@ -18,6 +18,9 @@
 #ifdef ENABLE_PYTHON
 #include "backend_python.h"
 #endif
+#ifdef ENABLE_GDS
+#include "backend_gds.h"
+#endif
 #include "os.h"
 
 static std::string textReplace(
@@ -162,6 +165,10 @@ Backend *getBackendByName(std::string name)
     if (name.compare("C++") == 0)
         return static_cast<Backend *>(new CppBackend());
 #endif
+#ifdef ENABLE_GDS
+    if (name.compare("NVIDIA-GDS") == 0)
+        return static_cast<Backend *>(new GDSBackend());
+#endif
     return NULL;
 }
 
@@ -192,6 +199,10 @@ Backend *getBackendByFileExtension(std::string name)
 #ifdef ENABLE_CPP
     if (sameString(ext, ".cpp"))
         return static_cast<Backend *>(new CppBackend());
+#endif
+#ifdef ENABLE_GDS
+    if (sameString(ext, ".cu"))
+        return static_cast<Backend *>(new GDSBackend());
 #endif
     return NULL;
 }
