@@ -62,7 +62,7 @@ std::string getLibraryPath()
 
 hid_t _getFileHandle(std::string filename, void *dfile_ptr)
 {
-#ifdef ENABLE_CPP
+#ifdef ENABLE_GDS
     DirectFile *directfile = (DirectFile *) dfile_ptr;
     return directfile->open(filename.c_str()) ? directfile->file_id : -1;
 #else
