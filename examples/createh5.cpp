@@ -14,6 +14,9 @@
 #include <fstream>
 #include <functional>
 
+hsize_t NATIVE_DIM0 = 100;
+hsize_t NATIVE_DIM1 = 50;
+
 int create_regular_dataset(hid_t file_id, int count);
 int create_compound_dataset_nostring(hid_t file_id, bool simple_layout, int count);
 int create_compound_dataset_string(hid_t file_id, bool simple_layout, int count);
@@ -61,9 +64,14 @@ int main(int argc, char **argv)
             "                    STRING             (a fixed-sized string dataset)\n"
             "                    VARSTRING          (a variable-sized string dataset)\n"
             "  --count=N         Create this many datasets in the output file (default: 0)\n"
-            "  --out=FILE        Output file name (truncates FILE if it already exists)\n\n");
+            "  --dims=X,Y        X and Y dimensions (default: %llu,%llu)\n"
+            "  --out=FILE        Output file name (truncates FILE if it already exists)\n\n",
+            NATIVE_DIM0, NATIVE_DIM1);
         return 1;
     }
+
+    std::stringstream default_dims;
+    default_dims << NATIVE_DIM0 << "," << NATIVE_DIM1;
 
     std::string compound = getOptionValue(argc, argv, "--compound", "");
     std::string datatype = getOptionValue(argc, argv, "--datatype", "");
@@ -74,6 +82,8 @@ int main(int argc, char **argv)
         fprintf(stderr, "Error: missing output file (--out=FILE)\n");
         return 1;
     }
+    std::string dims = getOptionValue(argc, argv, "--dims", default_dims.str().c_str());
+    sscanf(dims.c_str(), "%llu,%llu", &NATIVE_DIM0, &NATIVE_DIM1);
 
     hid_t file_id = H5Fcreate(hdf5_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     if (file_id < 0)
@@ -150,8 +160,6 @@ int main(int argc, char **argv)
 }
 
 // Files with native data types
-const int NATIVE_DIM0 = 100;
-const int NATIVE_DIM1 = 50;
 
 int __create_native_dataset(
     hid_t file_id, hid_t space_id, hid_t type_id, hid_t mem_type, int count, void *data)
@@ -178,8 +186,8 @@ int __create_native_dataset(
 int create_native_int32(hid_t file_id, int count)
 {
     int32_t data[NATIVE_DIM0][NATIVE_DIM1];
-    for (int i=0; i<NATIVE_DIM0; ++i)
-        for (int j=0; j<NATIVE_DIM1; ++j)
+    for (hsize_t i=0; i<NATIVE_DIM0; ++i)
+        for (hsize_t j=0; j<NATIVE_DIM1; ++j)
             data[i][j] = count * 10 * i + j;
 
     hsize_t dims[2] = {NATIVE_DIM0, NATIVE_DIM1};
