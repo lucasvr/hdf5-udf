@@ -13,6 +13,7 @@ UDFs on their datasets.
     - [CPython backend](#cpython-backend)
     - [C++ backend](#c++-backend)
     - [LuaJIT backend](#luajit-backend)
+    - [NVIDIA GPUDirect Storage (GDS) backend](#nvidia-gds-backend)
 2. [User-Defined Functions API](#user-defined-functions-api)
     - [Supported datatypes](#supported-datatypes)
     - [HDF5 groups](#hdf5-groups)
@@ -77,6 +78,15 @@ into HDF5.
 UDFs written in Lua are processed by the LuaJIT interpreter. The output bytecode
 is saved into HDF5 and interpreted by LuaJIT's just-in-time compiler when the
 dataset is read by the application.
+
+## NVIDIA GDS backend
+
+The GDS backend allows code written in CUDA to be compiled with NVIDIA's `nvcc`.
+Just like with the C++ backend, the resulting shared library is compressed and
+saved into HDF5. UDFs that happen to pull data from other datasets in the same
+HDF5 file have their runtime accelerated by NVIDIA GPUDirect Storage, too: data
+is DMA-transferred straight from storage to the GPU memory, as long as the
+underlying devices are supported by GDS.
 
 # User-Defined Functions API
 
