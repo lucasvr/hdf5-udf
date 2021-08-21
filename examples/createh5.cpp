@@ -13,17 +13,30 @@
 #include <sstream>
 #include <fstream>
 #include <functional>
+#include <map>
+
+#ifndef SNAPPY_CUDA_FILTER_ID
+#define SNAPPY_CUDA_FILTER_ID 32003
+#endif
 
 hsize_t NATIVE_DIM0 = 100;
 hsize_t NATIVE_DIM1 = 50;
 
-int create_regular_dataset(hid_t file_id, int count);
-int create_compound_dataset_nostring(hid_t file_id, bool simple_layout, int count);
-int create_compound_dataset_string(hid_t file_id, bool simple_layout, int count);
-int create_compound_dataset_varstring(hid_t file_id, bool simple_layout, int count);
-int create_native_int32(hid_t file_id, int count);
-int create_native_string(hid_t file_id, int count);
-int create_native_varstring(hid_t file_id, int count);
+hsize_t CHUNK_DIM0 = 100;
+hsize_t CHUNK_DIM1 = 25;
+
+const std::map<std::string, H5Z_filter_t> filter_map {
+    {"deflate", H5Z_FILTER_DEFLATE},
+    {"snappy-cuda", SNAPPY_CUDA_FILTER_ID},
+};
+
+int create_regular_dataset(hid_t file_id, std::string compression, int count);
+int create_compound_dataset_nostring(hid_t file_id, bool simple_layout, std::string compression, int count);
+int create_compound_dataset_string(hid_t file_id, bool simple_layout, std::string compression, int count);
+int create_compound_dataset_varstring(hid_t file_id, bool simple_layout, std::string compression, int count);
+int create_native_int32(hid_t file_id, std::string compression, int count);
+int create_native_string(hid_t file_id, std::string compression, int count);
+int create_native_varstring(hid_t file_id, std::string compression, int count);
 
 std::string getOptionValue(int argc, char **argv, const char *option, const char *default_value)
 {
@@ -48,25 +61,32 @@ int main(int argc, char **argv)
 {
     if (argc < 2)
     {
+        std::stringstream ss;
+        for (auto const &entry: filter_map)
+            ss << entry.first << ", ";
+        auto supported_filters = ss.str().substr(0, ss.str().length()-2);
+
         fprintf(stdout, "Syntax: %s  <options>\n", argv[0]);
         fprintf(stdout, "Available options are:\n"
-            "  --compound=TYPE   Create a compound dataset with a predefined structure\n"
-            "                    Valid options for TYPE are:\n"
-            "                    NOSTRING_SIMPLE    (simple layout, no string members)\n"
-            "                    NOSTRING_MIXED     (mixed layout, no string members)\n"
-            "                    STRING_SIMPLE      (simple layout, including a fixed-sized string member)\n"
-            "                    STRING_MIXED       (mixed layout, including a fixed-sized string member)\n"
-            "                    VARSTRING_SIMPLE   (simple layout, including a variable-sized string member)\n"
-            "                    VARSTRING_MIXED    (mixed layout, including a variable-sized string member)\n"
-            "  --datatype=TYPE   Create a dataset with a predefined native type\n"
-            "                    Valid options for TYPE are:\n"
-            "                    INT32              (an integer-based dataset)\n"
-            "                    STRING             (a fixed-sized string dataset)\n"
-            "                    VARSTRING          (a variable-sized string dataset)\n"
-            "  --count=N         Create this many datasets in the output file (default: 0)\n"
-            "  --dims=X,Y        X and Y dimensions (default: %llu,%llu)\n"
-            "  --out=FILE        Output file name (truncates FILE if it already exists)\n\n",
-            NATIVE_DIM0, NATIVE_DIM1);
+            "  --compound=TYPE    Create a compound dataset with a predefined structure\n"
+            "                     Valid options for TYPE are:\n"
+            "                     NOSTRING_SIMPLE    (simple layout, no string members)\n"
+            "                     NOSTRING_MIXED     (mixed layout, no string members)\n"
+            "                     STRING_SIMPLE      (simple layout, including a fixed-sized string member)\n"
+            "                     STRING_MIXED       (mixed layout, including a fixed-sized string member)\n"
+            "                     VARSTRING_SIMPLE   (simple layout, including a variable-sized string member)\n"
+            "                     VARSTRING_MIXED    (mixed layout, including a variable-sized string member)\n"
+            "  --datatype=TYPE    Create a dataset with a predefined native type\n"
+            "                     Valid options for TYPE are:\n"
+            "                     INT32              (an integer-based dataset)\n"
+            "                     STRING             (a fixed-sized string dataset)\n"
+            "                     VARSTRING          (a variable-sized string dataset)\n"
+            "  --count=N          Create this many datasets in the output file (default: 0)\n"
+            "  --dims=X,Y         X and Y dimensions (default: %llu,%llu)\n"
+            "  --compress=FILTER  Compress the dataset(s) with one of the supported filters:\n"
+            "                     %s\n"
+            "  --out=FILE         Output file name (truncates FILE if it already exists)\n\n",
+            NATIVE_DIM0, NATIVE_DIM1, supported_filters.c_str());
         return 1;
     }
 
@@ -76,6 +96,7 @@ int main(int argc, char **argv)
     std::string compound = getOptionValue(argc, argv, "--compound", "");
     std::string datatype = getOptionValue(argc, argv, "--datatype", "");
     int dataset_count = atoi(getOptionValue(argc, argv, "--count", "0").c_str());
+    std::string compression = getOptionValue(argc, argv, "--compress", "");
     std::string hdf5_file = getOptionValue(argc, argv, "--out", "");
     if (hdf5_file.size() == 0)
     {
@@ -95,7 +116,7 @@ int main(int argc, char **argv)
     struct {
         const char *type;
         bool simple_layout;
-        int (*func)(hid_t, bool, int);
+        int (*func)(hid_t, bool, std::string, int);
     } compound_functions[] = {
         {"NOSTRING_SIMPLE",  true,  create_compound_dataset_nostring},
         {"NOSTRING_MIXED",   false, create_compound_dataset_nostring},
@@ -108,7 +129,7 @@ int main(int argc, char **argv)
 
     struct {
         const char *type;
-        int (*func)(hid_t, int);
+        int (*func)(hid_t, std::string, int);
     } native_functions[] = {
         {"INT32",      create_native_int32},
         {"STRING",     create_native_string},
@@ -126,7 +147,7 @@ int main(int argc, char **argv)
             {
                 auto entry = &compound_functions[i];
                 if (compound.compare(entry->type) == 0)
-                    ret = entry->func(file_id, entry->simple_layout, count);
+                    ret = entry->func(file_id, entry->simple_layout, compression, count);
             }
             if (ret == -1)
             {
@@ -142,7 +163,7 @@ int main(int argc, char **argv)
             {
                 auto entry = &native_functions[i];
                 if (datatype.compare(entry->type) == 0)
-                    ret = entry->func(file_id, count);
+                    ret = entry->func(file_id, compression, count);
             }
             if (ret == -1)
             {
@@ -161,48 +182,111 @@ int main(int argc, char **argv)
 
 // Files with native data types
 
-int __create_native_dataset(
-    hid_t file_id, hid_t space_id, hid_t type_id, hid_t mem_type, int count, void *data)
+hid_t __make_compression_plist(std::string compression)
 {
+    auto filter_info = filter_map.find(compression);
+    if (filter_info == filter_map.end())
+    {
+        fprintf(stderr, "Requested compression filter not supported\n");
+        return -1;
+    }
+    hid_t plist_id = H5Pcreate(H5P_DATASET_CREATE);
+    if (plist_id < 0)
+    {
+        fprintf(stderr, "Failed to create property list\n");
+        return -1;
+    }
+
+    size_t cd_nvalues = 0;
+    unsigned int cd_values[4];
+    if (filter_info->second == H5Z_FILTER_DEFLATE)
+    {
+        // Set compression level
+        cd_nvalues = 1;
+        cd_values[0] = 9;
+    }
+
+    herr_t ret = H5Pset_filter(plist_id, filter_info->second, H5Z_FLAG_MANDATORY, cd_nvalues, cd_values);
+    if (ret < 0)
+    {
+        fprintf(stderr, "Failed to configure compression filter. Please check that $HDF5_PLUGIN_PATH is set\n");
+        H5Pclose(plist_id);
+        return -1;
+    }
+    hsize_t cdims[2] = {CHUNK_DIM0, CHUNK_DIM1};
+    ret = H5Pset_chunk(plist_id, 2, cdims);
+    if (ret < 0)
+    {
+        fprintf(stderr, "Failed to set chunk size\n");
+        H5Pclose(plist_id);
+        return -1;
+    }
+
+    return plist_id;
+}
+
+int __create_native_dataset(
+    hid_t file_id, hid_t space_id, hid_t type_id, hid_t mem_type, int count, void *data, std::string compression)
+{
+    int retval = 0;
     char name[64];
     snprintf(name, sizeof(name)-1, "Dataset%d", count);
-    hid_t dset_id = H5Dcreate(file_id, name, type_id, space_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+    hid_t plist_id = H5P_DEFAULT;
+    if (compression.size())
+    {
+        plist_id = __make_compression_plist(compression);
+        if (plist_id < 0)
+            return 1;
+    }
+
+    hid_t dset_id = H5Dcreate(file_id, name, type_id, space_id, H5P_DEFAULT, plist_id, H5P_DEFAULT);
     if (dset_id < 0)
     {
         fprintf(stderr, "Failed to create dataset\n");
-        return 1;
+        retval = 1;
     }
-    herr_t ret = H5Dwrite(dset_id, mem_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-    if (ret < 0)
+    else
     {
-        fprintf(stderr, "Error writing data to file\n");
-        return 1;
+        herr_t ret = H5Dwrite(dset_id, mem_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+        if (ret < 0)
+        {
+            fprintf(stderr, "Error writing data to file\n");
+            retval = 1;
+        }
+        H5Dclose(dset_id);
     }
-    H5Dclose(dset_id);
-    H5Sclose(space_id); // close handle provided as argument to this function
-    return 0;
+
+    if (plist_id != H5P_DEFAULT)
+        H5Pclose(plist_id);
+    return retval;
 }
 
-int create_native_int32(hid_t file_id, int count)
+int create_native_int32(hid_t file_id, std::string compression, int count)
 {
-    int32_t data[NATIVE_DIM0][NATIVE_DIM1];
+    int32_t *data = new int[NATIVE_DIM0 * NATIVE_DIM1];
     for (hsize_t i=0; i<NATIVE_DIM0; ++i)
         for (hsize_t j=0; j<NATIVE_DIM1; ++j)
-            data[i][j] = count * 10 * i + j;
+            data[i * NATIVE_DIM1 + j] = count * 10 * i + j;
 
     hsize_t dims[2] = {NATIVE_DIM0, NATIVE_DIM1};
     hid_t space_id = H5Screate_simple(2, dims, NULL);
     if (space_id < 0)
     {
         fprintf(stderr, "Failed to create dataspace\n");
+        delete[] data;
         return 1;
     }
 
-    return __create_native_dataset(
-        file_id, space_id, H5T_STD_I32LE, H5T_NATIVE_INT, count, (void *) data[0]);
+    int ret = __create_native_dataset(
+        file_id, space_id, H5T_STD_I32LE, H5T_NATIVE_INT, count, (void *) data, compression);
+
+    H5Sclose(space_id);
+    delete[] data;
+    return ret;
 }
 
-int __create_string_dataset(
+int __populate_string_data(
     int dims,
     int &current_dim,
     std::function<void(int, const char *)> write_fn)
@@ -236,7 +320,7 @@ int __create_string_dataset(
     return 0;
 }
 
-int create_native_varstring(hid_t file_id, int count)
+int create_native_varstring(hid_t file_id, std::string compression, int count)
 {
     // Prepare output data
     int current_dim = 0;
@@ -247,7 +331,7 @@ int create_native_varstring(hid_t file_id, int count)
         data[dim] = strdup(word);
     };
 
-    int ret = __create_string_dataset(NATIVE_DIM0, current_dim, _callback);
+    int ret = __populate_string_data(NATIVE_DIM0, current_dim, _callback);
     if (ret != 0)
         return 1;
 
@@ -264,11 +348,16 @@ int create_native_varstring(hid_t file_id, int count)
     hid_t stringtype_id = H5Tcopy(H5T_C_S1);
     H5Tset_size(stringtype_id, H5T_VARIABLE);
 
-    return __create_native_dataset(
-        file_id, space_id, stringtype_id, stringtype_id, count, (void *) data);
+    ret = __create_native_dataset(
+        file_id, space_id, stringtype_id, stringtype_id, count, (void *) data, compression);
+    
+    H5Sclose(space_id);
+    for (hsize_t dim=0; dim<NATIVE_DIM0; ++dim)
+        free(data[dim]);
+    return ret;
 }
 
-int create_native_string(hid_t file_id, int count)
+int create_native_string(hid_t file_id, std::string compression, int count)
 {
     // Prepare output data
     const int len = 32;
@@ -281,7 +370,7 @@ int create_native_string(hid_t file_id, int count)
         snprintf(data[dim], len-1, "%s", word);
     };
 
-    int ret = __create_string_dataset(NATIVE_DIM0, current_dim, _callback);
+    int ret = __populate_string_data(NATIVE_DIM0, current_dim, _callback);
     if (ret != 0)
         return 1;
 
@@ -298,8 +387,11 @@ int create_native_string(hid_t file_id, int count)
     hid_t stringtype_id = H5Tcopy(H5T_C_S1);
     H5Tset_size(stringtype_id, len);
 
-    return __create_native_dataset(
-        file_id, space_id, stringtype_id, stringtype_id, count, (void *) data[0]);
+    ret = __create_native_dataset(
+        file_id, space_id, stringtype_id, stringtype_id, count, (void *) data[0], compression);
+    
+    H5Sclose(space_id);
+    return ret;
 }
 
 // Files with compound data types
@@ -332,6 +424,7 @@ int __create_compound_dataset(
     size_t varstr_size,
     int count,
     T data,
+    std::string compression,
     std::function<void(hid_t, const char *, int)> string_fn)
 {
     char name[64];
@@ -342,6 +435,17 @@ int __create_compound_dataset(
     {
         fprintf(stderr, "Failed to create dataspace\n");
         return 1;
+    }
+
+    hid_t plist_id = H5P_DEFAULT;
+    if (compression.size())
+    {
+        plist_id = __make_compression_plist(compression);
+        if (plist_id < 0)
+        {
+            H5Sclose(space_id);
+            return 1;
+        }
     }
 
     // The dataset layout is based on the example provided by the HDF Group at
@@ -366,28 +470,33 @@ int __create_compound_dataset(
     // Create the compound dataset using either a simple approach (in which we write data
     // according to the memory layout) or a more complex one in which the memory and disk
     // layouts differ.
+    int retval = 0;
     hid_t dset_id = H5Dcreate(file_id, name, simple_layout ? memtype_id : filetype_id, space_id,
-        H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        H5P_DEFAULT, plist_id, H5P_DEFAULT);
     if (dset_id < 0)
     {
         fprintf(stderr, "Failed to create dataset\n");
-        return 1;
+        retval = 1;
     }
-
-    herr_t ret = H5Dwrite(dset_id, memtype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-    if (ret < 0)
+    else
     {
-        fprintf(stderr, "Error writing data to file\n");
-        return 1;
+        herr_t ret = H5Dwrite(dset_id, memtype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+        if (ret < 0)
+        {
+            fprintf(stderr, "Error writing data to file\n");
+            retval = 1;
+        }
     }
+    if (plist_id != H5P_DEFAULT)
+        H5Pclose(plist_id);
     H5Tclose(filetype_id);
     H5Tclose(memtype_id);
     H5Dclose(dset_id);
     H5Sclose(space_id);
-    return 0;
+    return retval;
 }
 
-int create_compound_dataset_varstring(hid_t file_id, bool simple_layout, int count)
+int create_compound_dataset_varstring(hid_t file_id, bool simple_layout, std::string compression, int count)
 {
     compound_varstring_t data[COMPOUND_DIM0];
     memset(data, 0, sizeof(data));
@@ -415,11 +524,11 @@ int create_compound_dataset_varstring(hid_t file_id, bool simple_layout, int cou
     };
 
     return __create_compound_dataset<compound_varstring_t *>(
-        file_id, simple_layout, sizeof(hvl_t), count, data, _callback);
+        file_id, simple_layout, sizeof(hvl_t), count, data, compression, _callback);
 }
 
 
-int create_compound_dataset_string(hid_t file_id, bool simple_layout, int count)
+int create_compound_dataset_string(hid_t file_id, bool simple_layout, std::string compression, int count)
 {
     compound_string_t data[COMPOUND_DIM0];
     memset(data, 0, sizeof(data));
@@ -445,10 +554,10 @@ int create_compound_dataset_string(hid_t file_id, bool simple_layout, int count)
     };
 
     return __create_compound_dataset<compound_string_t *>(
-        file_id, simple_layout, varstr_size, count, data, _callback);
+        file_id, simple_layout, varstr_size, count, data, compression, _callback);
 }
 
-int create_compound_dataset_nostring(hid_t file_id, bool simple_layout, int count)
+int create_compound_dataset_nostring(hid_t file_id, bool simple_layout, std::string compression, int count)
 {
     compound_nostring_t data[COMPOUND_DIM0];
     memset(data, 0, sizeof(data));
@@ -465,5 +574,5 @@ int create_compound_dataset_nostring(hid_t file_id, bool simple_layout, int coun
     // Provide a sizeof(hvl_t) to ensure the structure is padded when
     // simple_layout == false.
     return __create_compound_dataset<compound_nostring_t *>(
-        file_id, simple_layout, sizeof(hvl_t), count, data, _callback);
+        file_id, simple_layout, sizeof(hvl_t), count, data, compression, _callback);
 }
