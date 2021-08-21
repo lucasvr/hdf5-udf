@@ -6,11 +6,13 @@
  * $ hdf5-udf example-add_datasets.h5 example-add_datasets.cu
  *
  */
+#include <math.h>
 
-__global__ void add(int *a, int *b, int *out)
+__global__ void add(int *a, int *b, int *out, size_t n)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    out[i] = a[i] + b[i];
+    if (i < n)
+        out[i] = a[i] + b[i];
 }
 
 extern "C" void dynamic_dataset()
@@ -20,6 +22,8 @@ extern "C" void dynamic_dataset()
     auto udf_data = lib.getData<int>("UserDefinedDataset");
     auto udf_dims = lib.getDims("UserDefinedDataset");
 
-    auto size = udf_dims[0] * udf_dims[1];
-    add<<<(size+255)/256, 256>>>(ds1_data, ds2_data, udf_data);
+    size_t n = udf_dims[0] * udf_dims[1];
+    int block_size = 1024;
+    int grid_size = (int) ceil((float) (n * sizeof(int))/block_size);
+    add<<<grid_size, block_size>>>(ds1_data, ds2_data, udf_data, n);
 }
