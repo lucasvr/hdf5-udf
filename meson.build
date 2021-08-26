@@ -97,10 +97,14 @@ if get_option('with-gds')
   cuda_libdir = '/usr/local/cuda/targets/x86_64-linux/lib'
   deps += [
     meson.get_compiler('cpp').find_library('cufile', dirs: cuda_libdir, required: true),
-    meson.get_compiler('cpp').find_library('cudart', dirs: cuda_libdir, required: true)
+    meson.get_compiler('cpp').find_library('cudart', dirs: cuda_libdir, required: true),
+    meson.get_compiler('cpp').find_library('udf_snappy_reader', required: true),
+    meson.get_compiler('cpp').find_library('gomp', required: true)
   ]
+  add_global_arguments('-fopenmp', language: 'cpp')
   add_global_arguments('-DENABLE_GDS', language: 'cpp')
   add_global_arguments('-I/usr/local/cuda/targets/x86_64-linux/include', language: 'cpp')
+  add_global_arguments('-I/usr/include/snappy-cuda', language: 'cpp')
 endif
 
 if get_option('with-sandbox')

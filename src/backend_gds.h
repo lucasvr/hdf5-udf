@@ -8,17 +8,21 @@
 #ifndef __backend_gds_h
 #define __backend_gds_h
 
+#include <hdf5.h>
 #include <cufile.h>
+#include <tuple>
+#include <vector>
 #include "backend.h"
 
 // DeviceMemory: allocate and register memory on the device for GPUDirect I/O
 struct DeviceMemory {
-    DeviceMemory(size_t alloc_size);
+    DeviceMemory(size_t alloc_size, size_t aligned_alloc_size=0);
     ~DeviceMemory();
     void clear();
 
     void *dev_mem;
     size_t size;
+    size_t total_size;
 };
 
 // DirectStorage: simple interface to register and deregister the GDS driver.
@@ -44,6 +48,14 @@ struct DirectFile {
 // DirectDataset: open a dataset
 struct DirectDataset {
     static bool read(hid_t dset_id, const CUfileHandle_t &gds_handle, DeviceMemory &mm);
+    static bool readChunked(hid_t dset_id, const CUfileHandle_t &gds_handle, DeviceMemory &mm);
+    static bool readContiguous(hid_t dset_id, const CUfileHandle_t &gds_handle, DeviceMemory &mm);
+    static bool parseChunks(
+        hid_t dset_id,
+        hid_t fspace_id,
+        std::vector<hsize_t> &dims,
+        std::vector<hsize_t> &cdims,
+        std::vector<std::tuple<haddr_t, haddr_t, hsize_t, hsize_t, DeviceMemory *>> &data_blocks);
     static bool copyToHost(DeviceMemory &mm, void **host_mem);
 };
 
