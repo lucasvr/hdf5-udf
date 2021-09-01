@@ -21,13 +21,14 @@ int main(int argc, char **argv)
 {
     if (argc < 3)
     {
-        fprintf(stdout, "Syntax: %s <file.h5> <dataset> [palette dataset]\n", argv[0]);
+        fprintf(stdout, "Syntax: %s <file.h5> <dataset> [palette dataset] [--quiet]\n", argv[0]);
         return 1;
     }
 
     std::string hdf5_file = argv[1];
     std::string hdf5_dataset = argv[2];
-    std::string hdf5_palette = argc > 3 ? argv[3] : "";
+    std::string hdf5_palette = argc <= 3 || strcmp(argv[3], "--quiet") == 0 ? "" : argv[3];
+    bool quiet = strcmp(argv[argc-1], "--quiet") == 0;
 
     // Enable printing UTF-8 characters
     setlocale(LC_ALL, "en_US.UTF-8");
@@ -102,51 +103,61 @@ int main(int argc, char **argv)
     }
     H5Fclose(file_id);
 
-    // Image-based datasets needs to be stretched a little bit so they look prettier on
-    // the console. They also look better when rendered as special characters instead
-    // of a collection of 0s and 1s.
-    bool is_tux = hdf5_dataset.compare("Tux") == 0;
-
-    char line[8192];
-    char *cur = line, *end = line + sizeof(line);
-    memset(line, 0, sizeof(line));
-    for (size_t i=0; i<dims[0]*dims[1]; ++i)
+    if (! quiet)
     {
-        if (i && i%dims[0] == 0)
-        {
-            printf("%s\n", line);
-            memset(line, 0, sizeof(line));
-            cur = line;
-        }
+        // Image-based datasets needs to be stretched a little bit so they look prettier on
+        // the console. They also look better when rendered as special characters instead
+        // of a collection of 0s and 1s.
+        bool is_tux = hdf5_dataset.compare("Tux") == 0;
 
-        if (is_tux)
+        char line[8192];
+        char *cur = line, *end = line + sizeof(line);
+        memset(line, 0, sizeof(line));
+        for (size_t i=0; i<dims[0]*dims[1]; ++i)
         {
-            wchar_t shade = 0x2592;
-            int *rdata_int = (int *) rdata;
-            cur += snprintf(cur, end-cur, "%lc%lc", rdata_int[i] == 1 ? ' ' : shade, rdata_int[i] == 1 ? ' ' : shade);
-        }
-        else if (hdf5_palette.size())
-        {
-            pal_t *pal_ptr = (pal_t *) pal;
-            uint8_t data = rdata[i];
-            if (pal_ptr)
+            if (i && i%dims[0] == 0)
             {
-                // Render this pixel using Truecolor ANSI escape codes
-                pal_t *color = &pal_ptr[data];
-                cur += snprintf(cur, end-cur, "\033[48;2;%d;%d;%dm**\033[0m", color->r, color->g, color->b);
+                printf("%s\n", line);
+                memset(line, 0, sizeof(line));
+                cur = line;
+            }
+            else if (cur > end)
+            {
+                printf("%s", line);
+                memset(line, 0, sizeof(line));
+                cur = line;
+            }
+
+            if (is_tux)
+            {
+                wchar_t shade = 0x2592;
+                int *rdata_int = (int *) rdata;
+                cur += snprintf(cur, end-cur, "%lc%lc", rdata_int[i] == 1 ? ' ' : shade, rdata_int[i] == 1 ? ' ' : shade);
+            }
+            else if (hdf5_palette.size())
+            {
+                pal_t *pal_ptr = (pal_t *) pal;
+                uint8_t data = rdata[i];
+                if (pal_ptr)
+                {
+                    // Render this pixel using Truecolor ANSI escape codes
+                    pal_t *color = &pal_ptr[data];
+                    cur += snprintf(cur, end-cur, "\033[48;2;%d;%d;%dm**\033[0m", color->r, color->g, color->b);
+                }
+                else
+                    cur += snprintf(cur, end-cur, "%c%c", data, data);
             }
             else
-                cur += snprintf(cur, end-cur, "%c%c", data, data);
+            {
+                if (is_float)
+                    cur += snprintf(cur, end-cur, "%.1f ", (float) rdata[i]);
+                else
+                    cur += snprintf(cur, end-cur, "%d", (int) rdata[i]);
+            }
         }
-        else
-        {
-            if (is_float)
-                cur += snprintf(cur, end-cur, "%.1f ", (float) rdata[i]);
-            else
-                cur += snprintf(cur, end-cur, "%d", (int) rdata[i]);
-        }
+        printf("%s\n", line);
     }
-    printf("%s\n", line);
 
+    delete[] rdata;
     return 0;
 }
