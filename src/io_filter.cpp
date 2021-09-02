@@ -63,21 +63,26 @@ std::string getLibraryPath()
 hid_t _getFileHandle(std::string filename, void *dfile_ptr)
 {
 #ifdef ENABLE_GDS
-    DirectFile *directfile = (DirectFile *) dfile_ptr;
-    return directfile->open(filename.c_str()) ? directfile->file_id : -1;
-#else
-    return H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    if (dfile_ptr)
+    {
+        DirectFile *directfile = (DirectFile *) dfile_ptr;
+        return directfile->open(filename.c_str()) ? directfile->file_id : -1;
+    }
 #endif
+    return H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
 }
 
 void _putFileHandle(hid_t file_id, void *dfile_ptr)
 {
 #ifdef ENABLE_GDS
-    DirectFile *directfile = (DirectFile *) dfile_ptr;
-    directfile->close();
-#else
-    H5Fclose(file_id);
+    if (dfile_ptr)
+    {
+        DirectFile *directfile = (DirectFile *) dfile_ptr;
+        directfile->close();
+        return;
+    }
 #endif
+    H5Fclose(file_id);
 }
 
 /* Retrieve the HDF5 file handle associated with a given dataset name */
@@ -162,16 +167,23 @@ bool readHdf5Datasets(
         /* Read the dataset */
         if (read_data)
         {
-            bool read_ok;
+            bool read_ok = false;
+            if (dfile_ptr)
+            {
+                // NVIDIA-GDS backend
 #ifdef ENABLE_GDS
-            DirectFile *directfile = (DirectFile *) dfile_ptr;
-            GDSBackend *gds_backend = dynamic_cast<GDSBackend *>(backend);
-            assert(gds_backend);
-            DeviceMemory *devicememory = gds_backend->memoryHandler(rdata);
-            read_ok = DirectDataset::read(dset_id, directfile->gds_handle, *devicememory);
-#else
-            read_ok = H5Dread(dset_id, info.hdf5_datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata) >= 0;
+                DirectFile *directfile = (DirectFile *) dfile_ptr;
+                GDSBackend *gds_backend = dynamic_cast<GDSBackend *>(backend);
+                assert(gds_backend);
+                DeviceMemory *devicememory = gds_backend->memoryHandler(rdata);
+                read_ok = DirectDataset::read(dset_id, directfile->gds_handle, *devicememory);
 #endif
+            }
+            else
+            {
+                // All other backends
+                read_ok = H5Dread(dset_id, info.hdf5_datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata) >= 0;
+            }
             if (! read_ok)
             {
                 fprintf(stderr, "Failed to read HDF5 dataset\n");
@@ -179,7 +191,9 @@ bool readHdf5Datasets(
                 delete handle;
                 return false;
             }
-            benchmark.print("Time to read dataset from disk");
+            std::ostringstream ss;
+            ss << "Time to read dataset '" << dname << "' from disk";
+            benchmark.print(ss.str());
         }
         else
             backend->clear(rdata, n_elements * H5Tget_size(info.hdf5_datatype));
@@ -299,7 +313,12 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         // Register the GPUDirect driver
         DirectStorage directstorage;
         DirectFile directfile;
-        void *dfile_ptr = (void *) &directfile;
+        void *dfile_ptr = NULL;
+        if (backend_name.compare("NVIDIA-GDS") == 0)
+        {
+            directstorage.open();
+            dfile_ptr = (void *) &directfile;
+        }
 #else
         void *dfile_ptr = NULL;
 #endif
@@ -389,7 +408,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         } 
         else 
         {
-            // On NVIDIA GPUDirect Storage backend, memcpyDeviceToHost() allocates a
+            // On NVIDIA GPUDirect Storage backend, deviceToHost() allocates a
             // chunk of memory in host memory and performs a memcpy() from device to
             // host; the return value is a pointer to the newly allocated memory chunk.
             // On regular backends, this call simply returns the first argument; no

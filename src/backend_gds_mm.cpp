@@ -99,18 +99,26 @@ void DeviceMemory::clear()
 }
 
 // DirectStorage: simple interface to register and deregister the GDS driver.
-DirectStorage::DirectStorage()
+DirectStorage::DirectStorage() : is_opened(false)
+{
+}
+
+void DirectStorage::open()
 {
     CUfileError_t gds_err = cuFileDriverOpen();
     if (gds_err.err != CU_FILE_SUCCESS)
         fprintf(stderr, "Failed to open the GDS driver: %s\n", CUFILE_ERRSTR(gds_err.err));
+    is_opened = gds_err.err == CU_FILE_SUCCESS;
 }
 
 DirectStorage::~DirectStorage()
 {
-    CUfileError_t gds_err = cuFileDriverClose();
-    if (gds_err.err != CU_FILE_SUCCESS)
-        fprintf(stderr, "Failed to close the GDS driver: %s\n", CUFILE_ERRSTR(gds_err.err));
+    if (is_opened)
+    {
+        CUfileError_t gds_err = cuFileDriverClose();
+        if (gds_err.err != CU_FILE_SUCCESS)
+            fprintf(stderr, "Failed to close the GDS driver: %s\n", CUFILE_ERRSTR(gds_err.err));
+    }
 }
 
 // DirectFile: open and configures a HDF5 file for Direct I/O

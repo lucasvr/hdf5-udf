@@ -29,6 +29,9 @@ struct DeviceMemory {
 struct DirectStorage {
     DirectStorage();
     ~DirectStorage();
+    void open();
+
+    bool is_opened;
 };
 
 // DirectFile: open and configures a HDF5 file for Direct I/O
