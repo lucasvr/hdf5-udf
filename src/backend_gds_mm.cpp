@@ -25,9 +25,6 @@
 #include "dataset.h"
 #include "os.h"
 
-// Snappy-CUDA requires the use of managed memory
-#define USE_MANAGED_MEMORY 1
-
 #define cudaCheckError() do { \
  cudaError_t e = cudaGetLastError(); \
  if (e!=cudaSuccess) { \
@@ -50,13 +47,7 @@ DeviceMemory::DeviceMemory(size_t alloc_size, size_t aligned_alloc_size) :
     size(alloc_size),
     total_size(aligned_alloc_size ? aligned_alloc_size : alloc_size)
 {
-#ifdef USE_MANAGED_MEMORY
-    // Snappy-CUDA contains __host__ code that touches the allocated memory,
-    // so we have to resort to managed memory here.
-    cudaError_t err = cudaMallocManaged(&dev_mem, total_size);
-#else
     cudaError_t err = cudaMalloc(&dev_mem, total_size);
-#endif
     if (err != cudaSuccess)
     {
         const char *errmsg = cudaGetErrorString(err);
@@ -66,7 +57,6 @@ DeviceMemory::DeviceMemory(size_t alloc_size, size_t aligned_alloc_size) :
         return;
     }
 
-#ifndef USE_MANAGED_MEMORY
     CUfileError_t gds_err = cuFileBufRegister(dev_mem, total_size, 0);
     if (gds_err.err != CU_FILE_SUCCESS)
     {
@@ -74,16 +64,13 @@ DeviceMemory::DeviceMemory(size_t alloc_size, size_t aligned_alloc_size) :
         cudaFree(dev_mem);
         dev_mem = NULL;
     }
-#endif
 }
 
 DeviceMemory::~DeviceMemory()
 {
     if (dev_mem)
     {
-#ifndef USE_MANAGED_MEMORY
         cuFileBufDeregister(dev_mem);
-#endif
         cudaError_t err = cudaFree(dev_mem);
         if (err != cudaSuccess)
         {
