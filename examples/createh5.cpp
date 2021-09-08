@@ -83,15 +83,18 @@ int main(int argc, char **argv)
             "                     VARSTRING          (a variable-sized string dataset)\n"
             "  --count=N          Create this many datasets in the output file (default: 0)\n"
             "  --dims=X,Y         X and Y dimensions (default: %llu,%llu)\n"
+            "  --cdims=X,Y        Chunked X and Y dimensions (default: %llu,%llu)\n"
             "  --compress=FILTER  Compress the dataset(s) with one of the supported filters:\n"
             "                     %s\n"
             "  --out=FILE         Output file name (truncates FILE if it already exists)\n\n",
-            NATIVE_DIM0, NATIVE_DIM1, supported_filters.c_str());
+            NATIVE_DIM0, NATIVE_DIM1, CHUNK_DIM0, CHUNK_DIM1, supported_filters.c_str());
         return 1;
     }
 
-    std::stringstream default_dims;
+    // Argument processing
+    std::stringstream default_dims, default_cdims;
     default_dims << NATIVE_DIM0 << "," << NATIVE_DIM1;
+    default_cdims << CHUNK_DIM0 << "," << CHUNK_DIM1;
 
     std::string compound = getOptionValue(argc, argv, "--compound", "");
     std::string datatype = getOptionValue(argc, argv, "--datatype", "");
@@ -103,9 +106,14 @@ int main(int argc, char **argv)
         fprintf(stderr, "Error: missing output file (--out=FILE)\n");
         return 1;
     }
+
     std::string dims = getOptionValue(argc, argv, "--dims", default_dims.str().c_str());
     sscanf(dims.c_str(), "%llu,%llu", &NATIVE_DIM0, &NATIVE_DIM1);
 
+    std::string cdims = getOptionValue(argc, argv, "--cdims", default_cdims.str().c_str());
+    sscanf(cdims.c_str(), "%llu,%llu", &CHUNK_DIM0, &CHUNK_DIM1);
+
+    // Create (or truncate an existing) output file
     hid_t file_id = H5Fcreate(hdf5_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     if (file_id < 0)
     {
