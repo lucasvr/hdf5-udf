@@ -76,7 +76,7 @@ int main(int argc, char **argv)
             "                     STRING_MIXED       (mixed layout, including a fixed-sized string member)\n"
             "                     VARSTRING_SIMPLE   (simple layout, including a variable-sized string member)\n"
             "                     VARSTRING_MIXED    (mixed layout, including a variable-sized string member)\n"
-            "  --datatype=TYPE    Create a dataset with a predefined native type\n"
+            "  --datatype=TYPE    Create a dataset with a predefined native type (default: INT32)\n"
             "                     Valid options for TYPE are:\n"
             "                     INT32              (an integer-based dataset)\n"
             "                     STRING             (a fixed-sized string dataset)\n"
@@ -97,7 +97,7 @@ int main(int argc, char **argv)
     default_cdims << CHUNK_DIM0 << "," << CHUNK_DIM1;
 
     std::string compound = getOptionValue(argc, argv, "--compound", "");
-    std::string datatype = getOptionValue(argc, argv, "--datatype", "");
+    std::string datatype = getOptionValue(argc, argv, "--datatype", "INT32");
     int dataset_count = atoi(getOptionValue(argc, argv, "--count", "0").c_str());
     std::string compression = getOptionValue(argc, argv, "--compress", "");
     std::string hdf5_file = getOptionValue(argc, argv, "--out", "");
