@@ -176,7 +176,7 @@ bool readHdf5Datasets(
                 GDSBackend *gds_backend = dynamic_cast<GDSBackend *>(backend);
                 assert(gds_backend);
                 DeviceMemory *devicememory = gds_backend->memoryHandler(rdata);
-                read_ok = DirectDataset::read(dset_id, directfile->gds_handle, *devicememory);
+                read_ok = DirectDataset::read(dset_id, directfile, *devicememory);
 #endif
             }
             else

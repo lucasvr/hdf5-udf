@@ -50,9 +50,9 @@ struct DirectFile {
 
 // DirectDataset: open a dataset
 struct DirectDataset {
-    static bool read(hid_t dset_id, const CUfileHandle_t &gds_handle, DeviceMemory &mm);
-    static bool readChunked(hid_t dset_id, const CUfileHandle_t &gds_handle, DeviceMemory &mm);
-    static bool readContiguous(hid_t dset_id, const CUfileHandle_t &gds_handle, DeviceMemory &mm);
+    static bool read(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm);
+    static bool readChunked(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm);
+    static bool readContiguous(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm);
     static bool parseChunks(
         hid_t dset_id,
         hid_t fspace_id,

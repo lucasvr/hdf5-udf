@@ -56,21 +56,12 @@ DeviceMemory::DeviceMemory(size_t alloc_size, size_t aligned_alloc_size) :
         dev_mem = NULL;
         return;
     }
-
-    CUfileError_t gds_err = cuFileBufRegister(dev_mem, total_size, 0);
-    if (gds_err.err != CU_FILE_SUCCESS)
-    {
-        fprintf(stderr, "Failed to register buffer: %s\n", CUFILE_ERRSTR(gds_err.err));
-        cudaFree(dev_mem);
-        dev_mem = NULL;
-    }
 }
 
 DeviceMemory::~DeviceMemory()
 {
     if (dev_mem)
     {
-        cuFileBufDeregister(dev_mem);
         cudaError_t err = cudaFree(dev_mem);
         if (err != cudaSuccess)
         {
@@ -140,8 +131,7 @@ bool DirectFile::open(std::string hdf5_file)
     std::string old_env = getenv("HDF5_USE_FILE_LOCKING") ? : "";
     os::setEnvironmentVariable("HDF5_USE_FILE_LOCKING", "FALSE");
     file_id = H5Fopen(hdf5_file.c_str(), H5F_ACC_RDONLY, fapl_id);
-    if (old_env.size())
-        os::setEnvironmentVariable("HDF5_USE_FILE_LOCKING", old_env);
+    os::setEnvironmentVariable("HDF5_USE_FILE_LOCKING", old_env);
     if (file_id < 0)
     {
         H5Pclose(fapl_id);
@@ -170,6 +160,7 @@ bool DirectFile::open(std::string hdf5_file)
     {
         H5Fclose(file_id);
         file_id = -1;
+        file_fd = -1;
         FAIL("Failed to register file: %s\n", CUFILE_ERRSTR(gds_err.err));
     }
 
@@ -182,22 +173,22 @@ void DirectFile::close()
     {
         cuFileHandleDeregister(gds_handle);
         H5Fclose(file_id);
-        file_fd = -1;
         file_id = -1;
+        file_fd = -1;
     }
 }
 
 // DirectDataset: routines to read a dataset using GPUDirect Storage I/O
-bool DirectDataset::read(hid_t dset_id, const CUfileHandle_t &gds_handle, DeviceMemory &mm)
+bool DirectDataset::read(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm)
 {
     auto create_plist_id = H5Dget_create_plist(dset_id);
     auto dset_layout = H5Pget_layout(create_plist_id);
     bool ret = false;
 
     if (dset_layout == H5D_CHUNKED)
-        ret = readChunked(dset_id, gds_handle, mm);
+        ret = readChunked(dset_id, directfile, mm);
     else if (dset_layout == H5D_CONTIGUOUS)
-        ret = readContiguous(dset_id, gds_handle, mm);
+        ret = readContiguous(dset_id, directfile, mm);
 
     H5Pclose(create_plist_id);
     return ret;
@@ -254,11 +245,10 @@ bool DirectDataset::parseChunks(
     for (hsize_t i=0; i<nchunks; ++i)
     {
         haddr_t addr = 0;
-        hsize_t offset = 0, compressed_size = 0;
-        if (H5Dget_chunk_info(dset_id, fspace_id, i, &offset, NULL, &addr, NULL) < 0)
+        hsize_t offset[ndims], compressed_size = 0;
+        if (H5Dget_chunk_info(dset_id, fspace_id, i, offset, NULL, &addr, &compressed_size) < 0)
             FAIL("Failed to retrieve information from chunk %lld\n", i);
-
-        if (H5Dget_chunk_storage_size(dset_id, &offset, &compressed_size) < 0)
+        if (H5Dget_chunk_storage_size(dset_id, offset, &compressed_size) < 0)
             FAIL("Failed to retrieve storage size from chunk %lld\n", i);
 
         // Allocate a scratch memory area where the compressed chunk can be read to
@@ -269,6 +259,7 @@ bool DirectDataset::parseChunks(
         if (i == nchunks-1)
             decompressed_size = (dataset_num_elements - chunk_num_elements * i) * dset_element_size;
 
+        // TODO: push 'offset' rather than 'mem_offset'
         data_blocks.push_back(std::make_tuple(addr, mem_offset, compressed_size, decompressed_size, scratch_mm));
         mem_offset += decompressed_size;
     }
@@ -276,7 +267,7 @@ bool DirectDataset::parseChunks(
     return true;
 }
 
-bool DirectDataset::readChunked(hid_t dset_id, const CUfileHandle_t &gds_handle, DeviceMemory &mm)
+bool DirectDataset::readChunked(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm)
 {
     std::vector<std::tuple<haddr_t, haddr_t, hsize_t, hsize_t, DeviceMemory *>> data_blocks;
     std::vector<hsize_t> dims, cdims;
@@ -294,6 +285,11 @@ bool DirectDataset::readChunked(hid_t dset_id, const CUfileHandle_t &gds_handle,
     cudaSetDevice(0);
     cudaCheckError();
 
+    // Preallocate Snappy contexts for each OpenMP thread
+    std::vector<void *> snappy_ctx;
+    for (auto i=0; i<omp_get_max_threads(); ++i)
+        snappy_ctx.push_back(decompressor_alloc());
+
     // Read the dataset
     #pragma omp parallel for
     for (size_t i=0; i<data_blocks.size(); ++i)
@@ -305,75 +301,41 @@ bool DirectDataset::readChunked(hid_t dset_id, const CUfileHandle_t &gds_handle,
         DeviceMemory *scratch_mm = std::get<4>(data_blocks[i]);
 
         // Transfer data from storage to GPU via DMA
-        int n = cuFileRead(gds_handle, scratch_mm->dev_mem, chunk_size, file_offset, 0);
+        ssize_t n = cuFileRead(directfile->gds_handle, scratch_mm->dev_mem, chunk_size, file_offset, 0);
         if (n < 0)
         {
             // Cannot break from OpenMP structured block
-            fprintf(stderr, "Failed to read file data: %d\n", n);
+            fprintf(stderr, "Failed to read file data: %jd (%s)\n", n, strerror(errno));
             delete scratch_mm;
             retval = false;
             continue;
         }
+        else if (n != (ssize_t) chunk_size)
+        {
+            fprintf(stderr, "Requested to read %lld, received %jd\n", chunk_size, n);
+        }
 
-        // Decompress to a temporary memory region
-        DeviceMemory target(decompressed_size);
-        void *snappy_ctx = decompressor_init(
+        // Decompress to output dataset memory buffer
+        void *dst = (void *) (((char *) mm.dev_mem) + mem_offset);
+        void *ctx = snappy_ctx[omp_get_thread_num()];
+        decompressor_init(
             scratch_mm->dev_mem,
             scratch_mm->size,
             scratch_mm->total_size,
-            target.dev_mem,
-            target.size);
-        decompressor_run(snappy_ctx);
-
-        // Copy results to mm.dev_mem[] while respecting the chunk layout.
-        // We only support 1-dimensional and 2-dimensional chunks for now.
-        if (cdims.size() == 1)
-        {
-            // TODO: eliminate this memcpy
-            void *dst = (void *) (((char *) mm.dev_mem) + mem_offset);
-            memcpy(dst, target.dev_mem, target.size);
-        }
-        else if (cdims.size() == 2)
-        {
-            const int x = 1, y = 0;
-            auto blocks_in_line = (int) (ceil(dims[x] / cdims[x]));
-            auto blocks_in_col = (int) (ceil(dims[y] / cdims[y]));
-            auto last_line = (int) (floor(data_blocks.size() / blocks_in_line));
-            auto last_col = (int) (floor(data_blocks.size() / blocks_in_col));
-            auto line_nr = (int) (floor(i / blocks_in_line));
-            auto col_nr = (int) (floor(i % blocks_in_line));
-
-            int num_lines_in_block = cdims[y], num_cols_in_block = cdims[x];
-            if (line_nr == last_line-1 && (int) floor(dims[y] % cdims[y]))
-                num_lines_in_block = (int) floor(dims[y] % cdims[y]);
-            if (col_nr == last_col-1 && (int) floor(dims[x] % cdims[x]))
-                num_cols_in_block = (int) floor(dims[x] % cdims[x]);
-
-            haddr_t offset = (i % blocks_in_line) * cdims[x] + line_nr * dims[x] * cdims[y];
-            auto element_size = target.size / (cdims[x] * cdims[y]);
-            char *src = (char *) target.dev_mem;
-            char *dst = (((char *) mm.dev_mem) + offset * element_size);
-            for (int ii=0; ii<num_lines_in_block; ++ii)
-            {
-                // TODO: eliminate this memcpy
-                memcpy(dst, src, num_cols_in_block * element_size);
-                src += num_cols_in_block * element_size;
-                dst += dims[x] * element_size;
-            }
-        }
-        else
-        {
-            fprintf(stderr, "This backend only supports data in 1 or 2 dimensions\n");
-            retval = false;
-        }
-
-        decompressor_destroy(snappy_ctx);
+            dst,
+            decompressed_size,
+            ctx);
+        decompressor_run(ctx);
         delete scratch_mm;
     }
+
+    for (auto &ctx: snappy_ctx)
+        decompressor_destroy(ctx);
+
     return retval;
 }
 
-bool DirectDataset::readContiguous(hid_t dset_id, const CUfileHandle_t &gds_handle, DeviceMemory &mm)
+bool DirectDataset::readContiguous(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm)
 {
     // Get dataset offset. This call only succeeds if the requested dataset
     // has contiguous storage.
@@ -388,14 +350,32 @@ bool DirectDataset::readContiguous(hid_t dset_id, const CUfileHandle_t &gds_hand
     cudaSetDevice(0);
     cudaCheckError();
 
+    bool ret = true;
+
     // Read the dataset in one shot
-    int n = cuFileRead(gds_handle, mm.dev_mem, mm.size, dset_offset, 0);
-    if (n < 0)
+    #pragma omp parallel for shared(ret)
+    for (auto i=0; i<omp_get_num_threads(); ++i)
     {
-        fprintf(stderr, "Failed to read file data: %d\n", n);
-        return false;
+        size_t my_offset = (mm.size / omp_get_num_threads() * i);
+        size_t my_size = mm.size / omp_get_num_threads() * i;
+        if (my_offset + my_size > mm.size)
+            my_size = mm.size - mm.size;
+
+        ssize_t n = cuFileRead(
+            directfile->gds_handle,
+            (void *) (((char *) mm.dev_mem) + my_offset),
+            my_size,
+            dset_offset + my_offset,
+            0);
+        if (n < 0)
+        {
+            fprintf(stderr, "Failed to read file data: %jd\n", n);
+            #pragma omp critical
+            ret = false;
+        }
     }
-    return true;
+
+    return ret;
 }
 
 bool DirectDataset::copyToHost(DeviceMemory &mm, void **host_mem)
