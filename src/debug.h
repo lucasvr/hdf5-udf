@@ -12,6 +12,8 @@
 #include <ctype.h>
 #include <sys/time.h>
 
+#define DEBUG
+
 #ifdef DEBUG
 class Benchmark { 
     public:
