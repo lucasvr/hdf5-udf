@@ -397,6 +397,10 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
             return 0;
         }
 
+        // Synchronize CUDA streams/device
+        if (backend->name().compare("NVIDIA-GDS") == 0)
+            backend->sync();
+
         /* Execute the user-defined function */
         Benchmark benchmark;
         auto dtype = output_dataset.getCastDatatype();
@@ -414,7 +418,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
             // On regular backends, this call simply returns the first argument; no
             // memory allocation nor data copies happen. Because of this difference,
             // `output_dataset.data` can only be freed if the backend is GDS -- we end
-            // up providing invalid data on `*buf = host_mem` otherwise.
+            // up invalidating the data assignment on `*buf = host_mem` otherwise.
             void *host_mem = backend->deviceToHost(output_dataset.data, alloc_size);
             if (! host_mem)
                 nbytes = 0;

@@ -100,6 +100,10 @@ public:
         memset(dev_mem, 0, size);
     }
 
+    // Synchronize device data
+    void sync() {
+    }
+
     // Copy data from device memory to a newly allocated memory chunk in the host
     virtual void *deviceToHost(void *dev_mem, size_t size)
     {

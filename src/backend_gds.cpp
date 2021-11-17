@@ -19,6 +19,8 @@
 #include <sstream>
 #include <string>
 #include <algorithm>
+#include <cuda_runtime.h>
+#include <cuda.h>
 #include "sharedlib_manager.h"
 #include "udf_template_cpp.h" // use the C++ template file
 #include "backend_cpp.h" // reuse methods from the C++ backend
@@ -348,4 +350,9 @@ void GDSBackend::clear(void *dev_mem, size_t size)
         return;
     }
     it->second->clear();
+}
+
+void GDSBackend::sync()
+{
+    cudaDeviceSynchronize();
 }
