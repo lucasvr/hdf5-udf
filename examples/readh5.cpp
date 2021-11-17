@@ -10,6 +10,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <locale.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <wchar.h>
 #include <hdf5.h>
 #include <string>
@@ -57,6 +61,22 @@ int main(int argc, char **argv)
         return 1;
     }
     H5Pclose(fapl_id);
+
+    // Drop caches
+    void *file_handle = NULL;
+    herr_t err = H5Fget_vfd_handle(file_id, H5P_DEFAULT, (void **) &file_handle);
+    if (err < 0)
+    {
+        fprintf(stderr, "Failed to get HDF5 file VFD handle\n");
+        H5Fclose(file_id);
+        return 1;
+    }
+    
+    int file_fd = *((int *) file_handle);
+    struct stat statbuf;
+    fstat(file_fd, &statbuf);
+    if (posix_fadvise(file_fd, 0, statbuf.st_size, POSIX_FADV_DONTNEED) < 0)
+        fprintf(stderr, "Warning: failed to drop file cache\n");
 
     // Read dataset
     hid_t dataset_id = H5Dopen(file_id, hdf5_dataset.c_str(), H5P_DEFAULT);
