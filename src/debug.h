@@ -47,7 +47,7 @@ class Benchmark {
         }
 
         void print(std::string msg) {
-            fprintf(stdout, "%s: %.2f seconds\n", msg.c_str(), elapsed());
+            fprintf(stdout, "%s: %.7f seconds\n", msg.c_str(), elapsed());
         }
     
     private:
