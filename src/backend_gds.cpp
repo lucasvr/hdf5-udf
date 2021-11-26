@@ -79,7 +79,7 @@ std::string GDSBackend::compile(
     char *cmd[] = {
         (char *) "/usr/local/cuda/bin/nvcc",
         (char *) "-Xcompiler",
-        (char *) "-fpic",
+        (char *) "-fpic,-O3",
         (char *) "-shared",
         (char *) "-Xlinker",
         (char *) "-L/usr/local/cuda/targets/x86_64-linux/lib",
@@ -88,11 +88,10 @@ std::string GDSBackend::compile(
         (char *) "-o",
         (char *) output.c_str(),
         (char *) cpp_file.c_str(),
-        (char *) "-O2",
+        (char *) "-Xptxas",
+        (char *) "-O3",
         (char *) "-gencode",
-        (char *) "arch=compute_70,code=sm_70",
-        (char *) "-gencode",
-        (char *) "arch=compute_60,code=sm_60",
+        (char *) "arch=compute_80,code=sm_80",
         NULL
     };
     if (os::execCommand(cmd[0], cmd, NULL) == false)
