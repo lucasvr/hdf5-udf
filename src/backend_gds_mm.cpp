@@ -33,8 +33,8 @@
  } \
 } while(0)
 
-#define ALIGN(_p, _width) (((unsigned int)_p + (_width-1)) & (0-_width))
-#define ALIGN_LONG(_p, _width) (((long)_p + (_width-1)) & (0-_width))
+#define MB(n) (1024*1024*(n))
+#define ALIGN_1MB(size) ((size + (0x100000-1)) & ~(0x100000-1))
 
 #define FAIL(msg...) do { \
     fprintf(stderr, msg); \
@@ -42,11 +42,15 @@
 } while (0)
 
 // DeviceMemory: allocate and register memory on the device for GPUDirect I/O
-DeviceMemory::DeviceMemory(size_t alloc_size, size_t aligned_alloc_size) :
+DeviceMemory::DeviceMemory(size_t alloc_size) :
     dev_mem(NULL),
     size(alloc_size),
-    total_size(aligned_alloc_size ? aligned_alloc_size : alloc_size)
+    total_size(ALIGN_1MB(alloc_size)),
+    is_borrowed_mem(false)
 {
+    cudaSetDevice(0);
+    cudaCheckError();
+
     cudaError_t err = cudaMalloc(&dev_mem, total_size);
     if (err != cudaSuccess)
     {
@@ -56,12 +60,29 @@ DeviceMemory::DeviceMemory(size_t alloc_size, size_t aligned_alloc_size) :
         dev_mem = NULL;
         return;
     }
+
+    CUfileError_t gds_err = cuFileBufRegister(dev_mem, total_size, 0);
+    if (gds_err.err != CU_FILE_SUCCESS)
+    {
+        fprintf(stderr, "Failed to register buffer size %#lx: %s\n", total_size, CUFILE_ERRSTR(gds_err.err));
+        cudaFree(dev_mem);
+        dev_mem = NULL;
+    }
+}
+
+DeviceMemory::DeviceMemory(const DeviceMemory *src, size_t offset, size_t alloc_size) :
+    dev_mem((void *)(((char *) src->dev_mem) + offset)),
+    size(alloc_size),
+    total_size(ALIGN_1MB(alloc_size)),
+    is_borrowed_mem(true)
+{
 }
 
 DeviceMemory::~DeviceMemory()
 {
-    if (dev_mem)
+    if (dev_mem && !is_borrowed_mem)
     {
+        cuFileBufDeregister(dev_mem);
         cudaError_t err = cudaFree(dev_mem);
         if (err != cudaSuccess)
         {
@@ -298,15 +319,22 @@ bool DirectDataset::readChunked(hid_t dset_id, DirectFile *directfile, DeviceMem
         auto mem_offset = std::get<1>(data_blocks[i]);
         auto chunk_size = std::get<2>(data_blocks[i]);
         auto decompressed_size = std::get<3>(data_blocks[i]);
-        DeviceMemory *scratch_mm = std::get<4>(data_blocks[i]);
+        auto scratch_offset = scratch_size * omp_get_thread_num();
+
+        // Cook a DeviceMemory object reusing the previously allocated buffer
+        DeviceMemory scratch_mm(scratch_buffer, scratch_offset, chunk_size);
 
         // Transfer data from storage to GPU via DMA
-        ssize_t n = cuFileRead(directfile->gds_handle, scratch_mm->dev_mem, chunk_size, file_offset, 0);
+        auto n = cuFileRead(
+                 directfile->gds_handle,
+                 scratch_buffer->dev_mem,
+                 chunk_size,
+                 file_offset,
+                 scratch_offset);
         if (n < 0)
         {
             // Cannot break from OpenMP structured block
             fprintf(stderr, "Failed to read file data: %jd (%s)\n", n, strerror(errno));
-            delete scratch_mm;
             retval = false;
             continue;
         }
@@ -319,19 +347,19 @@ bool DirectDataset::readChunked(hid_t dset_id, DirectFile *directfile, DeviceMem
         void *dst = (void *) (((char *) mm.dev_mem) + mem_offset);
         void *ctx = snappy_ctx[omp_get_thread_num()];
         decompressor_init(
-            scratch_mm->dev_mem,
-            scratch_mm->size,
-            scratch_mm->total_size,
+            scratch_mm.dev_mem,
+            scratch_mm.size,
+            scratch_mm.total_size,
             dst,
             decompressed_size,
             ctx);
         decompressor_run(ctx);
-        delete scratch_mm;
     }
 
     for (auto &ctx: snappy_ctx)
         decompressor_destroy(ctx);
 
+    delete scratch_buffer;
     return retval;
 }
 
