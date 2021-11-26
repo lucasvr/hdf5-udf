@@ -16,13 +16,15 @@
 
 // DeviceMemory: allocate and register memory on the device for GPUDirect I/O
 struct DeviceMemory {
-    DeviceMemory(size_t alloc_size, size_t aligned_alloc_size=0);
+    DeviceMemory(const DeviceMemory *src, size_t offset, size_t alloc_size);
+    DeviceMemory(size_t alloc_size);
     ~DeviceMemory();
     void clear();
 
     void *dev_mem;
     size_t size;
     size_t total_size;
+    bool is_borrowed_mem;
 };
 
 // DirectStorage: simple interface to register and deregister the GDS driver.
