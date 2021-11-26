@@ -12,15 +12,19 @@
  * input datasets, Dataset1 and Dataset2.
  */
 
+#include <math.h>
+
 extern "C" void dynamic_dataset()
 {
-    auto ds1_data = lib.getData<int>("Dataset1");
-    auto ds2_data = lib.getData<int>("Dataset2");
+    auto a = lib.getData<int>("Dataset1");
+    auto b = lib.getData<int>("Dataset2");
     auto udf_data = lib.getData<int>("UserDefinedDataset-Cpp");
     auto udf_dims = lib.getDims("UserDefinedDataset-Cpp");
 
+    // https://www.usgs.gov/core-science-systems/nli/landsat/landsat-modified-soil-adjusted-vegetation-index
     for (size_t i=0; i<udf_dims[0] * udf_dims[1]; ++i)
     {
-        udf_data[i] = ds1_data[i] + ds2_data[i];
+        int n2 = (2 * a[i] + 1) * (2 * b[i] + 1);
+        udf_data[i] = (2 * a[i] + 1 - sqrt((float) (n2 - 8 * (a[i] - b[i])))) / 2;
     }
 }

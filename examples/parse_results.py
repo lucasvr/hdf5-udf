@@ -54,7 +54,7 @@ contents += f"""
 myself = sys.modules[__name__]
 modes = ["contiguous", "chunked"]
 ### grid_sizes = {grid_sizes}
-grid_sizes = ["1000", "2000", "4000", "8000", "16000"]
+grid_sizes = ["1000", "2000", "4000", "8000", "16000", "32000"]
 
 def compare_lang(entry):
   # langs = ['cpp', 'lua', 'py', 'cuda_1', 'cuda_16', 'cuda_2', 'cuda_32', 'cuda_4', 'cuda_8']
@@ -62,7 +62,7 @@ def compare_lang(entry):
 
 sorted_langs = {langs}
 sorted_langs.sort(key=compare_lang)
-sorted_langs = ['cuda_1', 'cuda_2', 'cuda_4', 'cuda_8', 'cuda_16', 'cuda_32', 'cpp', 'lua', 'py', 'ds1']
+sorted_langs = ['cuda_1', 'cuda_2', 'cuda_4', 'cuda_8', 'cuda_16', 'cpp', 'lua']
 ### sorted_langs = ['cpp', 'lua', 'py', 'ds1'] # XXX: sandbox vs no-sandbox comparison
 
 

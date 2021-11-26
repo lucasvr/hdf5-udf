@@ -12,15 +12,17 @@
 -- input datasets, Dataset1 and Dataset2.
 
 function dynamic_dataset()
-    local ds1_data = lib.getData("Dataset1")
-    local ds2_data = lib.getData("Dataset2")
+    local a = lib.getData("Dataset1")
+    local b = lib.getData("Dataset2")
     local udf_data = lib.getData("UserDefinedDataset-Lua")
     local udf_dims = lib.getDims("UserDefinedDataset-Lua")
+    local math = require("math")
 
     -- A gentle reminder that indexes in Lua start at 1
     local N = udf_dims[1] * udf_dims[2]
 
     for i=1, N do
-        udf_data[i] = ds1_data[i] + ds2_data[i]
+        n2 = (2*a[i]+1) * (2*a[i]+1)
+        udf_data[i] = (2*a[i]+1 - math.sqrt(n2-8*(a[i]-b[i])))/2
     end
 end

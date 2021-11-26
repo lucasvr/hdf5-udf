@@ -13,10 +13,13 @@
 #
 
 def dynamic_dataset():
-    ds1_data = lib.getData("Dataset1")
-    ds2_data = lib.getData("Dataset2")
+    import math
+
+    a = lib.getData("Dataset1")
+    b = lib.getData("Dataset2")
     udf_data = lib.getData("UserDefinedDataset-Py")
     udf_dims = lib.getDims("UserDefinedDataset-Py")
 
     for i in range(udf_dims[0] * udf_dims[1]):
-        udf_data[i] = ds1_data[i] + ds2_data[i]
+        n2 = (2*a[i]+1) * (2*a[i]+1)
+        udf_data[i] = int((2*a[i]+1 - math.sqrt(n2-8*(a[i]-b[i])))/2)

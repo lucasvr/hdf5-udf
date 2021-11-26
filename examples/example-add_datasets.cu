@@ -11,8 +11,10 @@
 __global__ void add(int *a, int *b, int *out, size_t n)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n)
-        out[i] = a[i] + b[i];
+    if (i < n) {
+        int n2 = (2 * a[i] + 1) * (2 * b[i] + 1);
+        out[i] = (2 * a[i] + 1 - sqrt((float) (n2 - 8 * (a[i] - b[i])))) / 2;
+    }
 }
 
 extern "C" void dynamic_dataset()
