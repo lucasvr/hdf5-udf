@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <math.h>
 #include <string.h>
 #include <unistd.h>
 #include <hdf5.h>
@@ -130,7 +131,7 @@ DirectFile::~DirectFile()
     this->close();
 }
 
-bool DirectFile::open(std::string hdf5_file)
+bool DirectFile::open(std::string hdf5_file, bool warn_on_error=true)
 {
     // Open file with the Direct I/O driver
     hid_t fapl_id = H5Pcreate(H5P_FILE_ACCESS);
@@ -156,7 +157,9 @@ bool DirectFile::open(std::string hdf5_file)
     if (file_id < 0)
     {
         H5Pclose(fapl_id);
-        FAIL("Failed to open %s in Direct I/O mode\n", hdf5_file.c_str());
+        if (warn_on_error)
+            fprintf(stderr, "Failed to open %s in Direct I/O mode\n", hdf5_file.c_str());
+        return false;
     }
     H5Pclose(fapl_id);
 
@@ -220,7 +223,7 @@ bool DirectDataset::parseChunks(
     hid_t fspace_id,
     std::vector<hsize_t> &dims,
     std::vector<hsize_t> &cdims,
-    std::vector<std::tuple<haddr_t, haddr_t, hsize_t, hsize_t, DeviceMemory *>> &data_blocks)
+    std::vector<std::tuple<haddr_t, haddr_t, hsize_t, hsize_t>> &data_blocks)
 {
     // Size of each grid element, in bytes
     auto datatype = H5Dget_type(dset_id);
@@ -272,16 +275,13 @@ bool DirectDataset::parseChunks(
         if (H5Dget_chunk_storage_size(dset_id, offset, &compressed_size) < 0)
             FAIL("Failed to retrieve storage size from chunk %lld\n", i);
 
-        // Allocate a scratch memory area where the compressed chunk can be read to
-        size_t total_size = ALIGN_LONG(compressed_size, 8) + 64;
-        DeviceMemory *scratch_mm = new DeviceMemory(compressed_size, total_size);
-
         size_t decompressed_size = chunk_num_elements * dset_element_size;
+
         if (i == nchunks-1)
             decompressed_size = (dataset_num_elements - chunk_num_elements * i) * dset_element_size;
 
         // TODO: push 'offset' rather than 'mem_offset'
-        data_blocks.push_back(std::make_tuple(addr, mem_offset, compressed_size, decompressed_size, scratch_mm));
+        data_blocks.push_back(std::make_tuple(addr, mem_offset, compressed_size, decompressed_size));
         mem_offset += decompressed_size;
     }
 
@@ -290,26 +290,33 @@ bool DirectDataset::parseChunks(
 
 bool DirectDataset::readChunked(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm)
 {
-    std::vector<std::tuple<haddr_t, haddr_t, hsize_t, hsize_t, DeviceMemory *>> data_blocks;
+    std::vector<std::tuple<haddr_t, haddr_t, hsize_t, hsize_t>> data_blocks;
     std::vector<hsize_t> dims, cdims;
     bool retval = true;
 
+    // TODO: this implementation only supports delegating workload to a single GPU
+    cudaSetDevice(0);
+    cudaCheckError();
+
     auto fspace_id = H5Dget_space(dset_id);
-    if (parseChunks(dset_id, fspace_id, dims, cdims, data_blocks)  == false)
+    if (parseChunks(dset_id, fspace_id, dims, cdims, data_blocks) == false)
     {
         H5Sclose(fspace_id);
         return false;
     }
     H5Sclose(fspace_id);
 
-    // TODO: this implementation only supports delegating workload to a single GPU
-    cudaSetDevice(0);
-    cudaCheckError();
+    // Allocate a scratch memory area where the compressed chunk can be read to
+    size_t scratch_size = 0;
+    for (size_t i=0; i<data_blocks.size(); ++i)
+        scratch_size = MAX(scratch_size, std::get<2>(data_blocks[i]));
+    DeviceMemory *scratch_buffer = new DeviceMemory(scratch_size * omp_get_max_threads());
 
     // Preallocate Snappy contexts for each OpenMP thread
     std::vector<void *> snappy_ctx;
+    snappy_ctx.resize(omp_get_max_threads());
     for (auto i=0; i<omp_get_max_threads(); ++i)
-        snappy_ctx.push_back(decompressor_alloc());
+        snappy_ctx[i] = decompressor_alloc();
 
     // Read the dataset
     #pragma omp parallel for
@@ -365,6 +372,10 @@ bool DirectDataset::readChunked(hid_t dset_id, DirectFile *directfile, DeviceMem
 
 bool DirectDataset::readContiguous(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm)
 {
+    // TODO: this implementation only supports delegating workload to a single GPU
+    cudaSetDevice(0);
+    cudaCheckError();
+
     // Get dataset offset. This call only succeeds if the requested dataset
     // has contiguous storage.
     haddr_t dset_offset = H5Dget_offset(dset_id);
@@ -374,27 +385,27 @@ bool DirectDataset::readContiguous(hid_t dset_id, DirectFile *directfile, Device
         return false;
     }
 
-    // TODO: this implementation only supports delegating workload to a single GPU
-    cudaSetDevice(0);
-    cudaCheckError();
-
     bool ret = true;
 
-    // Read the dataset in one shot
-    #pragma omp parallel for shared(ret)
-    for (auto i=0; i<omp_get_num_threads(); ++i)
+    // Define the I/O transfer size and thread count
+    int max_threads = omp_get_max_threads();
+    float tmp = ((float) mm.size) / MB(1);
+    if (tmp < max_threads)
+        max_threads = ((int) tmp) + 1;
+    size_t io_size = MB((size_t) ceilf(tmp / max_threads));
+
+    #pragma omp parallel for
+    for (auto i=0; i<max_threads; ++i)
     {
-        size_t my_offset = (mm.size / omp_get_num_threads() * i);
-        size_t my_size = mm.size / omp_get_num_threads() * i;
-        if (my_offset + my_size > mm.size)
-            my_size = mm.size - mm.size;
+        auto my_offset = io_size * i;
+        auto my_size = my_offset >= mm.size ? 0 : MIN(io_size, mm.size - my_offset);
 
         ssize_t n = cuFileRead(
-            directfile->gds_handle,
-            (void *) (((char *) mm.dev_mem) + my_offset),
-            my_size,
-            dset_offset + my_offset,
-            0);
+                directfile->gds_handle,
+                (void *) mm.dev_mem,
+                my_size,
+                dset_offset + my_offset,
+                my_offset);
         if (n < 0)
         {
             fprintf(stderr, "Failed to read file data: %jd\n", n);
@@ -408,6 +419,6 @@ bool DirectDataset::readContiguous(hid_t dset_id, DirectFile *directfile, Device
 
 bool DirectDataset::copyToHost(DeviceMemory &mm, void **host_mem)
 {
-    cudaMemcpy(*host_mem, mm.dev_mem, mm.size, cudaMemcpyDeviceToHost);
+    cudaMemcpyAsync(*host_mem, mm.dev_mem, mm.size, cudaMemcpyDeviceToHost);
     return true;
 }

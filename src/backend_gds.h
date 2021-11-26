@@ -40,7 +40,7 @@ struct DirectStorage {
 struct DirectFile {
     DirectFile();
     ~DirectFile();
-    bool open(std::string hdf5_file);
+    bool open(std::string hdf5_file, bool warn_on_error);
     void close();
 
     int file_fd;
@@ -60,7 +60,7 @@ struct DirectDataset {
         hid_t fspace_id,
         std::vector<hsize_t> &dims,
         std::vector<hsize_t> &cdims,
-        std::vector<std::tuple<haddr_t, haddr_t, hsize_t, hsize_t, DeviceMemory *>> &data_blocks);
+        std::vector<std::tuple<haddr_t, haddr_t, hsize_t, hsize_t>> &data_blocks);
     static bool copyToHost(DeviceMemory &mm, void **host_mem);
 };
 

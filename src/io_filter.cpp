@@ -66,7 +66,7 @@ hid_t _getFileHandle(std::string filename, void *dfile_ptr)
     if (dfile_ptr)
     {
         DirectFile *directfile = (DirectFile *) dfile_ptr;
-        return directfile->open(filename.c_str()) ? directfile->file_id : -1;
+        return directfile->open(filename.c_str(), false) ? directfile->file_id : -1;
     }
 #endif
     return H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
@@ -127,8 +127,6 @@ bool readHdf5Datasets(
 {
     auto readHdf5Dataset = [&](hid_t file_id, std::string dname, bool read_data)
     {
-        Benchmark benchmark;
-
         /* Open .h5 file in read-only mode */
         hid_t dset_id = H5Dopen(file_id, dname.data(), H5P_DEFAULT);
         if (dset_id < 0)
@@ -168,6 +166,9 @@ bool readHdf5Datasets(
         if (read_data)
         {
             bool read_ok = false;
+            std::ostringstream ss;
+            ss << "Time to read dataset '" << dname << "' from disk";
+
             if (dfile_ptr)
             {
                 // NVIDIA-GDS backend
@@ -176,13 +177,18 @@ bool readHdf5Datasets(
                 GDSBackend *gds_backend = dynamic_cast<GDSBackend *>(backend);
                 assert(gds_backend);
                 DeviceMemory *devicememory = gds_backend->memoryHandler(rdata);
+
+                Benchmark benchmark;
                 read_ok = DirectDataset::read(dset_id, directfile, *devicememory);
+                benchmark.print(ss.str());
 #endif
             }
             else
             {
                 // All other backends
+                Benchmark benchmark;
                 read_ok = H5Dread(dset_id, info.hdf5_datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata) >= 0;
+                benchmark.print(ss.str());
             }
             if (! read_ok)
             {
@@ -191,9 +197,6 @@ bool readHdf5Datasets(
                 delete handle;
                 return false;
             }
-            std::ostringstream ss;
-            ss << "Time to read dataset '" << dname << "' from disk";
-            benchmark.print(ss.str());
         }
         else
             backend->clear(rdata, n_elements * H5Tget_size(info.hdf5_datatype));
