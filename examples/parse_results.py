@@ -9,10 +9,25 @@ import numpy as np
 import sys\n
 """
 
-def get_numbers(path):
+# Get running times from results/numbers.${lang}
+def get_numbers_lowres(path):
     # 0:00.16
     times = [x.split(" ")[-1] for x in open(path).readlines() if x.find("wall clock") > 0]
     times_in_sec = [int(x.split(":")[0]) * 60 + float(x.split(":")[1]) for x in times]
+    return times_in_sec
+
+# Get running times from results/internal_numbers.${lang}
+def get_numbers_highres(path):
+    times_in_sec = []
+    with open(path) as f:
+        for line in f.readlines():
+            if line.startswith('Call to'):
+                times_in_sec += [ds1 + ds2]
+                ds1, ds2 = None, None
+            elif line.find('Dataset1') >= 0:
+                ds1 = float(line.split()[-2])
+            elif line.find('Dataset2') >= 0:
+                ds2 = float(line.split()[-2])
     return times_in_sec
 
 grid_sizes = []
@@ -25,7 +40,7 @@ for name in sorted(glob.glob("results-sandbox/results*")) + sorted(glob.glob("re
     if not f"{size}" in grid_sizes:
         grid_sizes.append(f"{size}")
 
-    for result in sorted(glob.glob(name + "/numbers.*") + glob.glob(name + "/noop.*") + glob.glob(name + "/one_dep.*")):
+    for result in sorted(glob.glob(name + "/internal_numbers.*") + glob.glob(name + "/noop.*") + glob.glob(name + "/one_dep.*")):
         lang = os.path.basename(result).split(".")[1].replace("_parallel", "") # cpp, lua, py, cuda
         threads = os.path.basename(result).split(".")[2] if lang == "cuda" else ""
         test_name = f"{sandbox}_{mode}_{size}_{lang}"
@@ -43,7 +58,7 @@ for name in sorted(glob.glob("results-sandbox/results*")) + sorted(glob.glob("re
         if not lang in langs:
             langs.append(lang)
 
-        numbers = get_numbers(result)
+        numbers = get_numbers_highres(result)
         data = f"{test_name} = {str(numbers)}\n"
         contents += data
 
@@ -62,7 +77,7 @@ def compare_lang(entry):
 
 sorted_langs = {langs}
 sorted_langs.sort(key=compare_lang)
-sorted_langs = ['cuda_1', 'cuda_2', 'cuda_4', 'cuda_8', 'cuda_16', 'cpp', 'lua']
+sorted_langs = ['cuda_1', 'cuda_2', 'cuda_4', 'cuda_8', 'cuda_16', 'cpp']
 ### sorted_langs = ['cpp', 'lua', 'py', 'ds1'] # XXX: sandbox vs no-sandbox comparison
 
 
@@ -88,7 +103,8 @@ for i, mode in enumerate(modes):
             label = label.replace('streams', 'threads')
         datapoints_avg = [np.average(getattr(myself, "no_sandbox_" + mode + "_" + grid + "_" + lang)) for grid in grid_sizes]
         datapoints_std = [np.std(getattr(myself, "no_sandbox_" + mode + "_" + grid + "_" + lang)) for grid in grid_sizes]
-        plt.errorbar(grid_sizes, datapoints_avg, yerr=datapoints_std, fmt=fmt_styles[j], label=label)
+        plt.plot(grid_sizes, datapoints_avg, fmt_styles[j], label=label)
+        #plt.errorbar(grid_sizes, datapoints_avg, yerr=datapoints_std, fmt=fmt_styles[j], label=label)
 
     plt.rcParams['font.family'] = 'serif'
     plt.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
