@@ -4,6 +4,7 @@ import os
 import glob
 
 contents = """#!/usr/bin/env python3\n
+from matplotlib import rcParams
 import matplotlib.pyplot as plt
 import numpy as np
 import sys\n
@@ -64,12 +65,13 @@ for name in sorted(glob.glob("results-sandbox/results*")) + sorted(glob.glob("re
 
     contents += "\n"
 
+grid_sizes = ["1000", "2000", "4000", "8000", "16000", "32000"]
+tmp = [f"{size}\u00b2" for size in grid_sizes]
 
 contents += f"""
 myself = sys.modules[__name__]
 modes = ["contiguous", "chunked"]
-### grid_sizes = {grid_sizes}
-grid_sizes = ["1000", "2000", "4000", "8000", "16000", "32000"]
+grid_sizes = {grid_sizes}
 
 def compare_lang(entry):
   # langs = ['cpp', 'lua', 'py', 'cuda_1', 'cuda_16', 'cuda_2', 'cuda_32', 'cuda_4', 'cuda_8']
@@ -77,47 +79,56 @@ def compare_lang(entry):
 
 sorted_langs = {langs}
 sorted_langs.sort(key=compare_lang)
-sorted_langs = ['cuda_1', 'cuda_2', 'cuda_4', 'cuda_8', 'cuda_16', 'cpp']
-### sorted_langs = ['cpp', 'lua', 'py', 'ds1'] # XXX: sandbox vs no-sandbox comparison
-
+sorted_langs = ['cuda_1', 'cuda_2', 'cuda_4', 'cuda_8', 'cuda_16', 'cpp', 'lua', 'py']
 
 fmt_styles = []
 pretty_names = []
 for lang in sorted_langs:
     lang = lang.replace('cpp', 'C++').replace('lua', 'LuaJIT').replace('py', 'CPython').replace('ds1', 'Reference')
-    ### lang = lang.replace('cpp', 'C++ UDF').replace('lua', 'LuaJIT UDF').replace('py', 'CPython UDF').replace('ds1', 'Contiguous dataset')
     if lang.startswith('cuda'):
         n = int(lang.split('_')[1])
         stream = 'stream' if n == 1 else 'streams'
-        lang = 'CUDA ({{}} {{}})'.format(n, stream)
+        lang = 'NVIDIA GDS ({{}} {{}})'.format(n, stream)
     pretty_names.append(lang)
-    fmt_styles.append('-o' if lang.startswith('CUDA') else '--o')
+    fmt_styles.append('-o' if lang.startswith('NVIDIA') else '--o')
 
 print("No-sandbox (GDS)")
-
+        
 # No-sandbox
+fig = plt.figure(figsize=(8.5, 4.5), constrained_layout=True)
+gs = fig.add_gridspec(1, 2, hspace=1, wspace=0.05)
+axs = gs.subplots(sharex=False, sharey=True)
 for i, mode in enumerate(modes):
+    this_plt = axs[i]
     for j, lang in enumerate(sorted_langs):
         label = pretty_names[j]
-        if mode == 'contiguous' and label.startswith('CUDA'):
-            label = label.replace('streams', 'threads')
         datapoints_avg = [np.average(getattr(myself, "no_sandbox_" + mode + "_" + grid + "_" + lang)) for grid in grid_sizes]
         datapoints_std = [np.std(getattr(myself, "no_sandbox_" + mode + "_" + grid + "_" + lang)) for grid in grid_sizes]
-        plt.plot(grid_sizes, datapoints_avg, fmt_styles[j], label=label)
-        #plt.errorbar(grid_sizes, datapoints_avg, yerr=datapoints_std, fmt=fmt_styles[j], label=label)
+        
+        this_plt.plot({tmp}, datapoints_avg, fmt_styles[j], label=label)
+        #this_plt.errorbar({tmp}, datapoints_avg, yerr=datapoints_std, fmt=fmt_styles[j], label=label)
 
-    plt.rcParams['font.family'] = 'serif'
-    plt.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
+    mode = mode[0].upper() + mode[1:]
+    if i == 0:
+        rcParams['font.family'] = 'serif'
+        rcParams['font.serif'] = ['Times New Roman'] + rcParams['font.serif']
 
-    plt.title("NDVI {{}} dataset read times".format(mode), fontname='Times New Roman', fontsize=12)
-    plt.xlabel("Dataset size", fontname='Times New Roman', fontsize=10)
-    plt.ylabel("Time (secs)", fontname='Times New Roman', fontsize=10)
-    plt.legend(loc="upper left")
-    plt.yscale("log")
-    plt.savefig("perf-no_sandbox-{{}}-logscale.pdf".format(mode))
-    plt.cla()
-    plt.clf()
-    plt.close()
+        this_plt.set_ylabel("Time (secs)", fontname='Times New Roman', fontsize=10)
+        this_plt.legend(loc="upper left")
+        fig.supxlabel("Dataset size", fontname='Times New Roman', fontsize=10)
+        this_plt.set_title("{{}} datasets".format(mode), fontname='Times New Roman', fontsize=11)
+    else:
+        this_plt.set_title("{{}} datasets + GPU-side decompression".format(mode), fontname='Times New Roman', fontsize=11)
+
+    this_plt.set_yscale("log")
+
+for ax in fig.get_axes():
+    ax.label_outer()
+
+plt.savefig("perf-no_sandbox-logscale.pdf")
+#plt.cla()
+#plt.clf()
+plt.close()
 
 sys.exit(0)
 
