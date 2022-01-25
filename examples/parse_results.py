@@ -23,7 +23,8 @@ def get_numbers_highres(path):
     with open(path) as f:
         for line in f.readlines():
             if line.startswith('Call to'):
-                times_in_sec += [ds1 + ds2]
+                time_to_execute_udf = float(line.split()[-2])
+                times_in_sec += [ds1 + ds2 + time_to_execute_udf]
                 ds1, ds2 = None, None
             elif line.find('Dataset1') >= 0:
                 ds1 = float(line.split()[-2])
@@ -65,7 +66,8 @@ for name in sorted(glob.glob("results-sandbox/results*")) + sorted(glob.glob("re
 
     contents += "\n"
 
-grid_sizes = ["1000", "2000", "4000", "8000", "16000", "32000"]
+#grid_sizes = ["1000", "2000", "4000", "8000", "16000", "32000"]
+grid_sizes = ["1000", "2000", "4000", "8000", "16000"]
 tmp = [f"{size}\u00b2" for size in grid_sizes]
 
 contents += f"""
@@ -95,7 +97,7 @@ for lang in sorted_langs:
 print("No-sandbox (GDS)")
         
 # No-sandbox
-fig = plt.figure(figsize=(8.5, 4.5), constrained_layout=True)
+fig = plt.figure(figsize=(8.5, 4.0), constrained_layout=True)
 gs = fig.add_gridspec(1, 2, hspace=1, wspace=0.05)
 axs = gs.subplots(sharex=False, sharey=True)
 for i, mode in enumerate(modes):
