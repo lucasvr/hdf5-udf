@@ -339,31 +339,31 @@ bool HDF5_Handler::extractUDFMetadata(std::string &json_payload)
     if (hdf5_datatype < 0 && extractInfo() == false)
         return false;
 
-    // Note: ideally, we'd like to resort to H5Dget_offset() to get the dataset
-    // offset relative to the beginning of the file and then read the UDF metadata
-    // by ourselves. However, H5Dget_offset does not work with chunked datasets,
-    // which we use to store UDFs.
-    // An alternative would be to retrieve the underlying file handle with
-    // H5Fget_vfd_handle() and then read the file offset at /proc/self/fdinfo/N,
-    // but does not work either: the file offset is reported as 0 after the handle
-    // is obtained (based on observation, not code inspection).
-    // So, we introduce a  semantic modification to our I/O filter read path: if
-    // there's an environment variable named "IOFILTER_READ_METADATA", then the I/O
-    // filter returns the JSON  metadata associated with the dataset -- otherwise
-    // the standard read operation executes. Not an ideal solution, but it works.
+    // Sanity check: make sure we have a valid data chunk in the file
+    hsize_t nchunks = 0;
+    if (H5Sselect_all(space_id) < 0)
+        FAIL("failed to select the full extent of the dataset\n");
+    if (H5Dget_num_chunks(dset_id, space_id, &nchunks) < 0)
+        FAIL("failed to retrieve the number of chunks in the dataset\n");
+    if (nchunks == 0)
+        FAIL("dataset has no chunks\n");
 
-    char *rdata = new char[1024*1024];
-    os::setEnvironmentVariable("IOFILTER_READ_METADATA", "1");
-    herr_t ret = H5Dread(dset_id, hdf5_datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata);
-    os::clearEnvironmentVariable("IOFILTER_READ_METADATA");
-    if (ret < 0)
-    {
-        delete[] rdata;
-        FAIL("error reading UDF dataset metadata");
-    }
-    json_payload.assign(rdata, strlen(rdata));
-    delete[] rdata;
-    return true;
+    // Locate the metadata, which is a NULL-terminated string allocated at the
+    // beginning of the first (and only) data chunk created by the UDF filter.
+    haddr_t file_offset = 0;
+    if (H5Dget_chunk_info(dset_id, space_id, 0, NULL, NULL, &file_offset, NULL) < 0)
+        FAIL("failed to retrieve information from chunk #0\n");
+
+    // Play safe and use a different file handle to extract the file data (as
+    // opposed to reusing the VFD file handle). We just don't want to make
+    // assumptions about the VFD driver.
+    std::ifstream file(hdf5_file, std::ifstream::in | std::ifstream::binary);
+    if (! file.is_open())
+        FAIL("failed to open %s\n", hdf5_file.c_str());
+    file.seekg(file_offset);
+    std::getline(file, json_payload);
+
+    return json_payload.length() > 0;
 }
 
 ///////////////////////

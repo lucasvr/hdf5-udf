@@ -242,12 +242,7 @@ static size_t
 H5Z_udf_filter_callback(unsigned int flags, size_t cd_nelmts,
 const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
 {
-    if (flags & H5Z_FLAG_REVERSE && getenv("IOFILTER_READ_METADATA") != NULL)
-    {
-        std::string json_string((const char *) *buf);
-        *buf_size = json_string.size();
-    }
-    else if (flags & H5Z_FLAG_REVERSE)
+    if (flags & H5Z_FLAG_REVERSE)
     {
         std::string json_string((const char *) *buf);
         json jas = json::parse(json_string);
