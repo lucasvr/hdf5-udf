@@ -42,6 +42,12 @@ udf_template_cpp = custom_target(
   output: ['udf_template_cpp.h'],
   command: [file2hex, '@INPUT@', '@SOURCE_ROOT@/src/@OUTPUT@']
 )
+udf_template_cu = custom_target(
+  'udf_template_cu',
+  input: ['src/udf_template.cu'],
+  output: ['udf_template_cu.h'],
+  command: [file2hex, '@INPUT@', '@SOURCE_ROOT@/src/@OUTPUT@']
+)
 udf_template_lua = custom_target(
   'udf_template_lua',
   input: ['src/udf_template.lua'],
@@ -133,7 +139,7 @@ message('\n' +
 
 hdf5_udf_lib = shared_library(
   'hdf5-udf',
-  sources + [udf_template_cpp, udf_template_lua, udf_template_py],
+  sources + [udf_template_cpp, udf_template_cu, udf_template_lua, udf_template_py],
   version: '2.1',
   soversion: '0',
   dependencies: deps,

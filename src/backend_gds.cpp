@@ -22,7 +22,7 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include "sharedlib_manager.h"
-#include "udf_template_cpp.h" // use the C++ template file
+#include "udf_template_cu.h" // use the CUDA template file
 #include "backend_cpp.h" // reuse methods from the C++ backend
 #include "backend_gds.h"
 #include "anon_mmap.h"
@@ -54,7 +54,7 @@ std::string GDSBackend::compile(
 
     AssembleData data = {
         .udf_file                 = udf_file,
-        .template_string          = std::string((char *) udf_template_cpp),
+        .template_string          = std::string((char *) udf_template_cu),
         .compound_placeholder     = "// compound_declarations_placeholder",
         .compound_decl            = compound_declarations,
         .methods_decl_placeholder = "// methods_declaration_placeholder",
@@ -174,12 +174,14 @@ bool GDSBackend::run(
         static_cast<std::vector<const char *>*>(shlib.loadsym("hdf5_udf_types"));
     auto hdf5_udf_dims =
         static_cast<std::vector<std::vector<hsize_t>>*>(shlib.loadsym("hdf5_udf_dims"));
-    if (! udf || ! hdf5_udf_data || ! hdf5_udf_names || ! hdf5_udf_types || ! hdf5_udf_dims)
+    int (*hdf5_udf_last_cuda_error)(void) = (int (*)()) shlib.loadsym("hdf5_udf_last_cuda_error");
+    if (! udf || ! hdf5_udf_data || ! hdf5_udf_names ||
+        ! hdf5_udf_types || ! hdf5_udf_dims || ! hdf5_udf_last_cuda_error)
         return false;
 
     /*
      * Populate vector of dataset names, sizes, and types. Note that we have
-     * to manually account for proper reference counting of hdf5_datatype by
+     * to manually handle the reference counting of hdf5_datatype by
      * calling each member's reopenDatatype() method.
      */
     std::vector<DatasetInfo> dataset_info;
@@ -203,11 +205,17 @@ bool GDSBackend::run(
     /* Run the UDF */
     udf();
 
+    cudaError_t err = static_cast<cudaError_t>(hdf5_udf_last_cuda_error());
+    if (err != cudaSuccess)
+        fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString(err));
+    else
+        cudaDeviceSynchronize();
+
     /* Flush stdout buffer so we don't miss any messages echoed by the UDF */
     fflush(stdout);
 
     unlink(so_file.c_str());
-    return true;
+    return err == cudaSuccess;
 }
 
 /* Scan the UDF file for references to HDF5 dataset names */
