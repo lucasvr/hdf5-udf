@@ -395,10 +395,6 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
             return 0;
         }
 
-        // Synchronize CUDA streams/device
-        if (backend->name().compare("NVIDIA-GDS") == 0)
-            backend->sync();
-
         /* Execute the user-defined function */
         Benchmark benchmark;
         auto dtype = output_dataset.getCastDatatype();

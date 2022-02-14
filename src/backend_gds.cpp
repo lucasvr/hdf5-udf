@@ -358,8 +358,3 @@ void GDSBackend::clear(void *dev_mem, size_t size)
     }
     it->second->clear();
 }
-
-void GDSBackend::sync()
-{
-    cudaDeviceSynchronize();
-}

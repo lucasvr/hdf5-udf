@@ -111,9 +111,6 @@ public:
     // Get a reference to the memory handler of the given device memory address
     DeviceMemory *memoryHandler(void *dev_mem);
 
-    // Synchronize device data
-    void sync();
-
 private:
     std::map<void*, DeviceMemory*> memory_map;
 };
