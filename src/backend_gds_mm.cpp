@@ -17,6 +17,7 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include <omp.h>
+#include <H5FDgds.h>
 #include <snappy-cuda/gds_interface.h>
 
 #include <string>
@@ -98,31 +99,8 @@ void DeviceMemory::clear()
     cudaMemset(dev_mem, 0, size);
 }
 
-// DirectStorage: simple interface to register and deregister the GDS driver.
-DirectStorage::DirectStorage() : is_opened(false)
-{
-}
-
-void DirectStorage::open()
-{
-    CUfileError_t gds_err = cuFileDriverOpen();
-    if (gds_err.err != CU_FILE_SUCCESS)
-        fprintf(stderr, "Failed to open the GDS driver: %s\n", CUFILE_ERRSTR(gds_err.err));
-    is_opened = gds_err.err == CU_FILE_SUCCESS;
-}
-
-DirectStorage::~DirectStorage()
-{
-    if (is_opened)
-    {
-        CUfileError_t gds_err = cuFileDriverClose();
-        if (gds_err.err != CU_FILE_SUCCESS)
-            fprintf(stderr, "Failed to close the GDS driver: %s\n", CUFILE_ERRSTR(gds_err.err));
-    }
-}
-
 // DirectFile: open and configures a HDF5 file for Direct I/O
-DirectFile::DirectFile() : file_fd(-1), file_id(-1)
+DirectFile::DirectFile() : file_id(-1)
 {
 }
 
@@ -133,7 +111,6 @@ DirectFile::~DirectFile()
 
 bool DirectFile::open(std::string hdf5_file, bool warn_on_error=true)
 {
-    // Open file with the Direct I/O driver
     hid_t fapl_id = H5Pcreate(H5P_FILE_ACCESS);
     if (fapl_id < 0)
     {
@@ -141,52 +118,24 @@ bool DirectFile::open(std::string hdf5_file, bool warn_on_error=true)
         return false;
     }
 
-    size_t alignment = 1024;
-    size_t block_size = 0;
-    size_t copy_buffer_size = 4096 * 8;
-    if (H5Pset_fapl_direct(fapl_id, alignment, block_size, copy_buffer_size) < 0)
+    // Open file with the NVIDIA GPUDirect Storage VFD.
+    // We use default values for boundary, block size, and copy buffer size.
+    size_t boundary = 0, block_size = 0, copy_buffer_size = 0;
+    if (H5Pset_fapl_gds(fapl_id, boundary, block_size, copy_buffer_size) < 0)
     {
         H5Pclose(fapl_id);
-        FAIL("Failed to enable the HDF5 direct I/O driver\n");
+        FAIL("Failed to enable the NVIDIA GPUDirect Storage VFD driver\n");
     }
 
-    std::string old_env = getenv("HDF5_USE_FILE_LOCKING") ? : "";
-    os::setEnvironmentVariable("HDF5_USE_FILE_LOCKING", "FALSE");
     file_id = H5Fopen(hdf5_file.c_str(), H5F_ACC_RDONLY, fapl_id);
-    os::setEnvironmentVariable("HDF5_USE_FILE_LOCKING", old_env);
     if (file_id < 0)
     {
         H5Pclose(fapl_id);
         if (warn_on_error)
-            fprintf(stderr, "Failed to open %s in Direct I/O mode\n", hdf5_file.c_str());
+            fprintf(stderr, "Failed to open %s with GPUDirect Storage\n", hdf5_file.c_str());
         return false;
     }
     H5Pclose(fapl_id);
-
-    // Get a *reference* to the file descriptor
-    void *file_handle = NULL;
-    herr_t err = H5Fget_vfd_handle(file_id, H5P_DEFAULT, (void **) &file_handle);
-    if (err < 0)
-    {
-        H5Fclose(file_id);
-        file_id = -1;
-        FAIL("Failed to get HDF5 file VFD handle\n");
-    }
-
-    file_fd = *((int *) file_handle);
-
-    // Configure Direct I/O
-    memset(&gds_descr, 0, sizeof(gds_descr));
-    gds_descr.handle.fd = file_fd;
-    gds_descr.type = CU_FILE_HANDLE_TYPE_OPAQUE_FD;
-    CUfileError_t gds_err = cuFileHandleRegister(&gds_handle, &gds_descr);
-    if (gds_err.err != CU_FILE_SUCCESS)
-    {
-        H5Fclose(file_id);
-        file_id = -1;
-        file_fd = -1;
-        FAIL("Failed to register file: %s\n", CUFILE_ERRSTR(gds_err.err));
-    }
 
     return true;
 }
@@ -195,16 +144,18 @@ void DirectFile::close()
 {
     if (file_id >= 0)
     {
-        cuFileHandleDeregister(gds_handle);
         H5Fclose(file_id);
         file_id = -1;
-        file_fd = -1;
     }
 }
 
 // DirectDataset: routines to read a dataset using GPUDirect Storage I/O
 bool DirectDataset::read(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm)
 {
+    // TODO: this implementation only supports delegating workload to a single GPU
+    cudaSetDevice(0);
+    cudaCheckError();
+
     auto create_plist_id = H5Dget_create_plist(dset_id);
     auto dset_layout = H5Pget_layout(create_plist_id);
     bool ret = false;
@@ -212,7 +163,7 @@ bool DirectDataset::read(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm
     if (dset_layout == H5D_CHUNKED)
         ret = readChunked(dset_id, directfile, mm);
     else if (dset_layout == H5D_CONTIGUOUS)
-        ret = readContiguous(dset_id, directfile, mm);
+        ret = readContiguous(dset_id, mm);
 
     H5Pclose(create_plist_id);
     return ret;
@@ -294,10 +245,6 @@ bool DirectDataset::readChunked(hid_t dset_id, DirectFile *directfile, DeviceMem
     std::vector<hsize_t> dims, cdims;
     bool retval = true;
 
-    // TODO: this implementation only supports delegating workload to a single GPU
-    cudaSetDevice(0);
-    cudaCheckError();
-
     auto fspace_id = H5Dget_space(dset_id);
     if (parseChunks(dset_id, fspace_id, dims, cdims, data_blocks) == false)
     {
@@ -318,6 +265,7 @@ bool DirectDataset::readChunked(hid_t dset_id, DirectFile *directfile, DeviceMem
     for (auto i=0; i<omp_get_max_threads(); ++i)
         snappy_ctx[i] = decompressor_alloc();
 
+#if 0
     // Read the dataset
     #pragma omp parallel for
     for (size_t i=0; i<data_blocks.size(); ++i)
@@ -362,6 +310,7 @@ bool DirectDataset::readChunked(hid_t dset_id, DirectFile *directfile, DeviceMem
             ctx);
         decompressor_run(ctx);
     }
+#endif
 
     for (auto &ctx: snappy_ctx)
         decompressor_destroy(ctx);
@@ -370,55 +319,39 @@ bool DirectDataset::readChunked(hid_t dset_id, DirectFile *directfile, DeviceMem
     return retval;
 }
 
-bool DirectDataset::readContiguous(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm)
+bool DirectDataset::readContiguous(hid_t dset_id, DeviceMemory &mm)
 {
-    // TODO: this implementation only supports delegating workload to a single GPU
-    cudaSetDevice(0);
-    cudaCheckError();
-
-    // Get dataset offset. This call only succeeds if the requested dataset
-    // has contiguous storage.
-    haddr_t dset_offset = H5Dget_offset(dset_id);
-    if (dset_offset == HADDR_UNDEF)
-    {
-        fprintf(stderr, "Failed to get offset of HDF5 dataset\n");
-        return false;
-    }
-
-    bool ret = true;
+    bool ret, need_unsetenv = false;
 
     // Define the I/O transfer size and thread count
-    int max_threads = omp_get_max_threads();
-    float tmp = ((float) mm.size) / MB(1);
-    if (tmp < max_threads)
-        max_threads = ((int) tmp) + 1;
-    size_t io_size = MB((size_t) ceilf(tmp / max_threads));
-
-    #pragma omp parallel for
-    for (auto i=0; i<max_threads; ++i)
+    if (getenv("H5_GDS_VFD_IO_THREADS") == NULL)
     {
-        auto my_offset = io_size * i;
-        auto my_size = my_offset >= mm.size ? 0 : MIN(io_size, mm.size - my_offset);
+        int max_threads = omp_get_max_threads();
+        float tmp = ((float) mm.size) / MB(1);
+        if (tmp < max_threads)
+            max_threads = ((int) tmp) + 1;
 
-        ssize_t n = cuFileRead(
-                directfile->gds_handle,
-                (void *) mm.dev_mem,
-                my_size,
-                dset_offset + my_offset,
-                my_offset);
-        if (n < 0)
-        {
-            fprintf(stderr, "Failed to read file data: %jd\n", n);
-            #pragma omp critical
-            ret = false;
-        }
+        std::stringstream ss;
+        ss << max_threads;
+        setenv("H5_GDS_VFD_IO_THREADS", ss.str().c_str(), 1);
+        need_unsetenv = true;
     }
+
+    ret = H5Dread(dset_id, H5Dget_type(dset_id), H5S_ALL, H5S_ALL, H5P_DEFAULT, mm.dev_mem) >= 0;
+
+    if (need_unsetenv)
+        unsetenv("H5_GDS_VFD_IO_THREADS");
 
     return ret;
 }
 
 bool DirectDataset::copyToHost(DeviceMemory &mm, void **host_mem)
 {
-    cudaMemcpyAsync(*host_mem, mm.dev_mem, mm.size, cudaMemcpyDeviceToHost);
-    return true;
+    cudaError_t err = cudaMemcpyAsync(*host_mem, mm.dev_mem, mm.size, cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess)
+    {
+        const char *msg = cudaGetErrorString(err);
+        fprintf(stderr, "CUDA error: %s\n", msg);
+    }
+    return err == cudaSuccess;
 }

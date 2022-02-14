@@ -104,6 +104,7 @@ if get_option('with-gds')
   deps += [
     meson.get_compiler('cpp').find_library('cufile', dirs: cuda_libdir, required: true),
     meson.get_compiler('cpp').find_library('cudart', dirs: cuda_libdir, required: true),
+    meson.get_compiler('cpp').find_library('hdf5_vfd_gds', required: true),
     meson.get_compiler('cpp').find_library('udf_snappy_reader', required: true),
     meson.get_compiler('cpp').find_library('gomp', required: true)
   ]

@@ -104,13 +104,15 @@ directory.
 
 ## Requirements
 
-HDF5-UDF comes with three backends, each of which requiring different
+HDF5-UDF comes with four backends, each of which requiring different
 pieces of software to allow the embedding of bytecode and their execution:
 
 - `Lua`: requires the [LuaJIT](https://luajit.org/install.html) package
 - `Python`: requires the [CFFI](https://pypi.org/project/cffi) module
-- `C/C++`: requires the [GNU C++ compiler](https://gnu.org/software/gcc) or,
+- `C++`: requires the [GNU C++ compiler](https://gnu.org/software/gcc) or,
    alternatively, the [Clang compiler](https://clang.llvm.org).
+- `CUDA/GDS`: requires the [NVIDIA CUDA toolchain](https://developer.nvidia.com/cuda-zone)
+   along with the [HDF5 GPUDirect Storage VFD](https://github.com/hpc-io/vfd-gds).
 
 It is possible to compile the code so that only a restricted number of system
 calls can be executed by the user-defined functions. We rely on two packages

@@ -173,13 +173,12 @@ bool readHdf5Datasets(
             {
                 // NVIDIA-GDS backend
 #ifdef ENABLE_GDS
-                DirectFile *directfile = (DirectFile *) dfile_ptr;
                 GDSBackend *gds_backend = dynamic_cast<GDSBackend *>(backend);
                 assert(gds_backend);
                 DeviceMemory *devicememory = gds_backend->memoryHandler(rdata);
 
                 Benchmark benchmark;
-                read_ok = DirectDataset::read(dset_id, directfile, *devicememory);
+                read_ok = DirectDataset::read(dset_id, (DirectFile *) dfile_ptr, *devicememory);
                 benchmark.print(ss.str());
 #endif
             }
@@ -307,18 +306,12 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
             return 0;
         }
 
+        void *dfile_ptr = NULL;
 #ifdef ENABLE_GDS
         // Register the GPUDirect driver
-        DirectStorage directstorage;
         DirectFile directfile;
-        void *dfile_ptr = NULL;
         if (backend_name.compare("NVIDIA-GDS") == 0)
-        {
-            directstorage.open();
             dfile_ptr = (void *) &directfile;
-        }
-#else
-        void *dfile_ptr = NULL;
 #endif
 
         /* Workaround for lack of API to retrieve the HDF5 file handle from the filter callback */

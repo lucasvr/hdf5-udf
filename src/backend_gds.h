@@ -27,34 +27,21 @@ struct DeviceMemory {
     bool is_borrowed_mem;
 };
 
-// DirectStorage: simple interface to register and deregister the GDS driver.
-struct DirectStorage {
-    DirectStorage();
-    ~DirectStorage();
-    void open();
-
-    bool is_opened;
-};
-
-// DirectFile: open and configures a HDF5 file for Direct I/O
+// DirectFile: open a file via GPUDirect Storage
 struct DirectFile {
     DirectFile();
     ~DirectFile();
     bool open(std::string hdf5_file, bool warn_on_error);
     void close();
 
-    int file_fd;
     hid_t file_id;
-    CUfileDescr_t gds_descr;
-    CUfileHandle_t gds_handle;
-
 };
 
-// DirectDataset: open a dataset
+// DirectDataset: read a dataset using GPUDirect Storage
 struct DirectDataset {
     static bool read(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm);
     static bool readChunked(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm);
-    static bool readContiguous(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm);
+    static bool readContiguous(hid_t dset_id, DeviceMemory &mm);
     static bool parseChunks(
         hid_t dset_id,
         hid_t fspace_id,
