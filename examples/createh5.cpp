@@ -15,19 +15,26 @@
 #include <functional>
 #include <map>
 
+// https://github.com/lucasvr/snappy-cuda
 #ifndef SNAPPY_CUDA_FILTER_ID
-#define SNAPPY_CUDA_FILTER_ID 32003
+#define SNAPPY_CUDA_FILTER_ID   32003
+#endif
+
+// https://github.com/lucasvr/nvcomp-iofilter
+#ifndef NVCOMP_FILTER_ID
+#define NVCOMP_FILTER_ID        32004
 #endif
 
 hsize_t NATIVE_DIM0 = 100;
 hsize_t NATIVE_DIM1 = 50;
 
-hsize_t CHUNK_DIM0 = 100;
+hsize_t CHUNK_DIM0 = NATIVE_DIM0;
 hsize_t CHUNK_DIM1 = 25;
 
 const std::map<std::string, H5Z_filter_t> filter_map {
     {"deflate", H5Z_FILTER_DEFLATE},
     {"snappy-cuda", SNAPPY_CUDA_FILTER_ID},
+    {"nvcomp", NVCOMP_FILTER_ID},
 };
 
 int create_regular_dataset(hid_t file_id, std::string compression, int count);
@@ -82,8 +89,8 @@ int main(int argc, char **argv)
             "                     STRING             (a fixed-sized string dataset)\n"
             "                     VARSTRING          (a variable-sized string dataset)\n"
             "  --count=N          Create this many datasets in the output file (default: 0)\n"
-            "  --dims=X,Y         X and Y dimensions (default: %llu,%llu)\n"
-            "  --cdims=X,Y        Chunked X and Y dimensions (default: %llu,%llu)\n"
+            "  --dims=X,Y         X and Y dimensions (default: %lu,%lu)\n"
+            "  --cdims=X,Y        Chunked X and Y dimensions (default: %lu,%lu)\n"
             "  --compress=FILTER  Compress the dataset(s) with one of the supported filters:\n"
             "                     %s\n"
             "  --out=FILE         Output file name (truncates FILE if it already exists)\n\n",
@@ -108,10 +115,10 @@ int main(int argc, char **argv)
     }
 
     std::string dims = getOptionValue(argc, argv, "--dims", default_dims.str().c_str());
-    sscanf(dims.c_str(), "%llu,%llu", &NATIVE_DIM0, &NATIVE_DIM1);
+    sscanf(dims.c_str(), "%lu,%lu", &NATIVE_DIM0, &NATIVE_DIM1);
 
     std::string cdims = getOptionValue(argc, argv, "--cdims", default_cdims.str().c_str());
-    sscanf(cdims.c_str(), "%llu,%llu", &CHUNK_DIM0, &CHUNK_DIM1);
+    sscanf(cdims.c_str(), "%lu,%lu", &CHUNK_DIM0, &CHUNK_DIM1);
 
     // Create (or truncate an existing) output file
     hid_t file_id = H5Fcreate(hdf5_file.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
