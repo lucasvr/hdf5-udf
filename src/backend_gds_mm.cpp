@@ -14,17 +14,20 @@
 #include <unistd.h>
 #include <hdf5.h>
 #include <H5FDdirect.h>
+#include <H5FDdevelop.h>
 #include <cuda_runtime.h>
 #include <cuda.h>
 #include <omp.h>
 #include <H5FDgds.h>
-#include <snappy-cuda/gds_interface.h>
+#include <nvcomp/snappy.hpp>
+#include <nvcomp.hpp>
 
 #include <string>
 #include <tuple>
 #include <vector>
 #include "backend_gds.h"
 #include "dataset.h"
+#include "debug.h"
 #include "os.h"
 
 #define cudaCheckError() do { \
@@ -43,8 +46,12 @@
     return false; \
 } while (0)
 
+#ifndef MAX
+# define MAX(x,y) (x) > (y) ? (x) : (y)
+#endif
+
 // DeviceMemory: allocate and register memory on the device for GPUDirect I/O
-DeviceMemory::DeviceMemory(size_t alloc_size) :
+DeviceMemory::DeviceMemory(size_t alloc_size, cudaStream_t stream) :
     dev_mem(NULL),
     size(alloc_size),
     total_size(ALIGN_1MB(alloc_size)),
@@ -53,7 +60,9 @@ DeviceMemory::DeviceMemory(size_t alloc_size) :
     cudaSetDevice(0);
     cudaCheckError();
 
-    cudaError_t err = cudaMalloc(&dev_mem, total_size);
+    // TODO: replace the following with a call to H5FDalloc_mem(). The GDS
+    // file driver will allocate device memory and register the buffer for us.
+    cudaError_t err = cudaMallocAsync(&dev_mem, total_size, stream);
     if (err != cudaSuccess)
     {
         const char *errmsg = cudaGetErrorString(err);
@@ -84,6 +93,8 @@ DeviceMemory::~DeviceMemory()
 {
     if (dev_mem && !is_borrowed_mem)
     {
+        // TODO: replace the following with a call to H5FDfree_mem(). The GDS
+        // file driver will deregister the buffer and deallocate memory for us.
         cuFileBufDeregister(dev_mem);
         cudaError_t err = cudaFree(dev_mem);
         if (err != cudaSuccess)
@@ -100,7 +111,7 @@ void DeviceMemory::clear()
 }
 
 // DirectFile: open and configures a HDF5 file for Direct I/O
-DirectFile::DirectFile() : file_id(-1)
+DirectFile::DirectFile() : file_id(-1), file_driver(NULL)
 {
 }
 
@@ -111,31 +122,29 @@ DirectFile::~DirectFile()
 
 bool DirectFile::open(std::string hdf5_file, bool warn_on_error=true)
 {
-    hid_t fapl_id = H5Pcreate(H5P_FILE_ACCESS);
+    fapl_id = H5Pcreate(H5P_FILE_ACCESS);
     if (fapl_id < 0)
-    {
-        fprintf(stderr, "Failed to create HDF5 file access property list\n");
-        return false;
-    }
+        FAIL("Failed to create HDF5 file access property list\n");
 
     // Open file with the NVIDIA GPUDirect Storage VFD.
     // We use default values for boundary, block size, and copy buffer size.
     size_t boundary = 0, block_size = 0, copy_buffer_size = 0;
     if (H5Pset_fapl_gds(fapl_id, boundary, block_size, copy_buffer_size) < 0)
-    {
-        H5Pclose(fapl_id);
         FAIL("Failed to enable the NVIDIA GPUDirect Storage VFD driver\n");
-    }
 
     file_id = H5Fopen(hdf5_file.c_str(), H5F_ACC_RDONLY, fapl_id);
     if (file_id < 0)
     {
-        H5Pclose(fapl_id);
         if (warn_on_error)
-            fprintf(stderr, "Failed to open %s with GPUDirect Storage\n", hdf5_file.c_str());
+            FAIL("Failed to open %s with GPUDirect Storage\n", hdf5_file.c_str());
         return false;
     }
-    H5Pclose(fapl_id);
+
+    // Resort to the new H5Fget_file_driver_handle() API to borrow a reference to the
+    // low-level file driver handle. The obtained handle can be provided on calls to
+    // the H5FD* APIs. The handle becomes invalid upon a call to H5Fclose(file_id).
+    if (H5Fget_file_driver_handle(file_id, (void **) &file_driver) < 0)
+        FAIL("Failed to get file driver handle\n");
 
     return true;
 }
@@ -147,6 +156,13 @@ void DirectFile::close()
         H5Fclose(file_id);
         file_id = -1;
     }
+    if (fapl_id >= 0)
+    {
+        H5Pclose(fapl_id);
+        fapl_id = -1;
+    }
+
+    file_driver = NULL;
 }
 
 // DirectDataset: routines to read a dataset using GPUDirect Storage I/O
@@ -163,7 +179,7 @@ bool DirectDataset::read(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm
     if (dset_layout == H5D_CHUNKED)
         ret = readChunked(dset_id, directfile, mm);
     else if (dset_layout == H5D_CONTIGUOUS)
-        ret = readContiguous(dset_id, mm);
+        ret = readContiguous(dset_id, directfile, mm);
 
     H5Pclose(create_plist_id);
     return ret;
@@ -222,9 +238,9 @@ bool DirectDataset::parseChunks(
         haddr_t addr = 0;
         hsize_t offset[ndims], compressed_size = 0;
         if (H5Dget_chunk_info(dset_id, fspace_id, i, offset, NULL, &addr, &compressed_size) < 0)
-            FAIL("Failed to retrieve information from chunk %lld\n", i);
+            FAIL("Failed to retrieve information from chunk %ld\n", i);
         if (H5Dget_chunk_storage_size(dset_id, offset, &compressed_size) < 0)
-            FAIL("Failed to retrieve storage size from chunk %lld\n", i);
+            FAIL("Failed to retrieve storage size from chunk %ld\n", i);
 
         size_t decompressed_size = chunk_num_elements * dset_element_size;
 
@@ -245,6 +261,7 @@ bool DirectDataset::readChunked(hid_t dset_id, DirectFile *directfile, DeviceMem
     std::vector<hsize_t> dims, cdims;
     bool retval = true;
 
+    // Get information about each data chunk
     auto fspace_id = H5Dget_space(dset_id);
     if (parseChunks(dset_id, fspace_id, dims, cdims, data_blocks) == false)
     {
@@ -253,75 +270,59 @@ bool DirectDataset::readChunked(hid_t dset_id, DirectFile *directfile, DeviceMem
     }
     H5Sclose(fspace_id);
 
-    // Allocate a scratch memory area where the compressed chunk can be read to
-    size_t scratch_size = 0;
-    for (size_t i=0; i<data_blocks.size(); ++i)
-        scratch_size = MAX(scratch_size, std::get<2>(data_blocks[i]));
-    DeviceMemory *scratch_buffer = new DeviceMemory(scratch_size * omp_get_max_threads());
+    // Read the compressed dataset via GDS to 'compressed_buffer' and decompress to 'mm'
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+    const int chunk_size = 1 << 16;
+    nvcomp::SnappyManager nvcomp_manager{chunk_size, stream};
 
-    // Preallocate Snappy contexts for each OpenMP thread
-    std::vector<void *> snappy_ctx;
-    snappy_ctx.resize(omp_get_max_threads());
-    for (auto i=0; i<omp_get_max_threads(); ++i)
-        snappy_ctx[i] = decompressor_alloc();
+    Benchmark benchmark;
+    DeviceMemory compressed_buffer(mm.size);
 
-#if 0
-    // Read the dataset
-    #pragma omp parallel for
-    for (size_t i=0; i<data_blocks.size(); ++i)
+    for (size_t i=0, compressed_offset=0, decompressed_offset=0; i<data_blocks.size(); ++i)
     {
         auto file_offset = std::get<0>(data_blocks[i]);
         auto mem_offset = std::get<1>(data_blocks[i]);
         auto chunk_size = std::get<2>(data_blocks[i]);
         auto decompressed_size = std::get<3>(data_blocks[i]);
-        auto scratch_offset = scratch_size * omp_get_thread_num();
 
-        // Cook a DeviceMemory object reusing the previously allocated buffer
-        DeviceMemory scratch_mm(scratch_buffer, scratch_offset, chunk_size);
+        auto comp_data = ((uint8_t *) compressed_buffer.dev_mem);
+        auto decomp_data = ((uint8_t *) mm.dev_mem) + decompressed_offset;
 
-        // Transfer data from storage to GPU via DMA
-        auto n = cuFileRead(
-                 directfile->gds_handle,
-                 scratch_buffer->dev_mem,
-                 chunk_size,
-                 file_offset,
-                 scratch_offset);
-        if (n < 0)
+        // Read to the given compressed buffer offset
+        H5FD_ctl_readp_args_t readp_args = {
+            .type = H5FD_MEM_DEFAULT,
+            .fapl_id = H5P_DEFAULT,
+            .addr = file_offset,
+            .size = chunk_size,
+            .output_buf_offset = compressed_offset
+        };
+        uint64_t opcode = H5FD_CTL__READP;
+        uint64_t flags = H5FD_CTL__FAIL_IF_UNKNOWN_FLAG;
+
+        if (H5FDctl(directfile->file_driver, opcode, flags, (void *) &readp_args, (void **) &comp_data) < 0)
         {
-            // Cannot break from OpenMP structured block
-            fprintf(stderr, "Failed to read file data: %jd (%s)\n", n, strerror(errno));
-            retval = false;
-            continue;
-        }
-        else if (n != (ssize_t) chunk_size)
-        {
-            fprintf(stderr, "Requested to read %lld, received %jd\n", chunk_size, n);
+            fprintf(stderr, "Failed to read file data\n");
+            return false;
         }
 
-        // Decompress to output dataset memory buffer
-        void *dst = (void *) (((char *) mm.dev_mem) + mem_offset);
-        void *ctx = snappy_ctx[omp_get_thread_num()];
-        decompressor_init(
-            scratch_mm.dev_mem,
-            scratch_mm.size,
-            scratch_mm.total_size,
-            dst,
-            decompressed_size,
-            ctx);
-        decompressor_run(ctx);
+        // Decompress
+        auto decomp_config = nvcomp_manager.configure_decompression(comp_data);
+        nvcomp_manager.decompress(decomp_data, comp_data, decomp_config);
+
+        compressed_offset += chunk_size;
+        decompressed_offset += decompressed_size;
     }
-#endif
 
-    for (auto &ctx: snappy_ctx)
-        decompressor_destroy(ctx);
+    cudaStreamDestroy(stream);
+    benchmark.print("Read/decompress loop");
 
-    delete scratch_buffer;
     return retval;
 }
 
-bool DirectDataset::readContiguous(hid_t dset_id, DeviceMemory &mm)
+bool DirectDataset::readContiguous(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm)
 {
-    bool ret, need_unsetenv = false;
+    bool retval = true, need_unsetenv = false;
 
     // Define the I/O transfer size and thread count
     if (getenv("H5_GDS_VFD_IO_THREADS") == NULL)
@@ -337,17 +338,24 @@ bool DirectDataset::readContiguous(hid_t dset_id, DeviceMemory &mm)
         need_unsetenv = true;
     }
 
-    ret = H5Dread(dset_id, H5Dget_type(dset_id), H5S_ALL, H5S_ALL, H5P_DEFAULT, mm.dev_mem) >= 0;
+    auto offset = H5Dget_offset(dset_id);
+    auto count = H5Dget_storage_size(dset_id);
+
+    if (H5FDread(directfile->file_driver, H5FD_MEM_DEFAULT, H5P_DEFAULT, offset, count, mm.dev_mem) < 0)
+    {
+        fprintf(stderr, "Failed to read contiguous file data via H5FDread\n");
+        retval = false;
+    }
 
     if (need_unsetenv)
         unsetenv("H5_GDS_VFD_IO_THREADS");
 
-    return ret;
+    return retval;
 }
 
 bool DirectDataset::copyToHost(DeviceMemory &mm, void **host_mem)
 {
-    cudaError_t err = cudaMemcpyAsync(*host_mem, mm.dev_mem, mm.size, cudaMemcpyDeviceToHost);
+    cudaError_t err = cudaMemcpy(*host_mem, mm.dev_mem, mm.size, cudaMemcpyDeviceToHost);
     if (err != cudaSuccess)
     {
         const char *msg = cudaGetErrorString(err);

@@ -12,12 +12,13 @@
 #include <cufile.h>
 #include <tuple>
 #include <vector>
+#include <cuda_runtime.h>
 #include "backend.h"
 
 // DeviceMemory: allocate and register memory on the device for GPUDirect I/O
 struct DeviceMemory {
     DeviceMemory(const DeviceMemory *src, size_t offset, size_t alloc_size);
-    DeviceMemory(size_t alloc_size);
+    DeviceMemory(size_t alloc_size, cudaStream_t stream = 0);
     ~DeviceMemory();
     void clear();
 
@@ -35,13 +36,15 @@ struct DirectFile {
     void close();
 
     hid_t file_id;
+    hid_t fapl_id;
+    H5FD_t *file_driver;
 };
 
 // DirectDataset: read a dataset using GPUDirect Storage
 struct DirectDataset {
     static bool read(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm);
     static bool readChunked(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm);
-    static bool readContiguous(hid_t dset_id, DeviceMemory &mm);
+    static bool readContiguous(hid_t dset_id, DirectFile *directfile, DeviceMemory &mm);
     static bool parseChunks(
         hid_t dset_id,
         hid_t fspace_id,
