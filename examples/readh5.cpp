@@ -16,8 +16,10 @@
 #include <fcntl.h>
 #include <wchar.h>
 #include <hdf5.h>
+#include <H5FDgds.h>
 #include <string>
 #include <cstring>
+#include "debug.h"
 
 typedef struct { uint8_t r; uint8_t g; uint8_t b; } pal_t;
 
@@ -25,14 +27,28 @@ int main(int argc, char **argv)
 {
     if (argc < 3)
     {
-        fprintf(stdout, "Syntax: %s <file.h5> <dataset> [palette dataset] [--quiet]\n", argv[0]);
+        fprintf(stdout, "Syntax: %s <file.h5> <dataset> [palette dataset] [--quiet] [--gds-vfd]\n", argv[0]);
         return 1;
     }
 
-    std::string hdf5_file = argv[1];
-    std::string hdf5_dataset = argv[2];
-    std::string hdf5_palette = argc <= 3 || strcmp(argv[3], "--quiet") == 0 ? "" : argv[3];
-    bool quiet = strcmp(argv[argc-1], "--quiet") == 0;
+    // Very simple argument parsing
+    int argn = 1;
+    std::string hdf5_file = argv[argn++];
+    std::string hdf5_dataset = argv[argn++];
+    std::string hdf5_palette = "";
+    bool use_gds_vfd = false;
+    bool quiet = false;
+
+    while (argn < argc)
+    {
+        if (strcmp(argv[argn], "--quiet") == 0)
+            quiet = true;
+        else if (strcmp(argv[argn], "--gds-vfd") == 0)
+            use_gds_vfd = true;
+        else
+            hdf5_palette = argv[argn];
+        argn++;
+    }
 
     // Enable printing UTF-8 characters
     setlocale(LC_ALL, "en_US.UTF-8");
@@ -45,12 +61,24 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    size_t alignment = 1024, block_size = 0, copy_buffer_size = 4096 * 8;
-    if (H5Pset_fapl_direct(fapl_id, alignment, block_size, copy_buffer_size) < 0)
+    if (use_gds_vfd)
     {
-        H5Pclose(fapl_id);
-        fprintf(stderr, "Failed to enable the HDF5 direct I/O driver\n");
-	return 1;
+        if (H5Pset_fapl_gds(fapl_id, 0, 0, 0) < 0)
+        {
+            H5Pclose(fapl_id);
+            fprintf(stderr, "Failed to enable the HDF5 VFD I/O driver\n");
+            return 1;
+        }
+    }
+    else
+    {
+        size_t alignment = 1024, block_size = 0, copy_buffer_size = 4096 * 8;
+        if (H5Pset_fapl_direct(fapl_id, alignment, block_size, copy_buffer_size) < 0)
+        {
+            H5Pclose(fapl_id);
+            fprintf(stderr, "Failed to enable the HDF5 direct I/O driver\n");
+            return 1;
+        }
     }
 
     hid_t file_id = H5Fopen(hdf5_file.c_str(), H5F_ACC_RDONLY, fapl_id);
@@ -98,6 +126,7 @@ int main(int argc, char **argv)
     hsize_t dims[2] = {0, 0};
     H5Sget_simple_extent_dims(space_id, dims, NULL);
 
+    Benchmark benchmark;
     uint8_t *rdata = new uint8_t[dims[0] * dims[1] * datatype_size];
     bool is_float = false;
     if (H5Tequal(type_id, H5T_NATIVE_INT))
@@ -114,6 +143,8 @@ int main(int argc, char **argv)
         fprintf(stderr, "We're only ready to deal with INT/UINT8 data types, sorry!\n");
         return 1;
     }
+    benchmark.print("Call to H5Dread");
+
     H5Sclose(space_id);
     H5Tclose(type_id);
     H5Dclose(dataset_id);
