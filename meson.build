@@ -26,6 +26,8 @@ sources = [
 seccomp_dep = ''
 deps = []
 
+add_global_arguments('-finstrument-functions', language: 'cpp')
+
 if host_machine.system() == 'windows'
   deps += meson.get_compiler('cpp').find_library('secur32', required: true)
 endif
@@ -105,13 +107,12 @@ if get_option('with-gds')
     meson.get_compiler('cpp').find_library('cufile', dirs: cuda_libdir, required: true),
     meson.get_compiler('cpp').find_library('cudart', dirs: cuda_libdir, required: true),
     meson.get_compiler('cpp').find_library('hdf5_vfd_gds', required: true),
-    meson.get_compiler('cpp').find_library('udf_snappy_reader', required: true),
+    meson.get_compiler('cpp').find_library('nvcomp', required: true),
     meson.get_compiler('cpp').find_library('gomp', required: true)
   ]
   add_global_arguments('-fopenmp', language: 'cpp')
   add_global_arguments('-DENABLE_GDS', language: 'cpp')
   add_global_arguments('-I/usr/local/cuda/targets/x86_64-linux/include', language: 'cpp')
-  add_global_arguments('-I/usr/include/snappy-cuda', language: 'cpp')
 endif
 
 if get_option('with-sandbox')
@@ -198,5 +199,9 @@ executable(
 executable(
   'readh5',
   ['examples/readh5.cpp'],
-  dependencies: [hdf5_lib],
+  dependencies: [
+    hdf5_lib,
+    meson.get_compiler('cpp').find_library('hdf5_vfd_gds', required: true)
+  ],
+  include_directories: 'src',
   install: false)
