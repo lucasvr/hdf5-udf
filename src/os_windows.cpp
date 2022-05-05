@@ -26,6 +26,7 @@
 #include <io.h>
 #include <regex>
 #include <set>
+#include "config.h"
 #include "os.h"
 
 // Windows protocols: NTSTATUS values

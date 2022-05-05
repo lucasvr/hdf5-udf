@@ -79,39 +79,37 @@ deps += [
 # Optional dependencies
 ########################
 
+gds_vfd_lib = meson.get_compiler('cpp').find_library('hdf5_vfd_gds', required: false)
+
 if get_option('with-python')
   sources += ['src/backend_python.cpp']
   deps += [
     dependency('python3', required: true),
     dependency('python3-embed', required: false)
   ]
-  add_global_arguments('-DENABLE_PYTHON', language: 'cpp')
 endif
 
-if get_option('with-cpp')
+if get_option('with-cpp') or get_option('with-cuda')
   sources += ['src/backend_cpp.cpp', 'src/miniz.cpp']
   deps += [meson.get_compiler('cpp').find_library('m', required: true)]
-  add_global_arguments('-DENABLE_CPP', language: 'cpp')
 endif
 
 if get_option('with-lua')
   sources += ['src/backend_lua.cpp']
   deps += [dependency('luajit', required: true)]
-  add_global_arguments('-DENABLE_LUA', language: 'cpp')
 endif
 
-if get_option('with-gds')
-  sources += ['src/backend_gds.cpp', 'src/backend_gds_mm.cpp']
+if get_option('with-cuda')
+  sources += ['src/backend_cuda.cpp', 'src/backend_cuda_mm.cpp']
   cuda_libdir = '/usr/local/cuda/targets/x86_64-linux/lib'
   deps += [
     meson.get_compiler('cpp').find_library('cufile', dirs: cuda_libdir, required: true),
     meson.get_compiler('cpp').find_library('cudart', dirs: cuda_libdir, required: true),
-    meson.get_compiler('cpp').find_library('hdf5_vfd_gds', required: true),
     meson.get_compiler('cpp').find_library('nvcomp', required: true),
-    meson.get_compiler('cpp').find_library('gomp', required: true)
+    meson.get_compiler('cpp').find_library('gomp', required: true),
+    gds_vfd_lib
   ]
   add_global_arguments('-fopenmp', language: 'cpp')
-  add_global_arguments('-DENABLE_GDS', language: 'cpp')
   add_global_arguments('-I/usr/local/cuda/targets/x86_64-linux/include', language: 'cpp')
 endif
 
@@ -122,18 +120,31 @@ if get_option('with-sandbox')
   elif build_machine.system() == 'darwin'
     sources += ['src/sandbox_macos.cpp']
   endif
-  add_global_arguments('-DENABLE_SANDBOX', language: 'cpp')
 endif
 
 message('\n' +
 '\n  HDF5-UDF: User-Defined Functions for HDF5\n' +
 '\n  Configuration' +
-'\n    Python support:     ' + get_option('with-python').to_string() +
-'\n    C/C++ support:      ' + get_option('with-cpp').to_string() +
-'\n    Lua support:        ' + get_option('with-lua').to_string() +
-'\n    NVIDIA GDS support: ' + get_option('with-gds').to_string() +
-'\n    Sandbox support:    ' + get_option('with-sandbox').to_string() +
+'\n    Python support:      ' + get_option('with-python').to_string() +
+'\n    C/C++ support:       ' + (get_option('with-cpp') or get_option('with-cuda')).to_string() +
+'\n    Lua support:         ' + get_option('with-lua').to_string() +
+'\n    CUDA support:        ' + get_option('with-cuda').to_string() +
+'\n      GPUDirect Storage: ' + gds_vfd_lib.found().to_string() +
+'\n    Sandbox support:     ' + get_option('with-sandbox').to_string() +
 '\n')
+
+##############
+# Header file
+##############
+
+sys_conf = configuration_data()
+sys_conf.set('HAVE_GDS_VFD', gds_vfd_lib.found())
+sys_conf.set('ENABLE_CPP', get_option('with-cpp') or get_option('with-cuda'))
+sys_conf.set('ENABLE_LUA', get_option('with-lua'))
+sys_conf.set('ENABLE_CUDA', get_option('with-cuda'))
+sys_conf.set('ENABLE_PYTHON', get_option('with-python'))
+sys_conf.set('ENABLE_SANDBOX', get_option('with-sandbox'))
+configure_file(output: 'config.h', configuration: sys_conf)
 
 ######################
 # Output main library
@@ -201,7 +212,7 @@ executable(
   ['examples/readh5.cpp'],
   dependencies: [
     hdf5_lib,
-    meson.get_compiler('cpp').find_library('hdf5_vfd_gds', required: true)
+    gds_vfd_lib
   ],
   include_directories: 'src',
   install: false)

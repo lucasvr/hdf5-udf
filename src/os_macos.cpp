@@ -13,6 +13,8 @@
 #include <dirent.h>
 #include <string.h>
 #include <pwd.h>
+
+#include "config.h"
 #include "os.h"
 #ifdef ENABLE_SANDBOX
 #include "sandbox_macos.h"

@@ -1,5 +1,5 @@
 option('with-python', type: 'boolean', value: 'false', description: 'Enable Python backend')
 option('with-lua', type: 'boolean', value: false, description: 'Enable Lua backend')
 option('with-cpp', type: 'boolean', value: false, description: 'Enable C/C++ backend')
-option('with-gds', type: 'boolean', value: false, description: 'Enable NVIDIA GPUDirect Storage backend')
+option('with-cuda', type: 'boolean', value: false, description: 'Enable CUDA backend')
 option('with-sandbox', type: 'boolean', value: true, description: 'Enable sandboxing through Seccomp')

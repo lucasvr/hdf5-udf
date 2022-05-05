@@ -17,11 +17,12 @@
 #include <iostream>
 #include <fstream>
 
+#include "config.h"
 #include "io_filter.h"
 #include "dataset.h"
 #include "backend.h"
-#ifdef ENABLE_GDS
-#include "backend_gds.h"
+#ifdef ENABLE_CUDA
+#include "backend_cuda.h"
 #endif
 #include "debug.h"
 #include "user_profile.h"
@@ -62,7 +63,7 @@ std::string getLibraryPath()
 
 hid_t _getFileHandle(std::string filename, void *dfile_ptr)
 {
-#ifdef ENABLE_GDS
+#ifdef ENABLE_CUDA
     if (dfile_ptr)
     {
         DirectFile *directfile = (DirectFile *) dfile_ptr;
@@ -74,7 +75,7 @@ hid_t _getFileHandle(std::string filename, void *dfile_ptr)
 
 void _putFileHandle(hid_t file_id, void *dfile_ptr)
 {
-#ifdef ENABLE_GDS
+#ifdef ENABLE_CUDA
     if (dfile_ptr)
     {
         DirectFile *directfile = (DirectFile *) dfile_ptr;
@@ -171,11 +172,11 @@ bool readHdf5Datasets(
 
             if (dfile_ptr)
             {
-                // NVIDIA-GDS backend
-#ifdef ENABLE_GDS
-                GDSBackend *gds_backend = dynamic_cast<GDSBackend *>(backend);
-                assert(gds_backend);
-                DeviceMemory *devicememory = gds_backend->memoryHandler(rdata);
+                // CUDA backend
+#ifdef ENABLE_CUDA
+                CudaBackend *cuda_backend = dynamic_cast<CudaBackend *>(backend);
+                assert(cuda_backend);
+                DeviceMemory *devicememory = cuda_backend->memoryHandler(rdata);
 
                 Benchmark benchmark;
                 read_ok = DirectDataset::read(dset_id, (DirectFile *) dfile_ptr, *devicememory);
@@ -307,10 +308,10 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
         }
 
         void *dfile_ptr = NULL;
-#ifdef ENABLE_GDS
+#ifdef ENABLE_CUDA
         // Register the GPUDirect driver
         DirectFile directfile;
-        if (backend_name.compare("NVIDIA-GDS") == 0)
+        if (backend_name.compare("CUDA") == 0)
             dfile_ptr = (void *) &directfile;
 #endif
 
@@ -415,7 +416,7 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
                 *buf = host_mem;
                 *buf_size = nbytes = alloc_size;
             }
-            if (backend->name().compare("NVIDIA-GDS") == 0)
+            if (backend->name().compare("CUDA") == 0)
                 backend->free(output_dataset.data);
             benchmark.print("Call to user-defined function");
         }

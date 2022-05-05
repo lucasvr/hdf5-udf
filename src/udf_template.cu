@@ -63,7 +63,7 @@ const char *UserDefinedLibrary::string(const char *element)
     return element;
 }
 
-// API needed by the CUDA/GDS backend to workaround a bug in which the
+// API needed by the CUDA backend to workaround a bug in which the
 // process that loaded the shared library cannot peek into the last
 // CUDA error.
 extern "C" int hdf5_udf_last_cuda_error()

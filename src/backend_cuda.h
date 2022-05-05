@@ -1,12 +1,12 @@
 /*
  * HDF5-UDF: User-Defined Functions for HDF5
  *
- * File: backend_gds.h
+ * File: backend_cuda.h
  *
- * NVIDIA GPUDirect Storage backend definitions.
+ * CUDA backend definitions.
  */
-#ifndef __backend_gds_h
-#define __backend_gds_h
+#ifndef __backend_cuda_h
+#define __backend_cuda_h
 
 #include <hdf5.h>
 #include <cufile.h>
@@ -54,7 +54,7 @@ struct DirectDataset {
     static bool copyToHost(DeviceMemory &mm, void **host_mem);
 };
 
-class GDSBackend : public Backend {
+class CudaBackend : public Backend {
 public:
     // Backend name
     std::string name();
@@ -105,4 +105,4 @@ private:
     std::map<void*, DeviceMemory*> memory_map;
 };
 
-#endif /* __backend_gds_h */
+#endif /* __backend_cuda_h */

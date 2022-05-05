@@ -17,6 +17,7 @@
 #include <sstream>
 #include <algorithm>
 #include <lua.hpp>
+#include "config.h"
 #include "udf_template_lua.h"
 #include "backend_lua.h"
 #include "anon_mmap.h"

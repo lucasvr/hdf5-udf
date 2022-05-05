@@ -15,6 +15,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <pwd.h>
+#include "config.h"
 #include "os.h"
 
 std::string os::makeTemporaryFile(std::string template_name, std::string extension)

@@ -111,8 +111,9 @@ pieces of software to allow the embedding of bytecode and their execution:
 - `Python`: requires the [CFFI](https://pypi.org/project/cffi) module
 - `C++`: requires the [GNU C++ compiler](https://gnu.org/software/gcc) or,
    alternatively, the [Clang compiler](https://clang.llvm.org).
-- `CUDA/GDS`: requires the [NVIDIA CUDA toolchain](https://developer.nvidia.com/cuda-zone)
-   along with the [HDF5 GPUDirect Storage VFD](https://github.com/hpc-io/vfd-gds).
+- `CUDA`: requires the [NVIDIA CUDA toolchain](https://developer.nvidia.com/cuda-zone).
+   Support for [HDF5 GPUDirect Storage VFD](https://github.com/hpc-io/vfd-gds)
+   is enabled if the library is detected at build time.
 
 It is possible to compile the code so that only a restricted number of system
 calls can be executed by the user-defined functions. We rely on two packages
@@ -142,7 +143,7 @@ $ meson -Dwith-python=true -Dwith-lua=true -Dwith-cpp=true . build
 ```
 
 At least one of `-Dwith-python=true`, `-Dwith-lua=true`, `-Dwith-cpp=true`, or
-`-Dwith-gds=true` options must be set. It's still possible to build HDF5-UDF
+`-Dwith-cuda=true` options must be set. It's still possible to build HDF5-UDF
 without any of these backends, but that would be a useless outcome!
 
 Support for sandboxing is strongly encouraged to be set, so it's enabled by default.

@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <fstream>
+#include "config.h"
 #include "backend.h"
 #ifdef ENABLE_CPP
 #include "backend_cpp.h"
@@ -18,8 +19,8 @@
 #ifdef ENABLE_PYTHON
 #include "backend_python.h"
 #endif
-#ifdef ENABLE_GDS
-#include "backend_gds.h"
+#ifdef ENABLE_CUDA
+#include "backend_cuda.h"
 #endif
 #include "os.h"
 
@@ -165,9 +166,9 @@ Backend *getBackendByName(std::string name)
     if (name.compare("C++") == 0)
         return static_cast<Backend *>(new CppBackend());
 #endif
-#ifdef ENABLE_GDS
-    if (name.compare("NVIDIA-GDS") == 0)
-        return static_cast<Backend *>(new GDSBackend());
+#ifdef ENABLE_CUDA
+    if (name.compare("CUDA") == 0)
+        return static_cast<Backend *>(new CudaBackend());
 #endif
     return NULL;
 }
@@ -200,9 +201,9 @@ Backend *getBackendByFileExtension(std::string name)
     if (sameString(ext, ".cpp"))
         return static_cast<Backend *>(new CppBackend());
 #endif
-#ifdef ENABLE_GDS
+#ifdef ENABLE_CUDA
     if (sameString(ext, ".cu"))
-        return static_cast<Backend *>(new GDSBackend());
+        return static_cast<Backend *>(new CudaBackend());
 #endif
     return NULL;
 }

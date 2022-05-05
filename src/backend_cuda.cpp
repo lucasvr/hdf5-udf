@@ -1,9 +1,9 @@
 /*
  * HDF5-UDF: User-Defined Functions for HDF5
  *
- * File: backend_gds.cpp
+ * File: backend_cuda.cpp
  *
- * NVIDIA GPUDirect Storage backend implementation.
+ * CUDA backend implementation.
  */
 #include <stdio.h>
 #include <dlfcn.h>
@@ -24,25 +24,25 @@
 #include "sharedlib_manager.h"
 #include "udf_template_cu.h" // use the CUDA template file
 #include "backend_cpp.h" // reuse methods from the C++ backend
-#include "backend_gds.h"
+#include "backend_cuda.h"
 #include "anon_mmap.h"
 #include "dataset.h"
 #include "os.h"
 
 /* This backend's name */
-std::string GDSBackend::name()
+std::string CudaBackend::name()
 {
-    return "NVIDIA-GDS";
+    return "CUDA";
 }
 
 /* Extension managed by this backend */
-std::string GDSBackend::extension()
+std::string CudaBackend::extension()
 {
     return ".cu";
 }
 
 /* Compile CU to a shared object using NVCC. Returns the shared object as a string. */
-std::string GDSBackend::compile(
+std::string CudaBackend::compile(
     std::string udf_file,
     std::string compound_declarations,
     std::string &source_code,
@@ -123,7 +123,7 @@ std::string GDSBackend::compile(
 }
 
 /* Execute the user-defined-function embedded in the given buffer */
-bool GDSBackend::run(
+bool CudaBackend::run(
     const std::string libpath,
     const std::vector<DatasetInfo> &input_datasets,
     const DatasetInfo &output_dataset,
@@ -156,9 +156,10 @@ bool GDSBackend::run(
     chmod(so_file.c_str(), 0755);
 
     /*
-     * Differently from the C++ backend, the GDS backend doesn't run the
-     * UDF in a separate proces; Among the limitations of CUDA GDS, one
-     * cannot call fork() after libcufile has been used.
+     * Differently from the C++ backend, the CUDA backend doesn't run the
+     * UDF in a separate proces when GPUDirect Storage is enabled; among
+     * the limitations of GDS, one cannot call fork() after libcufile has
+     * been used.
      */
     SharedLibraryManager shlib;
     if (shlib.open(so_file) == false)
@@ -219,7 +220,7 @@ bool GDSBackend::run(
 }
 
 /* Scan the UDF file for references to HDF5 dataset names */
-std::vector<std::string> GDSBackend::udfDatasetNames(std::string udf_file)
+std::vector<std::string> CudaBackend::udfDatasetNames(std::string udf_file)
 {
     std::vector<std::string> output;
     std::string input;
@@ -256,7 +257,7 @@ std::vector<std::string> GDSBackend::udfDatasetNames(std::string udf_file)
 }
 
 /* Create a textual declaration of a struct given a compound map */
-std::string GDSBackend::compoundToStruct(const DatasetInfo &info, bool hardcoded_name)
+std::string CudaBackend::compoundToStruct(const DatasetInfo &info, bool hardcoded_name)
 {
     // We use GCC's __attribute__((packed)) to ensure the structure
     // is byte-aligned. This is required so that we can iterate over
@@ -281,7 +282,7 @@ std::string GDSBackend::compoundToStruct(const DatasetInfo &info, bool hardcoded
 }
 
 /* Allocate memory for an input or scratch dataset in device memory */
-void *GDSBackend::alloc(size_t size)
+void *CudaBackend::alloc(size_t size)
 {
     DeviceMemory *devicememory = new DeviceMemory(size);
     if (! devicememory->dev_mem)
@@ -294,7 +295,7 @@ void *GDSBackend::alloc(size_t size)
 }
 
 /* Free memory previously allocated for an input or scratch dataset */
-void GDSBackend::free(void *mem)
+void CudaBackend::free(void *mem)
 {
     std::map<void*, DeviceMemory*>::iterator it = memory_map.find(mem);
     if (it != memory_map.end())
@@ -306,7 +307,7 @@ void GDSBackend::free(void *mem)
 }
 
 /* Copy data from device memory to a newly allocated memory chunk in the host */
-void *GDSBackend::deviceToHost(void *dev_mem, size_t size)
+void *CudaBackend::deviceToHost(void *dev_mem, size_t size)
 {
     std::map<void*, DeviceMemory*>::iterator it = memory_map.find(dev_mem);
     if (it == memory_map.end())
@@ -338,7 +339,7 @@ void *GDSBackend::deviceToHost(void *dev_mem, size_t size)
 }
 
 /* Get a reference to the memory handler of the given device memory address */
-DeviceMemory *GDSBackend::memoryHandler(void *dev_mem)
+DeviceMemory *CudaBackend::memoryHandler(void *dev_mem)
 {
     std::map<void*, DeviceMemory*>::iterator it = memory_map.find(dev_mem);
     if (it == memory_map.end())
@@ -350,7 +351,7 @@ DeviceMemory *GDSBackend::memoryHandler(void *dev_mem)
 }
 
 /* Zeroes out a range of memory previously allocated for an input or scratch dataset */
-void GDSBackend::clear(void *dev_mem, size_t size)
+void CudaBackend::clear(void *dev_mem, size_t size)
 {
     std::map<void*, DeviceMemory*>::iterator it = memory_map.find(dev_mem);
     if (it == memory_map.end())

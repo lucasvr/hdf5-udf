@@ -1,9 +1,9 @@
 /*
  * HDF5-UDF: User-Defined Functions for HDF5
  *
- * File: backend_gds_classes.cpp
+ * File: backend_cuda_mm.cpp
  *
- * NVIDIA GPUDirect Storage backend helper classes.
+ * CUDA backend helper classes.
  */
 #include <stdio.h>
 #include <sys/types.h>
@@ -25,7 +25,7 @@
 #include <string>
 #include <tuple>
 #include <vector>
-#include "backend_gds.h"
+#include "backend_cuda.h"
 #include "dataset.h"
 #include "debug.h"
 #include "os.h"

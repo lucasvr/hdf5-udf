@@ -19,6 +19,7 @@
 #include <sstream>
 #include <string>
 #include <algorithm>
+#include "config.h"
 #include "sharedlib_manager.h"
 #include "udf_template_cpp.h"
 #include "backend_cpp.h"
