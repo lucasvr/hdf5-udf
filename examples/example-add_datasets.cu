@@ -26,4 +26,5 @@ extern "C" void dynamic_dataset()
     int block_size = 1024;
     int grid_size = (int) ceil((float) (n * sizeof(int))/block_size);
     add<<<grid_size, block_size>>>(ds1_data, ds2_data, udf_data, n);
+    cudaDeviceSynchronize();
 }
