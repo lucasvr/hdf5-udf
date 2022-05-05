@@ -314,6 +314,14 @@ void *GDSBackend::deviceToHost(void *dev_mem, size_t size)
         fprintf(stderr, "Provided device memory address not managed by ourselves\n");
         return NULL;
     }
+    auto mm = it->second;
+    if (size != mm->size)
+    {
+        fprintf(stderr, "Buffer has %ld bytes on device memory but %ld bytes on system memory\n",
+            mm->size, size);
+        return NULL;
+    }
+
     void *host_mem = malloc(size);
     if (! host_mem)
     {
