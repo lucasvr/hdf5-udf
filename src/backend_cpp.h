@@ -42,12 +42,20 @@ public:
     // Create a textual declaration of a struct given a compound map
     std::string compoundToStruct(const DatasetInfo &info, bool hardcoded_name);
 
-private:
+    // The following methods are made public so they can be reused by
+    // other backends
+
+    // Generate UDF methods for string-based datasets
+    void generateUDFMethods(
+        const std::vector<DatasetInfo> &datasets,
+        std::string &methods_decl,
+        std::string &methods_impl);
+
     // Compress a data buffer
-    std::string compressBuffer(const char *data, size_t usize);
+    static std::string compressBuffer(const char *data, size_t usize);
 
     // Decompress a data buffer
-    std::string decompressBuffer(const char *data, size_t csize);
+    static std::string decompressBuffer(const char *data, size_t csize);
 };
 
 #endif /* __backend_cpp_h */

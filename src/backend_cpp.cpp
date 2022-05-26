@@ -19,6 +19,7 @@
 #include <sstream>
 #include <string>
 #include <algorithm>
+#include "config.h"
 #include "sharedlib_manager.h"
 #include "udf_template_cpp.h"
 #include "backend_cpp.h"
@@ -39,14 +40,13 @@ std::string CppBackend::extension()
     return ".cpp";
 }
 
-/* Compile C to a shared object using GCC. Returns the shared object as a string. */
-std::string CppBackend::compile(
-    std::string udf_file,
-    std::string compound_declarations,
-    std::string &source_code,
-    std::vector<DatasetInfo> &datasets)
+/* Generate UDF methods for string-based dataset */
+void CppBackend::generateUDFMethods(
+    const std::vector<DatasetInfo> &datasets,
+    std::string &methods_decl,
+    std::string &methods_impl)
 {
-    std::string methods_decl, methods_impl, spaces;
+    std::string spaces;
     for (auto &info: datasets)
     {
         if (info.datatype.compare(0, 6, "string") == 0)
@@ -65,9 +65,20 @@ std::string CppBackend::compile(
             methods_impl += spaces + "vsnprintf((char *) element.value, sizeof(element.value), format, argptr);\n";
             methods_impl += spaces + "va_end(argptr);\n";
             methods_impl += "}\n\n";
-
         }
     }
+}
+
+/* Compile C to a shared object using GCC. Returns the shared object as a string. */
+std::string CppBackend::compile(
+    std::string udf_file,
+    std::string compound_declarations,
+    std::string &source_code,
+    std::vector<DatasetInfo> &datasets)
+{
+    std::string methods_decl, methods_impl;
+    generateUDFMethods(datasets, methods_decl, methods_impl);
+
     AssembleData data = {
         .udf_file                 = udf_file,
         .template_string          = std::string((char *) udf_template_cpp),
