@@ -104,13 +104,14 @@ directory.
 
 ## Requirements
 
-HDF5-UDF comes with three backends, each of which requiring different
+HDF5-UDF comes with four backends, each of which requiring different
 pieces of software to allow the embedding of bytecode and their execution:
 
 - `Lua`: requires the [LuaJIT](https://luajit.org/install.html) package
 - `Python`: requires the [CFFI](https://pypi.org/project/cffi) module
-- `C/C++`: requires the [GNU C++ compiler](https://gnu.org/software/gcc) or,
+- `C++`: requires the [GNU C++ compiler](https://gnu.org/software/gcc) or,
    alternatively, the [Clang compiler](https://clang.llvm.org).
+- `CUDA`: requires the [NVIDIA CUDA toolchain](https://developer.nvidia.com/cuda-zone).
 
 It is possible to compile the code so that only a restricted number of system
 calls can be executed by the user-defined functions. We rely on two packages
@@ -139,9 +140,9 @@ $ mkdir -p build
 $ meson -Dwith-python=true -Dwith-lua=true -Dwith-cpp=true . build
 ```
 
-At least one of `-Dwith-python=true`, `-Dwith-lua=true`, or `-Dwith-cpp=true` options
-must be set. It's still possible to build HDF5-UDF without any of these backends, but
-that would be a useless outcome!
+At least one of `-Dwith-python=true`, `-Dwith-lua=true`, `-Dwith-cpp=true`, or
+`-Dwith-cuda=true` options must be set. It's still possible to build HDF5-UDF
+without any of these backends, but that would be a useless outcome!
 
 Support for sandboxing is strongly encouraged to be set, so it's enabled by default.
 If you are conducting local tests and do not plan on reading datasets provided by

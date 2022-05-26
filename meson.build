@@ -42,6 +42,12 @@ udf_template_cpp = custom_target(
   output: ['udf_template_cpp.h'],
   command: [file2hex, '@INPUT@', '@SOURCE_ROOT@/src/@OUTPUT@']
 )
+udf_template_cu = custom_target(
+  'udf_template_cu',
+  input: ['src/udf_template.cu'],
+  output: ['udf_template_cu.h'],
+  command: [file2hex, '@INPUT@', '@SOURCE_ROOT@/src/@OUTPUT@']
+)
 udf_template_lua = custom_target(
   'udf_template_lua',
   input: ['src/udf_template.lua'],
@@ -79,9 +85,20 @@ if get_option('with-python')
   ]
 endif
 
-if get_option('with-cpp')
+if get_option('with-cpp') or get_option('with-cuda')
   sources += ['src/backend_cpp.cpp', 'src/miniz.cpp']
   deps += [meson.get_compiler('cpp').find_library('m', required: true)]
+endif
+
+if get_option('with-cuda')
+  sources += ['src/backend_cuda.cpp', 'src/backend_cuda_posix.cpp']
+  cuda_libdir = '/usr/local/cuda/targets/x86_64-linux/lib'
+  deps += [
+    meson.get_compiler('cpp').find_library('cufile', dirs: cuda_libdir, required: true),
+    meson.get_compiler('cpp').find_library('cudart', dirs: cuda_libdir, required: true),
+    meson.get_compiler('cpp').find_library('nvcomp', required: true),
+  ]
+  add_global_arguments('-I/usr/local/cuda/targets/x86_64-linux/include', language: 'cpp')
 endif
 
 if get_option('with-lua')
@@ -104,6 +121,7 @@ message('\n' +
 '\n    Python support:      ' + get_option('with-python').to_string() +
 '\n    C/C++ support:       ' + (get_option('with-cpp') or get_option('with-cuda')).to_string() +
 '\n    Lua support:         ' + get_option('with-lua').to_string() +
+'\n    CUDA support:        ' + get_option('with-cuda').to_string() +
 '\n    Sandbox support:     ' + get_option('with-sandbox').to_string() +
 '\n')
 
@@ -114,6 +132,7 @@ message('\n' +
 sys_conf = configuration_data()
 sys_conf.set('ENABLE_CPP', get_option('with-cpp') or get_option('with-cuda'))
 sys_conf.set('ENABLE_LUA', get_option('with-lua'))
+sys_conf.set('ENABLE_CUDA', get_option('with-cuda'))
 sys_conf.set('ENABLE_PYTHON', get_option('with-python'))
 sys_conf.set('ENABLE_SANDBOX', get_option('with-sandbox'))
 configure_file(output: 'config.h', configuration: sys_conf)
@@ -124,7 +143,7 @@ configure_file(output: 'config.h', configuration: sys_conf)
 
 hdf5_udf_lib = shared_library(
   'hdf5-udf',
-  sources + [udf_template_cpp, udf_template_lua, udf_template_py],
+  sources + [udf_template_cpp, udf_template_cu, udf_template_lua, udf_template_py],
   version: '2.1',
   soversion: '0',
   dependencies: deps,

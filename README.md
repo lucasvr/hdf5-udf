@@ -13,6 +13,7 @@ UDFs on their datasets.
     - [CPython backend](#cpython-backend)
     - [C++ backend](#c++-backend)
     - [LuaJIT backend](#luajit-backend)
+    - [CUDA backend](#cuda-backend)
 2. [User-Defined Functions API](#user-defined-functions-api)
     - [Supported datatypes](#supported-datatypes)
     - [HDF5 groups](#hdf5-groups)
@@ -77,6 +78,12 @@ into HDF5.
 UDFs written in Lua are processed by the LuaJIT interpreter. The output bytecode
 is saved into HDF5 and interpreted by LuaJIT's just-in-time compiler when the
 dataset is read by the application.
+
+## CUDA backend
+
+The CUDA backend allows code written in CUDA to be compiled with NVIDIA's `nvcc`.
+Just like with the C++ backend, the resulting shared library is compressed and
+saved into HDF5.
 
 # User-Defined Functions API
 
