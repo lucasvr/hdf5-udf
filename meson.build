@@ -77,19 +77,16 @@ if get_option('with-python')
     dependency('python3', required: true),
     dependency('python3-embed', required: false)
   ]
-  add_global_arguments('-DENABLE_PYTHON', language: 'cpp')
 endif
 
 if get_option('with-cpp')
   sources += ['src/backend_cpp.cpp', 'src/miniz.cpp']
   deps += [meson.get_compiler('cpp').find_library('m', required: true)]
-  add_global_arguments('-DENABLE_CPP', language: 'cpp')
 endif
 
 if get_option('with-lua')
   sources += ['src/backend_lua.cpp']
   deps += [dependency('luajit', required: true)]
-  add_global_arguments('-DENABLE_LUA', language: 'cpp')
 endif
 
 if get_option('with-sandbox')
@@ -99,17 +96,27 @@ if get_option('with-sandbox')
   elif build_machine.system() == 'darwin'
     sources += ['src/sandbox_macos.cpp']
   endif
-  add_global_arguments('-DENABLE_SANDBOX', language: 'cpp')
 endif
 
 message('\n' +
 '\n  HDF5-UDF: User-Defined Functions for HDF5\n' +
 '\n  Configuration' +
-'\n    Python support : ' + get_option('with-python').to_string() +
-'\n    C/C++ support  : ' + get_option('with-cpp').to_string() +
-'\n    Lua support    : ' + get_option('with-lua').to_string() +
-'\n    Sandbox support: ' + get_option('with-sandbox').to_string() +
+'\n    Python support:      ' + get_option('with-python').to_string() +
+'\n    C/C++ support:       ' + (get_option('with-cpp') or get_option('with-cuda')).to_string() +
+'\n    Lua support:         ' + get_option('with-lua').to_string() +
+'\n    Sandbox support:     ' + get_option('with-sandbox').to_string() +
 '\n')
+
+##############
+# Header file
+##############
+
+sys_conf = configuration_data()
+sys_conf.set('ENABLE_CPP', get_option('with-cpp') or get_option('with-cuda'))
+sys_conf.set('ENABLE_LUA', get_option('with-lua'))
+sys_conf.set('ENABLE_PYTHON', get_option('with-python'))
+sys_conf.set('ENABLE_SANDBOX', get_option('with-sandbox'))
+configure_file(output: 'config.h', configuration: sys_conf)
 
 ######################
 # Output main library
@@ -176,4 +183,5 @@ executable(
   'readh5',
   ['examples/readh5.cpp'],
   dependencies: [hdf5_lib],
+  include_directories: 'src',
   install: false)

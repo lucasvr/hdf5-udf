@@ -17,6 +17,7 @@
 #include <iostream>
 #include <fstream>
 
+#include "config.h"
 #include "io_filter.h"
 #include "dataset.h"
 #include "backend.h"

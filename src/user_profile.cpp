@@ -18,6 +18,7 @@
 #include <string>
 #include <iomanip>
 
+#include "config.h"
 #include "user_profile.h"
 #include "file_search.h"
 #include "sysdefs.h"

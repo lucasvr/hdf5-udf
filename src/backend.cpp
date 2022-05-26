@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <fstream>
+#include "config.h"
 #include "backend.h"
 #ifdef ENABLE_CPP
 #include "backend_cpp.h"

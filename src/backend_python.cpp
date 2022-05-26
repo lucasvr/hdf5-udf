@@ -18,6 +18,7 @@
 #include <locale>
 #include <codecvt>
 #include <algorithm>
+#include "config.h"
 #include "udf_template_py.h"
 #include "backend_python.h"
 #include "backend_cpp.h"
