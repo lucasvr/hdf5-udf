@@ -5,8 +5,6 @@ compiler:
 
 before_install:
 - sudo apt install -y wget gnupg
-- echo "deb https://lucasvr.gobolinux.org/debian/repo/ /" | sudo tee -a /etc/apt/sources.list
-- wget -q -O - https://lucasvr.gobolinux.org/debian/repo/KEY.gpg | sudo apt-key add -
 - sudo apt-get -qq update
 - sudo apt install -y luajit libluajit-5.1-dev libseccomp-dev libsodium-dev libhdf5-dev hdf5-tools numdiff libpcre++-dev
 - sudo apt install -y python3-pip pkg-config cmake meson
