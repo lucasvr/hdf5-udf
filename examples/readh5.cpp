@@ -45,13 +45,15 @@ int main(int argc, char **argv)
         return 1;
     }
 
+#ifdef HAVE_DIRECT
     size_t alignment = 1024, block_size = 0, copy_buffer_size = 4096 * 8;
     if (H5Pset_fapl_direct(fapl_id, alignment, block_size, copy_buffer_size) < 0)
     {
         H5Pclose(fapl_id);
         fprintf(stderr, "Failed to enable the HDF5 direct I/O driver\n");
-	return 1;
+	    return 1;
     }
+#endif
 
     hid_t file_id = H5Fopen(hdf5_file.c_str(), H5F_ACC_RDONLY, fapl_id);
     if (file_id < 0)
