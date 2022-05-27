@@ -11,8 +11,6 @@ before_install:
 - wget https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5-1_12_1.tar.gz
 - tar zxf hdf5-1_12_1.tar.gz
 - pushd hdf5-hdf5-1_12_1; mkdir build; cd build; cmake -DHDF5_ENABLE_DIRECT_VFD=ON ..; make -j$(nproc); sudo make install; popd
-- sudo make install
-
 
 script:
 - mkdir -p build
