@@ -4,11 +4,13 @@ compiler:
 - clang
 
 before_install:
-- sudo apt install -y wget gnupg
 - sudo apt-get -qq update
-- sudo apt install -y luajit libluajit-5.1-dev libseccomp-dev libsodium-dev libhdf5-dev hdf5-tools numdiff libpcre++-dev
-- sudo apt install -y python3-pip pkg-config cmake meson
-- sudo pip3 install cffi
+- sudo apt install -y luajit libluajit-5.1-dev 
+- sudo apt install -y libseccomp-dev libsodium-dev numdiff libpcre++-dev
+- sudo pip3 install cffi meson ninja
+- wget https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5-1_12_1.tar.gz
+- tar zxf hdf5-1_12_1.tar.gz
+- pushd hdf5-hdf5-1_12_1; mkdir build; cd build; cmake -DHDF5_ENABLE_DIRECT_VFD=ON ..; make -j$(nproc); sudo make install; popd
 
 script:
 - mkdir -p build
@@ -17,4 +19,4 @@ script:
 - pushd test; ./run_tests.sh || travis_terminate 1; popd
 
 env:
-- HDF5_PLUGIN_PATH=$PWD/build PATH=$PATH:$PWD/build LD_LIBRARY_PATH=/usr/lib/python3.5/config-3.5m-x86_64-linux-gnu
+- PATH=$PATH:$PWD/build:/usr/local/HDF_Group/HDF5/1.12.1/bin LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/python3.6/config-3.6m-x86_64-linux-gnu:/usr/local/HDF_Group/HDF5/1.12.1/lib PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/HDF_Group/HDF5/1.12.1/lib/pkgconfig HDF5_PLUGIN_PATH=$PWD/build
