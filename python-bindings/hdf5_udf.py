@@ -49,6 +49,8 @@ class UserDefinedFunction:
         self.ctx = lib.libudf_init(
             bytes(hdf5_file, 'utf-8'),
             bytes(udf_file, 'utf-8'))
+        if self.ctx == ffi.NULL:
+            raise RuntimeError("Failed to initialize libhdf5-udf")
 
     def __enter__(self):
         return self
