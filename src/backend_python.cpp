@@ -30,6 +30,9 @@
 // Dataset names, sizes, and types
 static std::vector<DatasetInfo> dataset_info;
 
+// Path to the input HDF5 file
+static std::string input_hdf5_path;
+
 // Buffer used to hold the compound-to-struct name produced by pythonGetCast()
 static char compound_cast_name[256];
 
@@ -82,6 +85,11 @@ extern "C" const char *pythonGetDims(const char *element)
             return dataset_info[i].dimensions_str.c_str();
     fprintf(stderr, "%s: dataset %s not found\n", __func__, element);
     return NULL;
+}
+
+extern "C" const char *pythonGetFilePath()
+{
+    return input_hdf5_path.c_str();
 }
 
 /* This backend's name */
@@ -301,6 +309,8 @@ bool PythonBackend::run(
     dataset_info.push_back(std::move(output_dataset_copy));
     dataset_info.insert(
         dataset_info.end(), input_datasets.begin(), input_datasets.end());
+
+    input_hdf5_path = this->hdf5_file_path;
 
     // Init Python interpreter if needed
     PythonInterpreter python;

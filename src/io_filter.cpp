@@ -87,7 +87,7 @@ void _putFileHandle(hid_t file_id, void *dfile_ptr)
 }
 
 /* Retrieve the HDF5 file handle associated with a given dataset name */
-hid_t getDatasetHandle(std::string dataset, bool *handle_from_procfs, void *dfile_ptr)
+hid_t getDatasetHandle(std::string dataset, std::string &hdf5_path, bool *handle_from_procfs, void *dfile_ptr)
 {
     for (auto &fname: os::openedH5Files())
     {
@@ -108,6 +108,7 @@ hid_t getDatasetHandle(std::string dataset, bool *handle_from_procfs, void *dfil
 
         if (file_id >= 0 && H5Lexists(file_id, dataset.c_str(), H5P_DEFAULT ) > 0) {
             *handle_from_procfs = true;
+            hdf5_path = fname;
             return file_id;
         }
         if (file_id >= 0)
@@ -320,12 +321,14 @@ const unsigned int *cd_values, size_t nbytes, size_t *buf_size, void **buf)
 
         /* Workaround for lack of API to retrieve the HDF5 file handle from the filter callback */
         bool handle_from_procfs = false;
-        hid_t file_id = getDatasetHandle(output_name, &handle_from_procfs, dfile_ptr);
+        std::string hdf5_path = "";
+        hid_t file_id = getDatasetHandle(output_name, hdf5_path, &handle_from_procfs, dfile_ptr);
         if (file_id == -1)
         {
             delete blob;
             return 0;
         }
+        backend->setFilePath(hdf5_path);
 
         /* Allocate room for input data */
         std::vector<DatasetHandle *> input_handles;

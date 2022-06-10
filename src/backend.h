@@ -118,6 +118,14 @@ public:
 
     // Helper function: converts a string into a valid C variable name
     std::string sanitizedName(std::string name);
+
+    // Helper function: set the path to the input HDF5 file
+    void setFilePath(std::string path)
+    {
+        hdf5_file_path = path;
+    }
+
+    std::string hdf5_file_path;
 };
 
 // Get a backend by their name (e.g., "LuaJIT")

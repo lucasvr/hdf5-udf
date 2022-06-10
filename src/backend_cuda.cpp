@@ -181,6 +181,7 @@ bool CudaBackend::run(
 
     /* Get references to the UDF and the APIs defined in our C++ template */
     void (*udf)(void) = (void (*)()) shlib.loadsym("dynamic_dataset");
+    auto hdf5_file_path = static_cast<const char **>(shlib.loadsym("hdf5_file_path"));
     auto hdf5_udf_data =
         static_cast<std::vector<void *>*>(shlib.loadsym("hdf5_udf_data"));
     auto hdf5_udf_names =
@@ -190,7 +191,7 @@ bool CudaBackend::run(
     auto hdf5_udf_dims =
         static_cast<std::vector<std::vector<hsize_t>>*>(shlib.loadsym("hdf5_udf_dims"));
     int (*hdf5_udf_last_cuda_error)(void) = (int (*)()) shlib.loadsym("hdf5_udf_last_cuda_error");
-    if (! udf || ! hdf5_udf_data || ! hdf5_udf_names ||
+    if (! udf || ! hdf5_file_path || ! hdf5_udf_data || ! hdf5_udf_names ||
         ! hdf5_udf_types || ! hdf5_udf_dims || ! hdf5_udf_last_cuda_error)
         return false;
 
@@ -216,6 +217,8 @@ bool CudaBackend::run(
         hdf5_udf_types->push_back(dataset_info[i].getDatatypeName());
         hdf5_udf_dims->push_back(dataset_info[i].dimensions);
     }
+
+    *hdf5_file_path = this->hdf5_file_path.c_str();
 
     /* Run the UDF */
     udf();

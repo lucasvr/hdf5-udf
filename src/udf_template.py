@@ -25,11 +25,17 @@ class PythonLib:
             const char *pythonGetType(const char *);
             const char *pythonGetCast(const char *);
             const char *pythonGetDims(const char *);
+            const char *pythonGetFilePath(void);
             // compound_declarations_placeholder
             """, packed=True)
 
         # self.udflib is initialized from C code
         # self.udflib = self.ffi.dlopen(libpath)
+
+    def getFilePath(self):
+        """Retrieve the path to the input HDF5 file.
+        """
+        return self.ffi.string(self.udflib.pythonGetFilePath())
 
     def string(self, structure):
         """Retrieve the value of a HDF5 string datatype.

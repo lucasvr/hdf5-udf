@@ -36,6 +36,7 @@ static char compound_cast_name[256];
 #define TYPE_OFFSET(i)        (void *) (((char *) &State) + 300 + i)
 #define CAST_OFFSET(i)        (void *) (((char *) &State) + 400 + i)
 #define SIZE_OFFSET(i)        (void *) (((char *) &State) + 500 + i)
+#define FILE_OFFSET(i)        (void *) (((char *) &State) + 600 + i)
 
 extern "C" int index_of(const char *element)
 {
@@ -54,6 +55,13 @@ extern "C" int index_of(const char *element)
 }
 
 /* Functions exported to the Lua template library */
+extern "C" const char *luaGetFilePath(void)
+{
+    lua_pushlightuserdata(State, FILE_OFFSET(0));
+    lua_gettable(State, LUA_REGISTRYINDEX);
+    return lua_tostring(State, -1);
+}
+
 extern "C" void *luaGetData(const char *element)
 {
     int index = index_of(element);
@@ -287,6 +295,11 @@ bool LuaBackend::run(
         lua_pushnumber(L, dataset_info[i].getStorageSize());
         lua_settable(L, LUA_REGISTRYINDEX);
     }
+
+    /* Input HDF5 file path */
+    lua_pushlightuserdata(L, FILE_OFFSET(0));
+    lua_pushstring(L, hdf5_file_path.c_str());
+    lua_settable(L, LUA_REGISTRYINDEX);
 
     int retValue = luaL_loadbuffer(L, bytecode, bytecode_size, "hdf5_udf_bytecode");
     if (retValue != 0)

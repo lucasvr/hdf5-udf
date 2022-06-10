@@ -12,6 +12,7 @@ function init(libpath)
     local ffi = require("ffi")
     local udflib = ffi.load(libpath)
     ffi.cdef[[
+        const char *luaGetFilePath(void);
         void       *luaGetData(const char *);
         const char *luaGetType(const char *);
         const char *luaGetCast(const char *);
@@ -19,6 +20,10 @@ function init(libpath)
         int         luaGetElementSize(const char *);
         // compound_declarations_placeholder
     ]]
+
+    lib.getFilePath = function()
+        return ffi.string(udflib.luaGetFilePath())
+    end
 
     lib.string = function(name)
         local type = tostring(ffi.typeof(name)):gsub("ctype<", ""):gsub("( ?)[&>?]", "")

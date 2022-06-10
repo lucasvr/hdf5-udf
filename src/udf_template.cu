@@ -17,6 +17,7 @@ std::vector<void *> hdf5_udf_data;
 std::vector<const char *> hdf5_udf_names;
 std::vector<const char *> hdf5_udf_types;
 std::vector<std::vector<size_t> > hdf5_udf_dims;
+const char *hdf5_file_path;
 
 // compound_declarations_placeholder
 
@@ -31,6 +32,11 @@ public:
     const char *string(const char *element);
     // methods_declaration_placeholder
 };
+
+const char *UserDefinedLibrary::getFilePath()
+{
+    return hdf5_file_path;
+}
 
 template <class T>
 T *UserDefinedLibrary::getData(std::string name)
