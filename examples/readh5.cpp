@@ -88,24 +88,37 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    hsize_t dims[2] = {0, 0};
     hid_t type_id = H5Dget_type(dataset_id);
     hid_t space_id = H5Dget_space(dataset_id);
     size_t datatype_size = H5Tget_size(type_id);
     int ndims = H5Sget_simple_extent_ndims(space_id);
-    if (ndims != 2)
+    if (ndims == 1)
     {
-        fprintf(stderr, "Expected a dataset with 2 dimensions, got %d instead\n", ndims);
+        H5Sget_simple_extent_dims(space_id, dims, NULL);
+        dims[1] = 1;
+    }
+    else if (ndims == 2)
+    {
+        H5Sget_simple_extent_dims(space_id, dims, NULL);
+    }
+    else
+    {
+        fprintf(stderr, "Expected a dataset with 1 or 2 dimensions, got %d instead\n", ndims);
         return 1;
     }
-    hsize_t dims[2] = {0, 0};
-    H5Sget_simple_extent_dims(space_id, dims, NULL);
 
     uint8_t *rdata = new uint8_t[dims[0] * dims[1] * datatype_size];
-    bool is_float = false;
+    bool is_float = false, is_double = false;
     if (H5Tequal(type_id, H5T_NATIVE_INT))
         H5Dread(dataset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata);
     else if (H5Tequal(type_id, H5T_NATIVE_UINT8))
         H5Dread(dataset_id, H5T_NATIVE_UINT8, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata);
+    else if (H5Tequal(type_id, H5T_NATIVE_DOUBLE))
+    {
+        H5Dread(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata);
+        is_double = true;
+    }
     else if (H5Tequal(type_id, H5T_NATIVE_FLOAT))
     {
         H5Dread(dataset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rdata);
@@ -113,7 +126,7 @@ int main(int argc, char **argv)
     }
     else
     {
-        fprintf(stderr, "We're only ready to deal with INT/UINT8 data types, sorry!\n");
+        fprintf(stderr, "We're only able to deal with INT/UINT8/FLOAT/DOUBLE data types\n");
         return 1;
     }
     H5Sclose(space_id);
@@ -191,6 +204,8 @@ int main(int argc, char **argv)
             {
                 if (is_float)
                     cur += snprintf(cur, end-cur, "%.1f ", (float) rdata[i]);
+                else if (is_double)
+                    cur += snprintf(cur, end-cur, "%.1f ", (double) rdata[i]);
                 else
                     cur += snprintf(cur, end-cur, "%d", (int) rdata[i]);
             }
