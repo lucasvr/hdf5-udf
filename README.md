@@ -99,6 +99,8 @@ functions to interface with HDF5 datasets:
 - `lib.string(member)`: get the value of a string datatype
 - `lib.setString(member, value)`: write the given value to a string datatype.
    This API does boundary checks to prevent buffer overflows
+- `lib.getFilePath()`: absolute pathname of the HDF5 file where the
+   UDF dataset is stored
 
 The user-provided function must be named `dynamic_dataset`. That
 function takes no input and produces no output; data exchange is
