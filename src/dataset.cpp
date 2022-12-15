@@ -247,10 +247,10 @@ const char *DatasetInfo::getCastDatatype() const
 
 void DatasetInfo::printInfo(std::string dataset_type) const
 {
-    printf("%s dataset: %s, resolution=%lld",
+    printf("%s dataset: %s, resolution=%lu",
         dataset_type.c_str(), name.c_str(), dimensions.size() ? dimensions[0] : -1);
     for (size_t i=1; i<dimensions.size(); ++i)
-        printf("x%lld", dimensions[i]);
+        printf("x%lu", dimensions[i]);
     size_t size = H5Tget_size(hdf5_datatype);
     printf(", datatype=%s, size=%ld\n", datatype.c_str(), size);
 }
