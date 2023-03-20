@@ -77,6 +77,9 @@ $ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/opt/luajit-openresty/lib/pk
 $ export PATH=$PATH:/usr/local/opt/luajit-openresty/bin
 ```
 
+Note that on Apple Silicon (M1 and M2 processors) Homebrew is installed on
+`/opt/homebrew`, so you may need to adjust the variables above accordingly.
+
 ## Windows
 
 Please use the provided installer to have HDF5-UDF installed on your machine.
@@ -142,7 +145,7 @@ $ meson -Dwith-python=true -Dwith-lua=true -Dwith-cpp=true . build
 
 At least one of `-Dwith-python=true`, `-Dwith-lua=true`, `-Dwith-cpp=true`, or
 `-Dwith-cuda=true` options must be set. It's still possible to build HDF5-UDF
-without any of these backends, but that would be a useless outcome!
+without any of these backends, but that would be kind of pointless!
 
 Support for sandboxing is strongly encouraged to be set, so it's enabled by default.
 If you are conducting local tests and do not plan on reading datasets provided by
