@@ -74,11 +74,13 @@ int main(int argc, char **argv)
         return 1;
     }
     
+#ifdef __linux__
     int file_fd = *((int *) file_handle);
     struct stat statbuf;
     fstat(file_fd, &statbuf);
     if (posix_fadvise(file_fd, 0, statbuf.st_size, POSIX_FADV_DONTNEED) < 0)
         fprintf(stderr, "Warning: failed to drop file cache\n");
+#endif
 
     // Read dataset
     hid_t dataset_id = H5Dopen(file_id, hdf5_dataset.c_str(), H5P_DEFAULT);

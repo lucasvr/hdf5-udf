@@ -9,7 +9,6 @@
 #include <sys/utsname.h>
 #include <sys/stat.h>
 #include <stdlib.h>
-#include <seccomp.h>
 #include <unistd.h>
 #include <dirent.h>
 #include <string.h>
